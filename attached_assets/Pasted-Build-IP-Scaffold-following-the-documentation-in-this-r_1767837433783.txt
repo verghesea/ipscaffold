@@ -1,0 +1,158 @@
+Build IP Scaffold following the documentation in this repository.
+
+  Start with INSTRUCTIONS_FOR_REPLIT.md - this is your comprehensive build guide.
+
+  Key requirements:
+  - Use the Refined Editorial design (not basic Tailwind)
+  - Follow the 7-phase implementation order
+  - Use complete code from CODE_EXAMPLES.md
+  - Use AI prompts exactly from PRD.md
+  - Create all files per IMPLEMENTATION_GUIDE.md structure
+
+  I'll provide API keys when you're ready to configure.
+
+  ---
+  🔑 What You Need Before Building
+
+  Get these API keys:
+
+  1. Anthropic Claude API (Required)
+    - Sign up: https://console.anthropic.com
+    - Get API key from dashboard
+    - Cost: ~$0.27 per patent processed
+  2. SendGrid API (Required for emails)
+    - Sign up: https://sendgrid.com
+    - Free tier: 100 emails/day
+    - Verify sender email in dashboard
+  3. Flask Secret Key (Required)
+    - Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+  4. Sample Patent PDF (For testing)
+    - Download from: https://patents.google.com
+    - Any US utility patent works
+
+  ---
+  📁 All Documentation Files
+
+  Core Build Docs:
+
+  1. ✅ README.md - Overview
+  2. ✅ INSTRUCTIONS_FOR_REPLIT.md - Main build guide
+  3. ✅ QUICK_START_REPLIT.md - Quick reference
+  4. ✅ IMPLEMENTATION_GUIDE.md - Step-by-step instructions
+  5. ✅ CODE_EXAMPLES.md - Complete working code
+
+  Specifications:
+
+  6. ✅ PRD.md - Product requirements (includes AI prompts!)
+  7. ✅ DATABASE_SCHEMA.md - Database design
+  8. ✅ API_SPECIFICATION.md - All endpoints
+
+  Admin System:
+
+  9. ✅ ADMIN_DASHBOARD.md - Admin functionality spec
+  10. ✅ ADMIN_TEMPLATES.md - Basic admin templates
+
+  Refined Editorial Design:
+
+  11. ✅ FRONTEND_REFINED_EDITORIAL.md - Design system + landing
+  12. ✅ FRONTEND_REFINED_EDITORIAL_PART2.md - User templates
+  13. ✅ FRONTEND_ADMIN_EDITORIAL.md - Admin templates
+  14. ✅ DESIGN_IMPLEMENTATION_GUIDE.md - Design guide
+
+  ---
+  🚀 Build Process Overview
+
+  Replit AI will build in this order:
+
+  1. Setup (30 min) - Project structure, dependencies, config
+  2. Database (1 hour) - 5 models with relationships
+  3. Services (2 hours) - PDF parsing, AI generation, emails, downloads
+  4. Routes (2 hours) - Public, auth, dashboard, admin endpoints
+  5. Frontend (2 hours) - Refined editorial templates
+  6. Admin (1 hour) - Admin dashboard (optional)
+  7. Testing (30 min) - Full user flow validation
+
+  Total estimated time: 6-8 hours
+
+  ---
+  ✨ What You're Getting
+
+  User Experience:
+  - Beautiful editorial-style landing page
+  - PDF upload with drag-and-drop
+  - AI-generated insights (ELIA15, Business Narrative, Golden Circle)
+  - Magic link authentication (no passwords)
+  - Elegant dashboard
+  - Download artifacts as PDF/DOCX/TXT
+  - 100 free credits ($2/patent after)
+
+  Admin Dashboard:
+  - User management with search/filter
+  - Patent analytics
+  - Usage metrics and charts
+  - Credit tracking
+  - CSV exports
+
+  Design:
+  - Refined Editorial aesthetic (prestigious, sophisticated)
+  - Playfair Display serif headings
+  - Deep blues + refined amber colors
+  - Smooth animations
+  - Fully responsive
+
+  ---
+  🎯 Success Criteria
+
+  MVP is complete when users can:
+  1. ✅ Upload patent PDF
+  2. ✅ See ELIA15 instantly
+  3. ✅ Get magic link email
+  4. ✅ Log in and view dashboard
+  5. ✅ See all 3 artifacts
+  6. ✅ Download in multiple formats
+  7. ✅ Process additional patents (credit system works)
+  8. ✅ Admin can view metrics
+
+  ---
+  💰 Economics
+
+  Cost per patent:
+  - AI processing: ~$0.27
+  - Email: Free (SendGrid)
+  - Storage: Negligible
+
+  Revenue:
+  - User pays: $2/patent (10 credits @ $20/100)
+  - Your margin: ~$1.73/patent
+
+  ---
+  🆘 If Replit AI Gets Stuck
+
+  Point it to:
+  - INSTRUCTIONS_FOR_REPLIT.md - Main troubleshooting section
+  - Specific technical docs for that component
+  - CODE_EXAMPLES.md - Has complete, working implementations
+
+  Common issues are documented in:
+  - INSTRUCTIONS_FOR_REPLIT.md - "Common Issues & Solutions"
+  - DESIGN_IMPLEMENTATION_GUIDE.md - "Troubleshooting"
+
+  ---
+  📞 Next Steps
+
+  1. Upload all docs to Replit project
+  2. Give Replit AI the instruction message (above)
+  3. Provide API keys when asked
+  4. Let it build following INSTRUCTIONS_FOR_REPLIT.md
+  5. Test with sample patent PDF
+  6. Iterate based on results
+
+  ---
+  🎨 Design Highlight
+
+  The Refined Editorial design makes IP Scaffold memorable and distinctive:
+  - Not another generic AI tool
+  - Feels prestigious and trustworthy
+  - Perfect for academic/TTO audience
+  - Beautiful typography and spacing
+  - Sophisticated interactions
