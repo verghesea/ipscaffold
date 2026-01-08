@@ -40,11 +40,9 @@ export function Navbar() {
                 <span className="text-sm font-medium text-primary-900">{user.credits} Credits</span>
               </div>
               
-              <Link href="/dashboard">
-                <a className={`text-sm font-medium transition-colors hover:text-accent-600 flex items-center gap-2 ${location === '/dashboard' ? 'text-accent-600' : 'text-muted-foreground'}`} data-testid="link-dashboard">
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span className="hidden sm:inline">Dashboard</span>
-                </a>
+              <Link href="/dashboard" className={`text-sm font-medium transition-colors hover:text-accent-600 flex items-center gap-2 ${location === '/dashboard' ? 'text-accent-600' : 'text-muted-foreground'}`} data-testid="link-dashboard">
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
               </Link>
               
               <button 
@@ -57,10 +55,8 @@ export function Navbar() {
               </button>
             </>
           ) : (
-            <Link href="/">
-              <a className="text-sm font-medium text-primary-900 hover:text-accent-600 transition-colors">
-                About
-              </a>
+            <Link href="/" className="text-sm font-medium text-primary-900 hover:text-accent-600 transition-colors">
+              About
             </Link>
           )}
         </div>
