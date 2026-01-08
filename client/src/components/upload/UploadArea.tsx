@@ -1,14 +1,13 @@
 import { useCallback, useState } from 'react';
 import { UploadCloud, FileText, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { useStore } from '@/lib/mockStore';
+import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export function UploadArea() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [, setLocation] = useLocation();
-  const { uploadPatent } = useStore();
   const { toast } = useToast();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -31,14 +30,35 @@ export function UploadArea() {
       return;
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 10MB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsUploading(true);
     
-    // Simulate upload delay
-    setTimeout(() => {
-      const id = uploadPatent(file);
+    try {
+      const result = await api.uploadPatent(file);
       setIsUploading(false);
-      setLocation(`/preview/${id}`);
-    }, 2000);
+      
+      toast({
+        title: "Upload successful",
+        description: "Your patent is being analyzed. Generating ELIA15...",
+      });
+      
+      setLocation(`/preview/${result.patentId}`);
+    } catch (error: any) {
+      setIsUploading(false);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload patent. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -70,6 +90,7 @@ export function UploadArea() {
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
+      data-testid="upload-area"
     >
       <input
         type="file"
@@ -78,6 +99,7 @@ export function UploadArea() {
         accept=".pdf"
         onChange={handleChange}
         disabled={isUploading}
+        data-testid="input-file"
       />
       
       <div className="flex flex-col items-center gap-4">
@@ -108,6 +130,7 @@ export function UploadArea() {
           <label
             htmlFor="file-upload"
             className="mt-4 px-6 py-3 bg-primary-900 text-primary-foreground font-medium hover:bg-primary-800 transition-colors cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm duration-200"
+            data-testid="button-select-file"
           >
             Select File
           </label>

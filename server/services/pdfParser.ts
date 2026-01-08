@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse';
+import * as pdfParse from 'pdf-parse';
 import fs from 'fs/promises';
 
 export interface ParsedPatent {
@@ -12,7 +12,7 @@ export interface ParsedPatent {
 
 export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   const dataBuffer = await fs.readFile(filePath);
-  const data = await pdfParse(dataBuffer);
+  const data = await (pdfParse as any).default(dataBuffer);
   
   const text = data.text;
   
@@ -22,7 +22,7 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   
   // Fallback: get title from first few significant lines
   if (!title) {
-    const lines = text.split('\n').filter(line => line.trim().length > 10);
+    const lines = text.split('\n').filter((line: string) => line.trim().length > 10);
     title = lines[1] || lines[0] || 'Untitled Patent';
   }
   
