@@ -20,6 +20,7 @@ declare module "express-session" {
     userId: string;
     accessToken?: string;
     refreshToken?: string;
+    pendingPatentId?: string;
   }
 }
 

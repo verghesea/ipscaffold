@@ -140,15 +140,24 @@ export async function registerRoutes(
       }
 
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
-      const redirectUrl = patentId 
-        ? `${appUrl}/auth/callback?patent=${patentId}`
-        : `${appUrl}/auth/callback`;
+      
+      // Store patent ID in session for retrieval after auth
+      if (patentId) {
+        req.session.pendingPatentId = patentId;
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
 
       const { data, error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          emailRedirectTo: redirectUrl,
+          emailRedirectTo: `${appUrl}/auth/confirm`,
           shouldCreateUser: true,
+          data: patentId ? { pending_patent_id: patentId } : undefined,
         }
       });
 
@@ -159,7 +168,7 @@ export async function registerRoutes(
 
       console.log('Magic link sent to:', email);
 
-      res.json({ success: true, message: 'Magic link sent to your email' });
+      res.json({ success: true, message: 'Magic link sent to your email', patentId });
 
     } catch (error) {
       console.error('Magic link error:', error);
@@ -170,7 +179,7 @@ export async function registerRoutes(
   // Handle PKCE token verification (when using token_hash from email templates)
   app.get('/auth/confirm', async (req, res) => {
     try {
-      const { token_hash, type, next } = req.query;
+      const { token_hash, type } = req.query;
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
       
       if (!token_hash || !type) {
@@ -182,15 +191,38 @@ export async function registerRoutes(
         type: type as any,
       });
 
-      if (error || !data.session) {
+      if (error || !data.session || !data.user) {
         console.error('Token verification error:', error);
         return res.redirect(`${appUrl}/?error=invalid_token`);
       }
 
+      // Get patent ID from user metadata
+      const patentId = data.user.user_metadata?.pending_patent_id;
+      
       // Set up session
-      req.session.userId = data.user?.id;
+      req.session.userId = data.user.id;
       req.session.accessToken = data.session.access_token;
       req.session.refreshToken = data.session.refresh_token;
+
+      // Handle patent claiming if we have a patent ID
+      if (patentId) {
+        const profile = await supabaseStorage.getProfile(data.user.id);
+        const patent = await supabaseStorage.getPatent(patentId);
+        
+        if (patent && !patent.user_id && profile && profile.credits >= 10) {
+          await supabaseStorage.updatePatentUserId(patent.id, data.user.id);
+          const newBalance = profile.credits - 10;
+          await supabaseStorage.updateProfileCredits(data.user.id, newBalance);
+          await supabaseStorage.createCreditTransaction({
+            user_id: data.user.id,
+            amount: -10,
+            balance_after: newBalance,
+            transaction_type: 'ip_processing',
+            description: `Patent analysis: ${patent.title}`,
+            patent_id: patent.id,
+          });
+        }
+      }
 
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
@@ -199,8 +231,8 @@ export async function registerRoutes(
         });
       });
 
-      // Redirect to next URL or dashboard
-      const redirectTo = next ? decodeURIComponent(next as string) : '/dashboard';
+      // Redirect to patent page or dashboard
+      const redirectTo = patentId ? `/patent/${patentId}` : '/dashboard';
       res.redirect(redirectTo);
 
     } catch (error) {
