@@ -3,7 +3,7 @@ import { createRequire } from 'module';
 
 // pdf-parse is a CommonJS module
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 
 export interface ParsedPatent {
   title: string | null;
@@ -16,7 +16,8 @@ export interface ParsedPatent {
 
 export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   const dataBuffer = await fs.readFile(filePath);
-  const data = await pdfParse(dataBuffer);
+  const parser = new PDFParse({ data: dataBuffer });
+  const data = await parser.parse();
   
   const text = data.text;
   
