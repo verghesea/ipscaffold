@@ -182,39 +182,51 @@ export async function registerRoutes(
       const { token_hash, type } = req.query;
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
       
+      console.log('Auth confirm request:', { token_hash: token_hash?.toString().substring(0, 10) + '...', type });
+      
       if (!token_hash || !type) {
+        console.error('Missing token_hash or type');
         return res.redirect(`${appUrl}/?error=missing_token`);
       }
 
+      // Verify the OTP token
       const { data, error } = await supabase.auth.verifyOtp({
         token_hash: token_hash as string,
         type: type as any,
       });
 
+      console.log('Verify OTP result:', { 
+        hasSession: !!data?.session, 
+        hasUser: !!data?.user,
+        error: error?.message 
+      });
+
       if (error || !data.session || !data.user) {
         console.error('Token verification error:', error);
-        return res.redirect(`${appUrl}/?error=invalid_token`);
+        return res.redirect(`${appUrl}/?error=invalid_token&message=${encodeURIComponent(error?.message || 'Unknown error')}`);
       }
+      
+      const { session, user } = data;
 
       // Get patent ID from user metadata
-      const patentId = data.user.user_metadata?.pending_patent_id;
+      const patentId = user.user_metadata?.pending_patent_id;
       
       // Set up session
-      req.session.userId = data.user.id;
-      req.session.accessToken = data.session.access_token;
-      req.session.refreshToken = data.session.refresh_token;
+      req.session.userId = user.id;
+      req.session.accessToken = session.access_token;
+      req.session.refreshToken = session.refresh_token;
 
       // Handle patent claiming if we have a patent ID
       if (patentId) {
-        const profile = await supabaseStorage.getProfile(data.user.id);
+        const profile = await supabaseStorage.getProfile(user.id);
         const patent = await supabaseStorage.getPatent(patentId);
         
         if (patent && !patent.user_id && profile && profile.credits >= 10) {
-          await supabaseStorage.updatePatentUserId(patent.id, data.user.id);
+          await supabaseStorage.updatePatentUserId(patent.id, user.id);
           const newBalance = profile.credits - 10;
-          await supabaseStorage.updateProfileCredits(data.user.id, newBalance);
+          await supabaseStorage.updateProfileCredits(user.id, newBalance);
           await supabaseStorage.createCreditTransaction({
-            user_id: data.user.id,
+            user_id: user.id,
             amount: -10,
             balance_after: newBalance,
             transaction_type: 'ip_processing',
