@@ -10,46 +10,100 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     async function handleCallback() {
       try {
+        // Get Supabase config from server
+        const configResponse = await fetch('/api/supabase-config');
+        const config = await configResponse.json();
+        
+        const supabase = createClient(config.url, config.anonKey);
+        
+        // Get patent ID from query params before Supabase processes the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const patentId = urlParams.get('patent');
+        
+        // Check for hash fragment tokens (Supabase magic link format)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         
-        const urlParams = new URLSearchParams(window.location.search);
-        const patentId = urlParams.get('patent');
+        if (accessToken) {
+          // We have tokens from URL hash - set the session
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+          
+          if (error) throw error;
+          
+          // Verify with our backend
+          const response = await fetch('/api/auth/verify-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              accessToken: data.session?.access_token, 
+              refreshToken: data.session?.refresh_token,
+              patentId 
+            }),
+          });
 
-        if (!accessToken) {
-          const error = hashParams.get('error_description') || urlParams.get('error_description');
-          if (error) {
+          if (!response.ok) {
+            throw new Error('Failed to verify session');
+          }
+
+          setStatus('success');
+          setMessage('Login successful! Redirecting...');
+
+          setTimeout(() => {
+            if (patentId) {
+              setLocation(`/patent/${patentId}`);
+            } else {
+              setLocation('/dashboard');
+            }
+          }, 1000);
+        } else {
+          // No tokens in hash - try to get session from Supabase
+          // (handles cases where Supabase auto-processes the URL)
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error || !session) {
+            // Check for error in URL
+            const errorDesc = hashParams.get('error_description') || urlParams.get('error_description');
+            if (errorDesc) {
+              setStatus('error');
+              setMessage(decodeURIComponent(errorDesc));
+              return;
+            }
+            
             setStatus('error');
-            setMessage(error);
+            setMessage('No authentication token received. The link may have expired.');
             return;
           }
           
-          setStatus('error');
-          setMessage('No authentication token received');
-          return;
-        }
+          // Verify with our backend
+          const response = await fetch('/api/auth/verify-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              accessToken: session.access_token, 
+              refreshToken: session.refresh_token,
+              patentId 
+            }),
+          });
 
-        const response = await fetch('/api/auth/verify-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accessToken, refreshToken, patentId }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to verify session');
-        }
-
-        setStatus('success');
-        setMessage('Login successful! Redirecting...');
-
-        setTimeout(() => {
-          if (patentId) {
-            setLocation(`/patent/${patentId}`);
-          } else {
-            setLocation('/dashboard');
+          if (!response.ok) {
+            throw new Error('Failed to verify session');
           }
-        }, 1000);
+
+          setStatus('success');
+          setMessage('Login successful! Redirecting...');
+
+          setTimeout(() => {
+            if (patentId) {
+              setLocation(`/patent/${patentId}`);
+            } else {
+              setLocation('/dashboard');
+            }
+          }, 1000);
+        }
 
       } catch (error) {
         console.error('Auth callback error:', error);
