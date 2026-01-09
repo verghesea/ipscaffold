@@ -38,6 +38,7 @@ export interface IStorage {
   getPatentsByUser(userId: number): Promise<Patent[]>;
   createPatent(patent: InsertPatent): Promise<Patent>;
   updatePatentStatus(id: number, status: string, errorMessage?: string): Promise<void>;
+  updatePatentUserId(id: number, userId: number): Promise<void>;
 
   // Artifact operations
   getArtifactsByPatent(patentId: number): Promise<Artifact[]>;
@@ -103,6 +104,13 @@ export class DatabaseStorage implements IStorage {
     await db.update(patents).set({ 
       status, 
       errorMessage,
+      updatedAt: new Date() 
+    }).where(eq(patents.id, id));
+  }
+
+  async updatePatentUserId(id: number, userId: number): Promise<void> {
+    await db.update(patents).set({ 
+      userId,
       updatedAt: new Date() 
     }).where(eq(patents.id, id));
   }

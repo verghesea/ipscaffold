@@ -164,12 +164,29 @@ export async function registerRoutes(
         });
       }
 
-      // Assign patent to user if unclaimed
+      // Assign patent to user if unclaimed and deduct credits
       const patent = await storage.getPatent(parseInt(patentId));
       if (patent && !patent.userId) {
-        await storage.createPatent({
-          ...patent,
+        // Check if user has enough credits
+        if (user.credits < 10) {
+          return res.status(400).json({ error: 'Insufficient credits. You need 10 credits per patent.' });
+        }
+
+        // Assign patent to user
+        await storage.updatePatentUserId(patent.id, user.id);
+        
+        // Deduct credits
+        const newBalance = user.credits - 10;
+        await storage.updateUserCredits(user.id, newBalance);
+        
+        // Record transaction
+        await storage.createCreditTransaction({
           userId: user.id,
+          amount: -10,
+          balanceAfter: newBalance,
+          transactionType: 'ip_processing',
+          description: `Patent analysis: ${patent.title}`,
+          patentId: patent.id,
         });
       }
 
@@ -336,6 +353,82 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Patent detail error:', error);
       res.status(500).json({ error: 'Failed to load patent' });
+    }
+  });
+
+  // Check patent status and trigger remaining artifact generation if needed
+  app.post('/api/patent/:id/generate', async (req, res) => {
+    try {
+      const patentId = parseInt(req.params.id);
+      const patent = await storage.getPatent(patentId);
+
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
+      }
+
+      // If already completed or failed, just return status
+      if (patent.status === 'completed' || patent.status === 'failed') {
+        return res.json({ status: patent.status });
+      }
+
+      // Check existing artifacts
+      const artifacts = await storage.getArtifactsByPatent(patentId);
+      const hasElia15 = artifacts.some(a => a.artifactType === 'elia15');
+      const hasNarrative = artifacts.some(a => a.artifactType === 'business_narrative');
+      const hasGoldenCircle = artifacts.some(a => a.artifactType === 'golden_circle');
+
+      // If all artifacts exist, mark as completed
+      if (hasElia15 && hasNarrative && hasGoldenCircle) {
+        await storage.updatePatentStatus(patentId, 'completed');
+        return res.json({ status: 'completed' });
+      }
+
+      // Generate missing artifacts
+      const elia15 = artifacts.find(a => a.artifactType === 'elia15');
+      
+      if (!hasElia15) {
+        return res.json({ status: 'processing', message: 'ELIA15 not yet generated' });
+      }
+
+      // Generate remaining artifacts synchronously
+      try {
+        if (!hasNarrative) {
+          const narrativeResult = await generateBusinessNarrative(patent.fullText, elia15!.content);
+          await storage.createArtifact({
+            patentId,
+            artifactType: 'business_narrative',
+            content: narrativeResult.content,
+            tokensUsed: narrativeResult.tokensUsed,
+            generationTimeSeconds: narrativeResult.generationTimeSeconds,
+          });
+        }
+
+        if (!hasGoldenCircle) {
+          const narrative = artifacts.find(a => a.artifactType === 'business_narrative') ||
+            (await storage.getArtifactsByPatent(patentId)).find(a => a.artifactType === 'business_narrative');
+          
+          const goldenCircleResult = await generateGoldenCircle(elia15!.content, narrative?.content || '');
+          await storage.createArtifact({
+            patentId,
+            artifactType: 'golden_circle',
+            content: goldenCircleResult.content,
+            tokensUsed: goldenCircleResult.tokensUsed,
+            generationTimeSeconds: goldenCircleResult.generationTimeSeconds,
+          });
+        }
+
+        await storage.updatePatentStatus(patentId, 'completed');
+        res.json({ status: 'completed' });
+
+      } catch (error) {
+        console.error('Error generating artifacts:', error);
+        await storage.updatePatentStatus(patentId, 'failed', 'Failed to generate artifacts');
+        res.json({ status: 'failed' });
+      }
+
+    } catch (error) {
+      console.error('Generate error:', error);
+      res.status(500).json({ error: 'Failed to generate artifacts' });
     }
   });
 
