@@ -144,9 +144,8 @@ export async function registerRoutes(
       const { data, error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          emailRedirectTo: `${appUrl}/auth/confirm`,
+          emailRedirectTo: `${appUrl}/auth/callback${patentId ? `?patent=${patentId}` : ''}`,
           shouldCreateUser: true,
-          data: patentId ? { pending_patent_id: patentId } : undefined,
         }
       });
 
@@ -165,82 +164,19 @@ export async function registerRoutes(
     }
   });
 
-  // Handle PKCE token verification (when using token_hash from email templates)
+  // Redirect token_hash verification to frontend (client-side verification works better)
   app.get('/auth/confirm', async (req, res) => {
-    try {
-      const { token_hash, type } = req.query;
-      const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
-      
-      console.log('Auth confirm request:', { token_hash: token_hash?.toString().substring(0, 10) + '...', type });
-      
-      if (!token_hash || !type) {
-        console.error('Missing token_hash or type');
-        return res.redirect(`${appUrl}/?error=missing_token`);
-      }
-
-      // Verify the OTP token
-      const { data, error } = await supabase.auth.verifyOtp({
-        token_hash: token_hash as string,
-        type: type as any,
-      });
-
-      console.log('Verify OTP result:', { 
-        hasSession: !!data?.session, 
-        hasUser: !!data?.user,
-        error: error?.message 
-      });
-
-      if (error || !data.session || !data.user) {
-        console.error('Token verification error:', error);
-        return res.redirect(`${appUrl}/?error=invalid_token&message=${encodeURIComponent(error?.message || 'Unknown error')}`);
-      }
-      
-      const { session, user } = data;
-
-      // Get patent ID from user metadata
-      const patentId = user.user_metadata?.pending_patent_id;
-      
-      // Set up session
-      req.session.userId = user.id;
-      req.session.accessToken = session.access_token;
-      req.session.refreshToken = session.refresh_token;
-
-      // Handle patent claiming if we have a patent ID
-      if (patentId) {
-        const profile = await supabaseStorage.getProfile(user.id);
-        const patent = await supabaseStorage.getPatent(patentId);
-        
-        if (patent && !patent.user_id && profile && profile.credits >= 10) {
-          await supabaseStorage.updatePatentUserId(patent.id, user.id);
-          const newBalance = profile.credits - 10;
-          await supabaseStorage.updateProfileCredits(user.id, newBalance);
-          await supabaseStorage.createCreditTransaction({
-            user_id: user.id,
-            amount: -10,
-            balance_after: newBalance,
-            transaction_type: 'ip_processing',
-            description: `Patent analysis: ${patent.title}`,
-            patent_id: patent.id,
-          });
-        }
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      // Redirect to patent page or dashboard
-      const redirectTo = patentId ? `/patent/${patentId}` : '/dashboard';
-      res.redirect(redirectTo);
-
-    } catch (error) {
-      console.error('Auth confirm error:', error);
-      const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
-      res.redirect(`${appUrl}/?error=auth_failed`);
-    }
+    const { token_hash, type } = req.query;
+    const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
+    
+    console.log('Auth confirm - redirecting to frontend callback');
+    
+    // Redirect to frontend callback with the token params
+    const params = new URLSearchParams();
+    if (token_hash) params.set('token_hash', token_hash as string);
+    if (type) params.set('type', type as string);
+    
+    res.redirect(`${appUrl}/auth/callback?${params.toString()}`);
   });
 
   app.post('/api/auth/verify-session', async (req, res) => {
