@@ -167,6 +167,49 @@ export async function registerRoutes(
     }
   });
 
+  // Handle PKCE token verification (when using token_hash from email templates)
+  app.get('/auth/confirm', async (req, res) => {
+    try {
+      const { token_hash, type, next } = req.query;
+      const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
+      
+      if (!token_hash || !type) {
+        return res.redirect(`${appUrl}/?error=missing_token`);
+      }
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: token_hash as string,
+        type: type as any,
+      });
+
+      if (error || !data.session) {
+        console.error('Token verification error:', error);
+        return res.redirect(`${appUrl}/?error=invalid_token`);
+      }
+
+      // Set up session
+      req.session.userId = data.user?.id;
+      req.session.accessToken = data.session.access_token;
+      req.session.refreshToken = data.session.refresh_token;
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      // Redirect to next URL or dashboard
+      const redirectTo = next ? decodeURIComponent(next as string) : '/dashboard';
+      res.redirect(redirectTo);
+
+    } catch (error) {
+      console.error('Auth confirm error:', error);
+      const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
+      res.redirect(`${appUrl}/?error=auth_failed`);
+    }
+  });
+
   app.post('/api/auth/verify-session', async (req, res) => {
     try {
       const { accessToken, refreshToken, patentId } = req.body;
