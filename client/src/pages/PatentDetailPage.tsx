@@ -15,11 +15,11 @@ export function PatentDetailPage() {
 
   useEffect(() => {
     if (params?.id) {
-      loadPatent(parseInt(params.id));
+      loadPatent(params.id);
     }
   }, [params?.id]);
 
-  const loadPatent = async (id: number) => {
+  const loadPatent = async (id: string) => {
     try {
       const data = await api.getPatentDetail(id);
       setPatent(data.patent);

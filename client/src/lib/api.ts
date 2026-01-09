@@ -1,5 +1,5 @@
 export interface Patent {
-  id: number;
+  id: string;
   title: string;
   assignee: string | null;
   filingDate: string | null;
@@ -14,14 +14,14 @@ export interface Artifact {
 }
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   credits: number;
   isAdmin: boolean;
 }
 
 export const api = {
-  async uploadPatent(file: File): Promise<{ success: boolean; patentId: number }> {
+  async uploadPatent(file: File): Promise<{ success: boolean; patentId: string }> {
     const formData = new FormData();
     formData.append('pdf', file);
     
@@ -38,7 +38,7 @@ export const api = {
     return response.json();
   },
   
-  async getPreview(id: number): Promise<{
+  async getPreview(id: string): Promise<{
     patent: Partial<Patent>;
     elia15: string | null;
     showEmailGate: boolean;
@@ -52,8 +52,8 @@ export const api = {
     return response.json();
   },
   
-  async requestAccess(email: string, patentId: number): Promise<void> {
-    const response = await fetch('/api/request-access', {
+  async requestMagicLink(email: string, patentId?: string): Promise<void> {
+    const response = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, patentId }),
@@ -61,7 +61,7 @@ export const api = {
     
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to request access');
+      throw new Error(error.error || 'Failed to send magic link');
     }
   },
   
@@ -85,7 +85,7 @@ export const api = {
     return response.json();
   },
   
-  async getPatentDetail(id: number): Promise<{
+  async getPatentDetail(id: string): Promise<{
     patent: Partial<Patent>;
     artifacts: Artifact[];
   }> {

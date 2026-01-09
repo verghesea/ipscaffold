@@ -18,11 +18,11 @@ export function PreviewPage() {
 
   useEffect(() => {
     if (params?.id) {
-      loadPreview(parseInt(params.id));
+      loadPreview(params.id);
     }
   }, [params?.id]);
 
-  const loadPreview = async (id: number) => {
+  const loadPreview = async (id: string) => {
     try {
       const data = await api.getPreview(id);
       setPatent(data.patent);
@@ -49,7 +49,7 @@ export function PreviewPage() {
     setIsSubmitting(true);
     
     try {
-      await api.requestAccess(email, parseInt(params?.id || '0'));
+      await api.requestMagicLink(email, params?.id);
       toast({
         title: 'Success!',
         description: 'Check your email for a magic link to access your full analysis.',

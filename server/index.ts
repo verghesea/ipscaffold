@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerRoutes } from "./supabaseRoutes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import session from "express-session";
@@ -17,7 +17,9 @@ declare module "http" {
 
 declare module "express-session" {
   interface SessionData {
-    userId: number;
+    userId: string;
+    accessToken?: string;
+    refreshToken?: string;
   }
 }
 
