@@ -140,17 +140,6 @@ export async function registerRoutes(
       }
 
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
-      
-      // Store patent ID in session for retrieval after auth
-      if (patentId) {
-        req.session.pendingPatentId = patentId;
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      }
 
       const { data, error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
@@ -163,16 +152,16 @@ export async function registerRoutes(
 
       if (error) {
         console.error('Magic link error:', error);
-        return res.status(500).json({ error: 'Failed to send magic link' });
+        return res.status(500).json({ error: 'Failed to send magic link', details: error.message });
       }
 
       console.log('Magic link sent to:', email);
 
       res.json({ success: true, message: 'Magic link sent to your email', patentId });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Magic link error:', error);
-      res.status(500).json({ error: 'Failed to send magic link' });
+      res.status(500).json({ error: 'Failed to send magic link', details: error?.message });
     }
   });
 
