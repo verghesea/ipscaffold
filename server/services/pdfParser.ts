@@ -1,6 +1,4 @@
 import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 export interface ParsedPatent {
   title: string | null;
@@ -12,24 +10,22 @@ export interface ParsedPatent {
 }
 
 // Dynamic import for pdf-parse that works in both ESM dev and CJS production
-async function getPdfParser() {
-  // Try ESM dynamic import first
+async function getPdfParseClass(): Promise<any> {
   try {
     const module = await import('pdf-parse');
-    return module.default || module;
+    return (module as any).PDFParse || module.default?.PDFParse;
   } catch {
-    // Fallback for CJS
-    return eval('require')('pdf-parse');
+    return eval('require')('pdf-parse').PDFParse;
   }
 }
 
 export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   const dataBuffer = await fs.readFile(filePath);
   
-  const pdfParse = await getPdfParser();
-  
-  // pdf-parse returns a promise with { text, numpages, info, metadata }
-  const result = await pdfParse(dataBuffer);
+  const PDFParse = await getPdfParseClass();
+  const parser = new PDFParse({ data: dataBuffer });
+  await parser.load();
+  const result = await parser.getText();
   const text = result.text;
   
   // Extract title (usually near the beginning, after "Title:" or as second line)
