@@ -205,14 +205,18 @@ export async function registerRoutes(
       console.log('Profile:', { exists: !!profile, credits: profile?.credits });
       
       if (!profile) {
-        // Create profile for new user
+        // Create profile for new user (may fail if already created by Supabase trigger)
         console.log('Creating new profile for user:', user.id);
-        await supabaseStorage.createProfile({
-          id: user.id,
-          email: user.email || '',
-          credits: 100,
-          is_admin: false,
-        });
+        try {
+          await supabaseStorage.createProfile({
+            id: user.id,
+            email: user.email || '',
+            credits: 100,
+            is_admin: false,
+          });
+        } catch (e) {
+          console.log('Profile creation skipped (may already exist):', e);
+        }
         profile = await supabaseStorage.getProfile(user.id);
       }
 
@@ -236,17 +240,21 @@ export async function registerRoutes(
         }
       }
 
-      // Save session
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => {
-          if (err) {
-            console.error('Session save error:', err);
-            reject(err);
-          } else {
-            resolve();
-          }
+      // Save session (don't fail if session save has issues)
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
         });
-      });
+      } catch (sessionError) {
+        console.error('Session save failed, continuing anyway:', sessionError);
+      }
 
       console.log('Session verified successfully for user:', user.id);
 
