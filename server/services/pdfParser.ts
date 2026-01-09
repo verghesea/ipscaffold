@@ -17,9 +17,8 @@ export interface ParsedPatent {
 export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   const dataBuffer = await fs.readFile(filePath);
   const parser = new PDFParse({ data: dataBuffer });
-  const data = await parser.parse();
-  
-  const text = data.text;
+  await parser.load();
+  const text = await parser.getText();
   
   // Extract title (usually near the beginning, after "Title:" or as second line)
   const titleMatch = text.match(/(?:Title:|Patent Title:)\s*(.+?)(?:\n|Inventors?:|Abstract:)/i);
