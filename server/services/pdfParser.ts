@@ -1,9 +1,6 @@
 import fs from 'fs/promises';
-import { createRequire } from 'module';
-
-// pdf-parse is a CommonJS module
-const require = createRequire(import.meta.url);
-const { PDFParse } = require('pdf-parse');
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 export interface ParsedPatent {
   title: string | null;
@@ -14,11 +11,25 @@ export interface ParsedPatent {
   fullText: string;
 }
 
+// Dynamic import for pdf-parse that works in both ESM dev and CJS production
+async function getPdfParser() {
+  // Try ESM dynamic import first
+  try {
+    const module = await import('pdf-parse');
+    return module.default || module;
+  } catch {
+    // Fallback for CJS
+    return eval('require')('pdf-parse');
+  }
+}
+
 export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   const dataBuffer = await fs.readFile(filePath);
-  const parser = new PDFParse({ data: dataBuffer });
-  await parser.load();
-  const result = await parser.getText();
+  
+  const pdfParse = await getPdfParser();
+  
+  // pdf-parse returns a promise with { text, numpages, info, metadata }
+  const result = await pdfParse(dataBuffer);
   const text = result.text;
   
   // Extract title (usually near the beginning, after "Title:" or as second line)

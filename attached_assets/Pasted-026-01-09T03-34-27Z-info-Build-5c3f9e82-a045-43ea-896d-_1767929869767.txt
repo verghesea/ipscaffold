@@ -1,0 +1,233 @@
+026-01-09T03:34:27Z info: Build: 5c3f9e82-a045-43ea-896d-9d081365692e
+2026-01-09T03:34:27Z info: Running Security Scan
+2026-01-09T03:34:33Z info: Security Scan Complete
+2026-01-09T03:34:33Z info: Connecting to builder
+2026-01-09T03:34:33Z info: Builder connected
+2026-01-09T03:34:33Z info: Installing packages
+2026-01-09T03:34:34Z info: Starting Build
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+
+building client...
+
+vite v7.1.12 building for production...
+
+transforming...
+
+✓ 1783 modules transformed.
+
+rendering chunks...
+
+[meta-images] using internal app domain: https://ipscaffold.replit.app
+[meta-images] updating meta image tags to: https://ipscaffold.replit.app/opengraph.jpg
+
+computing gzip size...
+
+../dist/public/index.html                   1.52 kB │ gzip:   0.62 kB
+../dist/public/assets/index-C2gvW-ht.css  105.19 kB │ gzip:  17.12 kB
+../dist/public/assets/index-CC527gzD.js   349.78 kB │ gzip: 109.41 kB
+✓ built in 3.94s
+building server...
+
+▲ [WARNING] "import.meta" is not available with the "cjs" output format and will be empty [empty-import-meta]
+
+    server/services/pdfParser.ts:5:30:
+      5 │ const require = createRequire(import.meta.url);
+        ╵                               ~~~~~~~~~~~
+
+  You need to set the output format to "esm" for "import.meta" to work correctly.
+
+
+1 warning
+
+  dist/index.cjs  1.0mb ⚠️
+
+⚡ Done in 264ms
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.7.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.7.0
+npm notice To update run: npm install -g npm@11.7.0
+npm notice
+
+2026-01-09T03:34:42Z info: Pushing pid1 binary layer...
+2026-01-09T03:34:43Z info: Pushing Repl layer...
+2026-01-09T03:34:43Z info: Pushing hosting layer...
+2026-01-09T03:34:43Z info: Created pid1 binary layer
+2026-01-09T03:34:44Z info: Created hosting layer
+2026-01-09T03:35:04Z info: Created Repl layer
+2026-01-09T03:35:05Z info: Pushed image manifest
+2026-01-09T03:35:06Z info: Pushed soci index manifest
+2026-01-09T03:35:25Z info: Creating Autoscale service
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+metasidecar: loaded enterprise status from environment is_enterprise=false
+forwarding local port 5000 to external port 80 (mapped as 1104)
+    at node:internal/main/run_main_module:28:49 {
+    ^
+node:internal/modules/cjs/loader:1696
+
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+    ^
+
+command finished with error [node ./dist/index.cjs]: exit status 1
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+
+}
+
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+  code: 'ERR_INVALID_ARG_VALUE'
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+Node.js v20.19.3
+Node.js v20.19.3
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+node:internal/modules/cjs/loader:1696
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+
+}
+node:internal/modules/cjs/loader:1696
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at node:internal/main/run_main_module:28:49 {
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+Node.js v20.19.3
+node:internal/modules/cjs/loader:1696
+  code: 'ERR_INVALID_ARG_VALUE'
+    ^
+
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+    ^
+    at node:internal/main/run_main_module:28:49 {
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+}
+Node.js v20.19.3
+command finished with error [node ./dist/index.cjs]: exit status 1
+command finished with error [node ./dist/index.cjs]: exit status 1
+    at node:internal/main/run_main_module:28:49 {
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+}
+starting up user application
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+command finished with error [node ./dist/index.cjs]: exit status 1
+Node.js v20.19.3
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+  code: 'ERR_INVALID_ARG_VALUE'
+
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+}
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+
+Node.js v20.19.3
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+command finished with error [node ./dist/index.cjs]: exit status 1
+
+    ^
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+  code: 'ERR_INVALID_ARG_VALUE'
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+    ^
+
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+}
+command finished with error [node ./dist/index.cjs]: exit status 1
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+  code: 'ERR_INVALID_ARG_VALUE'
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at node:internal/main/run_main_module:28:49 {
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+node:internal/modules/cjs/loader:1696
+Node.js v20.19.3
+  code: 'ERR_INVALID_ARG_VALUE'
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+node:internal/modules/cjs/loader:1696
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+  code: 'ERR_INVALID_ARG_VALUE'
+
+    at node:internal/main/run_main_module:28:49 {
+
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at node:internal/main/run_main_module:28:49 {
+command finished with error [node ./dist/index.cjs]: exit status 1
+}
+
+node:internal/modules/cjs/loader:1696
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    ^
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+node:internal/modules/cjs/loader:1696
+    ^
+
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+
+    at node:internal/main/run_main_module:28:49 {
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+}
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+command finished with error [node ./dist/index.cjs]: exit status 1
+Node.js v20.19.3
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+  code: 'ERR_INVALID_ARG_VALUE'
+node:internal/modules/cjs/loader:1696
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at createRequire (node:internal/modules/cjs/loader:1696:11)
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined
+    throw new ERR_INVALID_ARG_VALUE('filename', filename, createRequireError);
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    ^
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+
+    at node:internal/main/run_main_module:28:49 {
+}
+  code: 'ERR_INVALID_ARG_VALUE'
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+Node.js v20.19.3
+
+command finished with error [node ./dist/index.cjs]: exit status 1
+    at Object.<anonymous> (/home/runner/workspace/dist/index.cjs:72:33562)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+
+    ^
+  code: 'ERR_INVALID_ARG_VALUE'
+}
+crash loop detected
