@@ -182,48 +182,73 @@ export async function registerRoutes(
   app.post('/api/auth/verify-session', async (req, res) => {
     try {
       const { accessToken, refreshToken, patentId } = req.body;
+      console.log('Verify session request:', { hasAccessToken: !!accessToken, patentId });
 
       if (!accessToken) {
         return res.status(400).json({ error: 'Access token required' });
       }
 
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
+      console.log('getUser result:', { hasUser: !!user, error: error?.message });
 
       if (error || !user) {
-        return res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({ error: 'Invalid token', details: error?.message });
       }
 
+      // Set session
       req.session.userId = user.id;
       req.session.accessToken = accessToken;
       req.session.refreshToken = refreshToken;
 
-      const profile = await supabaseStorage.getProfile(user.id);
+      // Get or create profile
+      let profile = await supabaseStorage.getProfile(user.id);
+      console.log('Profile:', { exists: !!profile, credits: profile?.credits });
+      
+      if (!profile) {
+        // Create profile for new user
+        console.log('Creating new profile for user:', user.id);
+        await supabaseStorage.createProfile({
+          id: user.id,
+          email: user.email || '',
+          credits: 100,
+          is_admin: false,
+        });
+        profile = await supabaseStorage.getProfile(user.id);
+      }
 
-      if (patentId) {
+      // Handle patent claiming
+      if (patentId && profile) {
         const patent = await supabaseStorage.getPatent(patentId);
-        if (patent && !patent.user_id && profile) {
-          if (profile.credits >= 10) {
-            await supabaseStorage.updatePatentUserId(patent.id, user.id);
-            const newBalance = profile.credits - 10;
-            await supabaseStorage.updateProfileCredits(user.id, newBalance);
-            await supabaseStorage.createCreditTransaction({
-              user_id: user.id,
-              amount: -10,
-              balance_after: newBalance,
-              transaction_type: 'ip_processing',
-              description: `Patent analysis: ${patent.title}`,
-              patent_id: patent.id,
-            });
-          }
+        if (patent && !patent.user_id && profile.credits >= 10) {
+          console.log('Claiming patent:', patentId);
+          await supabaseStorage.updatePatentUserId(patent.id, user.id);
+          const newBalance = profile.credits - 10;
+          await supabaseStorage.updateProfileCredits(user.id, newBalance);
+          await supabaseStorage.createCreditTransaction({
+            user_id: user.id,
+            amount: -10,
+            balance_after: newBalance,
+            transaction_type: 'ip_processing',
+            description: `Patent analysis: ${patent.title}`,
+            patent_id: patent.id,
+          });
+          profile.credits = newBalance;
         }
       }
 
+      // Save session
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) {
+            console.error('Session save error:', err);
+            reject(err);
+          } else {
+            resolve();
+          }
         });
       });
+
+      console.log('Session verified successfully for user:', user.id);
 
       res.json({ 
         success: true, 
@@ -234,9 +259,9 @@ export async function registerRoutes(
         }
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Session verification error:', error);
-      res.status(500).json({ error: 'Failed to verify session' });
+      res.status(500).json({ error: 'Failed to verify session', details: error?.message });
     }
   });
 

@@ -76,6 +76,22 @@ export class SupabaseStorage {
       .eq('id', userId);
   }
 
+  async createProfile(profile: { id: string; email: string; credits: number; is_admin: boolean }): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: profile.id,
+        email: profile.email.toLowerCase(),
+        credits: profile.credits,
+        is_admin: profile.is_admin,
+      });
+    
+    if (error) {
+      console.error('Failed to create profile:', error);
+      throw new Error(`Failed to create profile: ${error.message}`);
+    }
+  }
+
   async getPatent(id: string): Promise<Patent | null> {
     const { data, error } = await supabaseAdmin
       .from('patents')
