@@ -139,15 +139,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Email required' });
       }
 
+      const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
       const redirectUrl = patentId 
-        ? `${process.env.APP_URL || 'http://localhost:5000'}/auth/callback?patent=${patentId}`
-        : `${process.env.APP_URL || 'http://localhost:5000'}/auth/callback`;
+        ? `${appUrl}/auth/callback?patent=${patentId}`
+        : `${appUrl}/auth/callback`;
 
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
+      const { data, error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          redirectTo: redirectUrl
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: true,
         }
       });
 
@@ -156,8 +157,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: 'Failed to send magic link' });
       }
 
-      console.log('Magic link generated for:', email);
-      console.log('Link:', data.properties?.action_link);
+      console.log('Magic link sent to:', email);
 
       res.json({ success: true, message: 'Magic link sent to your email' });
 
