@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { supabaseStorage } from "./supabaseStorage";
 import { supabaseAdmin, supabase, supabaseUrl, supabaseAnonKey } from "./lib/supabase";
@@ -7,6 +7,17 @@ import { nanoid } from "nanoid";
 import fs from "fs/promises";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+      };
+    }
+  }
+}
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -25,6 +36,34 @@ const upload = multer({
     }
   }
 });
+
+async function getUserFromToken(req: Request): Promise<{ id: string; email: string } | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const token = authHeader.substring(7);
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) return null;
+    return { id: user.id, email: user.email || '' };
+  } catch {
+    return null;
+  }
+}
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  getUserFromToken(req).then(user => {
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    req.user = user;
+    next();
+  }).catch(() => {
+    res.status(401).json({ error: 'Not authenticated' });
+  });
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -48,12 +87,13 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      const user = await getUserFromToken(req);
       const filePath = req.file.path;
       const filename = req.file.filename;
       const parsedPatent = await parsePatentPDF(filePath);
 
       const patent = await supabaseStorage.createPatent({
-        user_id: req.session.userId || null,
+        user_id: user?.id || null,
         title: parsedPatent.title,
         inventors: parsedPatent.inventors,
         assignee: parsedPatent.assignee,
@@ -105,6 +145,7 @@ export async function registerRoutes(
     try {
       const patentId = req.params.id;
       const patent = await supabaseStorage.getPatent(patentId);
+      const user = await getUserFromToken(req);
 
       if (!patent) {
         return res.status(404).json({ error: 'Patent not found' });
@@ -122,7 +163,7 @@ export async function registerRoutes(
           status: patent.status,
         },
         elia15: elia15?.content || null,
-        showEmailGate: !req.session.userId
+        showEmailGate: !user
       });
 
     } catch (error) {
@@ -164,14 +205,12 @@ export async function registerRoutes(
     }
   });
 
-  // Redirect token_hash verification to frontend (client-side verification works better)
   app.get('/auth/confirm', async (req, res) => {
     const { token_hash, type } = req.query;
     const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
     
     console.log('Auth confirm - redirecting to frontend callback');
     
-    // Redirect to frontend callback with the token params
     const params = new URLSearchParams();
     if (token_hash) params.set('token_hash', token_hash as string);
     if (type) params.set('type', type as string);
@@ -195,17 +234,10 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'Invalid token', details: error?.message });
       }
 
-      // Set session
-      req.session.userId = user.id;
-      req.session.accessToken = accessToken;
-      req.session.refreshToken = refreshToken;
-
-      // Get or create profile
       let profile = await supabaseStorage.getProfile(user.id);
       console.log('Profile:', { exists: !!profile, credits: profile?.credits });
       
       if (!profile) {
-        // Create profile for new user (may fail if already created by Supabase trigger)
         console.log('Creating new profile for user:', user.id);
         try {
           await supabaseStorage.createProfile({
@@ -220,7 +252,6 @@ export async function registerRoutes(
         profile = await supabaseStorage.getProfile(user.id);
       }
 
-      // Handle patent claiming
       if (patentId && profile) {
         const patent = await supabaseStorage.getPatent(patentId);
         if (patent && !patent.user_id && profile.credits >= 10) {
@@ -240,22 +271,6 @@ export async function registerRoutes(
         }
       }
 
-      // Save session (don't fail if session save has issues)
-      try {
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) {
-              console.error('Session save error:', err);
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
-      } catch (sessionError) {
-        console.error('Session save failed, continuing anyway:', sessionError);
-      }
-
       console.log('Session verified successfully for user:', user.id);
 
       res.json({ 
@@ -273,12 +288,8 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/user', async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const profile = await supabaseStorage.getProfile(req.session.userId);
+  app.get('/api/user', requireAuth, async (req, res) => {
+    const profile = await supabaseStorage.getProfile(req.user!.id);
     if (!profile) {
       return res.status(401).json({ error: 'User not found' });
     }
@@ -292,18 +303,12 @@ export async function registerRoutes(
   });
 
   app.post('/api/logout', (req, res) => {
-    req.session.destroy(() => {
-      res.json({ success: true });
-    });
+    res.json({ success: true });
   });
 
-  app.get('/api/dashboard', async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
+  app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
-      const patents = await supabaseStorage.getPatentsByUser(req.session.userId);
+      const patents = await supabaseStorage.getPatentsByUser(req.user!.id);
       
       const patentsWithArtifactCount = await Promise.all(
         patents.map(async (patent) => {
@@ -328,16 +333,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/patent/:id', async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
+  app.get('/api/patent/:id', requireAuth, async (req, res) => {
     try {
       const patentId = req.params.id;
       const patent = await supabaseStorage.getPatent(patentId);
 
-      if (!patent || patent.user_id !== req.session.userId) {
+      if (!patent || patent.user_id !== req.user!.id) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -352,118 +353,69 @@ export async function registerRoutes(
           filingDate: patent.filing_date,
           issueDate: patent.issue_date,
           status: patent.status,
+          createdAt: patent.created_at,
         },
         artifacts: artifacts.map(a => ({
+          id: a.id,
           type: a.artifact_type,
           content: a.content,
+          tokensUsed: a.tokens_used,
+          generationTime: a.generation_time_seconds,
+          createdAt: a.created_at,
         })),
       });
 
     } catch (error) {
-      console.error('Patent detail error:', error);
+      console.error('Patent error:', error);
       res.status(500).json({ error: 'Failed to load patent' });
     }
   });
 
-  app.post('/api/patent/:id/generate', async (req, res) => {
+  app.get('/api/credits', requireAuth, async (req, res) => {
     try {
-      const patentId = req.params.id;
-      const patent = await supabaseStorage.getPatent(patentId);
+      const profile = await supabaseStorage.getProfile(req.user!.id);
 
-      if (!patent) {
-        return res.status(404).json({ error: 'Patent not found' });
-      }
-
-      if (patent.status === 'completed' || patent.status === 'failed') {
-        return res.json({ status: patent.status });
-      }
-
-      const artifacts = await supabaseStorage.getArtifactsByPatent(patentId);
-      const hasElia15 = artifacts.some(a => a.artifact_type === 'elia15');
-      const hasNarrative = artifacts.some(a => a.artifact_type === 'business_narrative');
-      const hasGoldenCircle = artifacts.some(a => a.artifact_type === 'golden_circle');
-
-      if (hasElia15 && hasNarrative && hasGoldenCircle) {
-        await supabaseStorage.updatePatentStatus(patentId, 'completed');
-        return res.json({ status: 'completed' });
-      }
-
-      const elia15 = artifacts.find(a => a.artifact_type === 'elia15');
-      
-      if (!hasElia15) {
-        return res.json({ status: 'processing', message: 'ELIA15 not yet generated' });
-      }
-
-      try {
-        if (!hasNarrative) {
-          const narrativeResult = await generateBusinessNarrative(patent.full_text, elia15!.content);
-          await supabaseStorage.createArtifact({
-            patent_id: patentId,
-            artifact_type: 'business_narrative',
-            content: narrativeResult.content,
-            tokens_used: narrativeResult.tokensUsed,
-            generation_time_seconds: narrativeResult.generationTimeSeconds,
-          });
-        }
-
-        if (!hasGoldenCircle) {
-          const updatedArtifacts = await supabaseStorage.getArtifactsByPatent(patentId);
-          const narrative = updatedArtifacts.find(a => a.artifact_type === 'business_narrative');
-          
-          const goldenCircleResult = await generateGoldenCircle(elia15!.content, narrative?.content || '');
-          await supabaseStorage.createArtifact({
-            patent_id: patentId,
-            artifact_type: 'golden_circle',
-            content: goldenCircleResult.content,
-            tokens_used: goldenCircleResult.tokensUsed,
-            generation_time_seconds: goldenCircleResult.generationTimeSeconds,
-          });
-        }
-
-        await supabaseStorage.updatePatentStatus(patentId, 'completed');
-        res.json({ status: 'completed' });
-
-      } catch (error) {
-        console.error('Error generating artifacts:', error);
-        await supabaseStorage.updatePatentStatus(patentId, 'failed', 'Failed to generate artifacts');
-        res.json({ status: 'failed' });
-      }
+      res.json({
+        balance: profile?.credits || 0,
+        transactions: [],
+      });
 
     } catch (error) {
-      console.error('Generate error:', error);
-      res.status(500).json({ error: 'Failed to generate artifacts' });
+      console.error('Credits error:', error);
+      res.status(500).json({ error: 'Failed to load credits' });
     }
   });
 
   return httpServer;
 }
 
-async function generateRemainingArtifacts(
-  patentId: string,
-  fullText: string,
-  elia15Content: string
-): Promise<void> {
+async function generateRemainingArtifacts(patentId: string, fullText: string, elia15Content: string) {
   try {
-    const narrativeResult = await generateBusinessNarrative(fullText, elia15Content);
-    await supabaseStorage.createArtifact({
-      patent_id: patentId,
-      artifact_type: 'business_narrative',
-      content: narrativeResult.content,
-      tokens_used: narrativeResult.tokensUsed,
-      generation_time_seconds: narrativeResult.generationTimeSeconds,
-    });
+    const [narrativeResult, goldenCircleResult] = await Promise.all([
+      generateBusinessNarrative(fullText, elia15Content),
+      generateGoldenCircle(fullText, elia15Content),
+    ]);
 
-    const goldenCircleResult = await generateGoldenCircle(elia15Content, narrativeResult.content);
-    await supabaseStorage.createArtifact({
-      patent_id: patentId,
-      artifact_type: 'golden_circle',
-      content: goldenCircleResult.content,
-      tokens_used: goldenCircleResult.tokensUsed,
-      generation_time_seconds: goldenCircleResult.generationTimeSeconds,
-    });
+    await Promise.all([
+      supabaseStorage.createArtifact({
+        patent_id: patentId,
+        artifact_type: 'business_narrative',
+        content: narrativeResult.content,
+        tokens_used: narrativeResult.tokensUsed,
+        generation_time_seconds: narrativeResult.generationTimeSeconds,
+      }),
+      supabaseStorage.createArtifact({
+        patent_id: patentId,
+        artifact_type: 'golden_circle',
+        content: goldenCircleResult.content,
+        tokens_used: goldenCircleResult.tokensUsed,
+        generation_time_seconds: goldenCircleResult.generationTimeSeconds,
+      }),
+    ]);
 
     await supabaseStorage.updatePatentStatus(patentId, 'completed');
-    
+    console.log('All artifacts generated for patent:', patentId);
+
   } catch (error) {
     console.error('Error generating remaining artifacts:', error);
     await supabaseStorage.updatePatentStatus(patentId, 'failed', 'Failed to generate all artifacts');

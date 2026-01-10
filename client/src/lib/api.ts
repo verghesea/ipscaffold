@@ -20,6 +20,31 @@ export interface User {
   isAdmin: boolean;
 }
 
+const AUTH_TOKEN_KEY = 'ip_scaffold_access_token';
+const REFRESH_TOKEN_KEY = 'ip_scaffold_refresh_token';
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setStoredTokens(accessToken: string, refreshToken: string): void {
+  localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+export function clearStoredTokens(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getStoredToken();
+  if (token) {
+    return { 'Authorization': `Bearer ${token}` };
+  }
+  return {};
+}
+
 export const api = {
   async uploadPatent(file: File): Promise<{ success: boolean; patentId: string }> {
     const formData = new FormData();
@@ -27,6 +52,7 @@ export const api = {
     
     const response = await fetch('/api/upload', {
       method: 'POST',
+      headers: getAuthHeaders(),
       body: formData,
     });
     
@@ -43,7 +69,9 @@ export const api = {
     elia15: string | null;
     showEmailGate: boolean;
   }> {
-    const response = await fetch(`/api/preview/${id}`);
+    const response = await fetch(`/api/preview/${id}`, {
+      headers: getAuthHeaders(),
+    });
     
     if (!response.ok) {
       throw new Error('Failed to load preview');
@@ -66,7 +94,9 @@ export const api = {
   },
   
   async getUser(): Promise<User> {
-    const response = await fetch('/api/user');
+    const response = await fetch('/api/user', {
+      headers: getAuthHeaders(),
+    });
     
     if (!response.ok) {
       throw new Error('Not authenticated');
@@ -76,7 +106,9 @@ export const api = {
   },
   
   async getDashboard(): Promise<{ patents: Patent[] }> {
-    const response = await fetch('/api/dashboard');
+    const response = await fetch('/api/dashboard', {
+      headers: getAuthHeaders(),
+    });
     
     if (!response.ok) {
       throw new Error('Failed to load dashboard');
@@ -89,7 +121,9 @@ export const api = {
     patent: Partial<Patent>;
     artifacts: Artifact[];
   }> {
-    const response = await fetch(`/api/patent/${id}`);
+    const response = await fetch(`/api/patent/${id}`, {
+      headers: getAuthHeaders(),
+    });
     
     if (!response.ok) {
       throw new Error('Failed to load patent');
@@ -99,6 +133,7 @@ export const api = {
   },
   
   async logout(): Promise<void> {
+    clearStoredTokens();
     await fetch('/api/logout', { method: 'POST' });
   },
 };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { createClient } from '@supabase/supabase-js';
+import { setStoredTokens } from '@/lib/api';
 
 export default function AuthCallbackPage() {
   const [, setLocation] = useLocation();
@@ -10,26 +11,22 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     async function handleCallback() {
       try {
-        // Get Supabase config from server
         const configResponse = await fetch('/api/supabase-config');
         const config = await configResponse.json();
         
         const supabase = createClient(config.url, config.anonKey);
         
-        // Get patent ID from query params
         const urlParams = new URLSearchParams(window.location.search);
         const patentId = urlParams.get('patent');
         const tokenHash = urlParams.get('token_hash');
         const type = urlParams.get('type');
         
-        // Check for hash fragment tokens (Supabase magic link format)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         
         console.log('Auth callback params:', { patentId, tokenHash: !!tokenHash, type, accessToken: !!accessToken });
         
-        // Option 1: Token hash in URL (PKCE flow) - verify client-side
         if (tokenHash && type) {
           console.log('Verifying token hash client-side...');
           const { data, error } = await supabase.auth.verifyOtp({
@@ -46,7 +43,10 @@ export default function AuthCallbackPage() {
             throw new Error('No session returned from token verification');
           }
           
-          // Verify with our backend to set up Express session
+          // Store tokens in localStorage for API calls
+          setStoredTokens(data.session.access_token, data.session.refresh_token);
+          
+          // Verify with backend and handle patent claiming
           const response = await fetch('/api/auth/verify-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -58,7 +58,8 @@ export default function AuthCallbackPage() {
           });
 
           if (!response.ok) {
-            throw new Error('Failed to set up session');
+            const errorData = await response.json();
+            throw new Error(errorData.details || 'Failed to set up session');
           }
 
           setStatus('success');
@@ -74,7 +75,6 @@ export default function AuthCallbackPage() {
           return;
         }
         
-        // Option 2: Access token in hash fragment (implicit flow)
         if (accessToken) {
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -82,6 +82,10 @@ export default function AuthCallbackPage() {
           });
           
           if (error) throw error;
+          
+          if (data.session) {
+            setStoredTokens(data.session.access_token, data.session.refresh_token);
+          }
           
           const response = await fetch('/api/auth/verify-session', {
             method: 'POST',
@@ -110,7 +114,6 @@ export default function AuthCallbackPage() {
           return;
         }
         
-        // Option 3: Try to get existing session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error || !session) {
@@ -125,6 +128,8 @@ export default function AuthCallbackPage() {
           setMessage('No authentication token received. The link may have expired.');
           return;
         }
+        
+        setStoredTokens(session.access_token, session.refresh_token);
         
         const response = await fetch('/api/auth/verify-session', {
           method: 'POST',

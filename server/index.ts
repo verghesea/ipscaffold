@@ -2,9 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./supabaseRoutes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import pg from "pg";
 
 const app = express();
 const httpServer = createServer(app);
@@ -15,38 +12,14 @@ declare module "http" {
   }
 }
 
-declare module "express-session" {
-  interface SessionData {
-    userId: string;
-    accessToken?: string;
-    refreshToken?: string;
-    pendingPatentId?: string;
+declare module "express" {
+  interface Request {
+    user?: {
+      id: string;
+      email: string;
+    };
   }
 }
-
-// Session store
-const PgStore = connectPgSimple(session);
-const sessionPool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-app.use(
-  session({
-    store: new PgStore({
-      pool: sessionPool,
-      createTableIfMissing: true,
-    }),
-    secret: process.env.SESSION_SECRET || 'development-secret-change-in-production',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    },
-  })
-);
 
 app.use(
   express.json({
