@@ -37,7 +37,7 @@ export function clearStoredTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = getStoredToken();
   if (token) {
     return { 'Authorization': `Bearer ${token}` };

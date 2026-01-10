@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { api, type Artifact } from '@/lib/api';
-import { ArrowLeft, Download, FileText } from 'lucide-react';
+import { api, type Artifact, getAuthHeaders } from '@/lib/api';
+import { ArrowLeft, Download, FileText, RefreshCw, AlertCircle } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 export function PatentDetailPage() {
   const [, params] = useRoute('/patent/:id');
@@ -11,6 +12,7 @@ export function PatentDetailPage() {
   const [patent, setPatent] = useState<any>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -102,15 +104,57 @@ export function PatentDetailPage() {
             </div>
           </div>
 
+          {(patent.status === 'failed' || patent.status === 'partial') && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-display text-lg font-bold text-red-900 mb-2">
+                    {patent.status === 'failed' ? 'Processing Failed' : 'Partial Completion'}
+                  </h3>
+                  <p className="text-red-700 mb-4">
+                    {patent.status === 'failed' 
+                      ? 'We encountered an error while processing this patent. You can retry the processing.'
+                      : 'Some artifacts could not be generated. You can retry to complete the remaining artifacts.'}
+                  </p>
+                  <Button
+                    onClick={async () => {
+                      setRetrying(true);
+                      try {
+                        const res = await fetch(`/api/patent/${patent.id}/retry`, {
+                          method: 'POST',
+                          headers: getAuthHeaders(),
+                        });
+                        if (!res.ok) throw new Error('Retry failed');
+                        toast({ title: 'Retry Started', description: 'Processing has been restarted. Check back shortly.' });
+                        if (params?.id) loadPatent(params.id);
+                      } catch (error) {
+                        toast({ title: 'Error', description: 'Failed to retry processing', variant: 'destructive' });
+                      } finally {
+                        setRetrying(false);
+                      }
+                    }}
+                    disabled={retrying}
+                    className="bg-red-600 hover:bg-red-700"
+                    data-testid="button-retry"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
+                    {retrying ? 'Retrying...' : 'Retry Processing'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Artifacts */}
           <div className="space-y-12">
-            {artifacts.length === 0 ? (
+            {artifacts.length === 0 && patent.status !== 'failed' && patent.status !== 'partial' ? (
               <div className="text-center py-16 bg-card border border-border rounded-lg">
                 <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
                 <h3 className="font-display text-2xl font-bold text-primary-900 mb-2">Generating artifacts...</h3>
                 <p className="text-muted-foreground">Your analysis is being generated. Check back soon.</p>
               </div>
-            ) : (
+            ) : artifacts.length === 0 ? null : (
               artifacts.map((artifact, index) => (
                 <div key={artifact.type} className="space-y-6">
                   {/* Artifact Header */}

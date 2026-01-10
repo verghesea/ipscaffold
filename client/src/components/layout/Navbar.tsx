@@ -1,7 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { api, type User } from "@/lib/api";
-import { LogOut, LayoutDashboard } from "lucide-react";
+import { LogOut, LayoutDashboard, Shield } from "lucide-react";
+import { NotificationDropdown } from "@/components/NotificationDropdown";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
@@ -33,17 +34,26 @@ export function Navbar() {
           IP Scaffold
         </Link>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           {user ? (
             <>
               <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-secondary rounded-full" data-testid="text-credits">
                 <span className="text-sm font-medium text-primary-900">{user.credits} Credits</span>
               </div>
+
+              <NotificationDropdown />
               
               <Link href="/dashboard" className={`text-sm font-medium transition-colors hover:text-accent-600 flex items-center gap-2 ${location === '/dashboard' ? 'text-accent-600' : 'text-muted-foreground'}`} data-testid="link-dashboard">
                 <LayoutDashboard className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
+
+              {user.isAdmin && (
+                <Link href="/admin" className={`text-sm font-medium transition-colors hover:text-amber-600 flex items-center gap-2 ${location === '/admin' ? 'text-amber-600' : 'text-muted-foreground'}`} data-testid="link-admin">
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden sm:inline">Admin</span>
+                </Link>
+              )}
               
               <button 
                 onClick={handleLogout}

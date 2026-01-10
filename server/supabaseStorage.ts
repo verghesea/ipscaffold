@@ -182,6 +182,74 @@ export class SupabaseStorage {
     if (error) return [];
     return data || [];
   }
+
+  async getAllProfiles(): Promise<Profile[]> {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) return [];
+    return data || [];
+  }
+
+  async getAllPatents(): Promise<Patent[]> {
+    const { data, error } = await supabaseAdmin
+      .from('patents')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) return [];
+    return data || [];
+  }
+
+  async getSystemMetrics(): Promise<any> {
+    const { data, error } = await supabaseAdmin.rpc('get_system_metrics');
+    if (error) {
+      console.error('Failed to get system metrics:', error);
+      return {
+        total_users: 0,
+        total_patents: 0,
+        patents_today: 0,
+        total_credits_used: 0,
+        status_breakdown: [],
+      };
+    }
+    return data;
+  }
+
+  async updateProfileAdmin(userId: string, isAdmin: boolean): Promise<void> {
+    await supabaseAdmin
+      .from('profiles')
+      .update({ is_admin: isAdmin })
+      .eq('id', userId);
+  }
+
+  async adjustUserCredits(userId: string, amount: number, description: string): Promise<void> {
+    const profile = await this.getProfile(userId);
+    if (!profile) throw new Error('User not found');
+    
+    const newBalance = profile.credits + amount;
+    await this.updateProfileCredits(userId, newBalance);
+    await this.createCreditTransaction({
+      user_id: userId,
+      amount: amount,
+      balance_after: newBalance,
+      transaction_type: 'admin_adjustment',
+      description: description,
+      patent_id: null,
+    });
+  }
+
+  async createAuditLog(adminId: string, action: string, targetType?: string, targetId?: string, details?: any): Promise<void> {
+    await supabaseAdmin.from('admin_audit_log').insert({
+      admin_id: adminId,
+      action,
+      target_type: targetType,
+      target_id: targetId,
+      details,
+    });
+  }
 }
 
 export const supabaseStorage = new SupabaseStorage();

@@ -127,7 +127,17 @@ export async function registerRoutes(
           message: 'Patent uploaded and ELIA15 generated successfully'
         });
 
-        generateRemainingArtifacts(patent.id, parsedPatent.fullText, elia15Result.content).catch(console.error);
+        if (user?.id) {
+          generateRemainingArtifactsWithNotifications(
+            patent.id, 
+            parsedPatent.fullText, 
+            elia15Result.content, 
+            user.id, 
+            parsedPatent.title
+          ).catch((err) => console.error('Error in generation with notifications:', err));
+        } else {
+          generateRemainingArtifacts(patent.id, parsedPatent.fullText, elia15Result.content).catch(console.error);
+        }
 
       } catch (error) {
         console.error('Error generating ELIA15:', error);
@@ -374,15 +384,185 @@ export async function registerRoutes(
   app.get('/api/credits', requireAuth, async (req, res) => {
     try {
       const profile = await supabaseStorage.getProfile(req.user!.id);
+      const transactions = await supabaseStorage.getCreditTransactionsByUser(req.user!.id);
 
       res.json({
         balance: profile?.credits || 0,
-        transactions: [],
+        transactions: transactions.map(t => ({
+          id: t.id,
+          amount: t.amount,
+          balanceAfter: t.balance_after,
+          type: t.transaction_type,
+          description: t.description,
+          createdAt: t.created_at,
+        })),
       });
 
     } catch (error) {
       console.error('Credits error:', error);
       res.status(500).json({ error: 'Failed to load credits' });
+    }
+  });
+
+  app.get('/api/notifications', requireAuth, async (req, res) => {
+    try {
+      const { NotificationService } = await import('./services/notificationService');
+      const unreadOnly = req.query.unread === 'true';
+      const notifications = await NotificationService.getUserNotifications(req.user!.id, unreadOnly);
+      const unreadCount = await NotificationService.getUnreadCount(req.user!.id);
+
+      res.json({ notifications, unreadCount });
+    } catch (error) {
+      console.error('Notifications error:', error);
+      res.status(500).json({ error: 'Failed to load notifications' });
+    }
+  });
+
+  app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
+    try {
+      const { NotificationService } = await import('./services/notificationService');
+      await NotificationService.markAsRead(req.params.id, req.user!.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Mark read error:', error);
+      res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+  });
+
+  app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
+    try {
+      const { NotificationService } = await import('./services/notificationService');
+      await NotificationService.markAllAsRead(req.user!.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Mark all read error:', error);
+      res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
+  const requireAdmin = async (req: any, res: any, next: any) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const profile = await supabaseStorage.getProfile(req.user.id);
+    if (!profile?.is_admin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+  };
+
+  app.get('/api/admin/metrics', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const metrics = await supabaseStorage.getSystemMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error('Admin metrics error:', error);
+      res.status(500).json({ error: 'Failed to load metrics' });
+    }
+  });
+
+  app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const profiles = await supabaseStorage.getAllProfiles();
+      res.json({ users: profiles });
+    } catch (error) {
+      console.error('Admin users error:', error);
+      res.status(500).json({ error: 'Failed to load users' });
+    }
+  });
+
+  app.get('/api/admin/patents', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const patents = await supabaseStorage.getAllPatents();
+      res.json({ patents });
+    } catch (error) {
+      console.error('Admin patents error:', error);
+      res.status(500).json({ error: 'Failed to load patents' });
+    }
+  });
+
+  app.post('/api/admin/users/:id/credits', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { amount, description } = req.body;
+      if (typeof amount !== 'number') {
+        return res.status(400).json({ error: 'Amount must be a number' });
+      }
+      await supabaseStorage.adjustUserCredits(req.params.id, amount, description || 'Admin adjustment');
+      await supabaseStorage.createAuditLog(req.user!.id, 'adjust_credits', 'user', req.params.id, { amount, description });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin credits error:', error);
+      res.status(500).json({ error: 'Failed to adjust credits' });
+    }
+  });
+
+  app.post('/api/admin/users/:id/admin', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { isAdmin } = req.body;
+      await supabaseStorage.updateProfileAdmin(req.params.id, !!isAdmin);
+      await supabaseStorage.createAuditLog(req.user!.id, 'update_admin_status', 'user', req.params.id, { isAdmin });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin update error:', error);
+      res.status(500).json({ error: 'Failed to update admin status' });
+    }
+  });
+
+  app.post('/api/patent/:id/retry', requireAuth, async (req, res) => {
+    try {
+      const patent = await supabaseStorage.getPatent(req.params.id);
+      
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
+      }
+      
+      if (patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      if (patent.status === 'completed') {
+        return res.status(400).json({ error: 'Patent is already completed' });
+      }
+      
+      if (patent.status !== 'failed' && patent.status !== 'partial') {
+        return res.status(400).json({ error: 'Patent is not in a failed state' });
+      }
+      
+      await supabaseStorage.updatePatentStatus(req.params.id, 'processing');
+      
+      const existingArtifacts = await supabaseStorage.getArtifactsByPatent(req.params.id);
+      const hasElia15 = existingArtifacts.some(a => a.artifact_type === 'elia15');
+      
+      if (!hasElia15) {
+        const elia15Result = await generateELIA15(patent.full_text, patent.title || 'Patent Document');
+        await supabaseStorage.createArtifact({
+          patent_id: req.params.id,
+          artifact_type: 'elia15',
+          content: elia15Result.content,
+          tokens_used: elia15Result.tokensUsed,
+          generation_time_seconds: elia15Result.generationTimeSeconds,
+        });
+        await supabaseStorage.updatePatentStatus(req.params.id, 'elia15_complete');
+      }
+      
+      const artifacts = await supabaseStorage.getArtifactsByPatent(req.params.id);
+      const elia15 = artifacts.find(a => a.artifact_type === 'elia15');
+      
+      if (elia15) {
+        generateRemainingArtifactsWithNotifications(
+          req.params.id, 
+          patent.full_text, 
+          elia15.content, 
+          req.user!.id, 
+          patent.title
+        ).catch((err) => console.error('Error in retry generation:', err));
+      }
+      
+      res.json({ success: true, message: 'Retry initiated' });
+      
+    } catch (error) {
+      console.error('Retry error:', error);
+      res.status(500).json({ error: 'Failed to retry patent processing' });
     }
   });
 
@@ -419,5 +599,49 @@ async function generateRemainingArtifacts(patentId: string, fullText: string, el
   } catch (error) {
     console.error('Error generating remaining artifacts:', error);
     await supabaseStorage.updatePatentStatus(patentId, 'failed', 'Failed to generate all artifacts');
+  }
+}
+
+async function generateRemainingArtifactsWithNotifications(
+  patentId: string, 
+  fullText: string, 
+  elia15Content: string, 
+  userId: string, 
+  patentTitle: string | null
+) {
+  const { NotificationService } = await import('./services/notificationService');
+  
+  try {
+    const [narrativeResult, goldenCircleResult] = await Promise.all([
+      generateBusinessNarrative(fullText, elia15Content),
+      generateGoldenCircle(fullText, elia15Content),
+    ]);
+
+    await Promise.all([
+      supabaseStorage.createArtifact({
+        patent_id: patentId,
+        artifact_type: 'business_narrative',
+        content: narrativeResult.content,
+        tokens_used: narrativeResult.tokensUsed,
+        generation_time_seconds: narrativeResult.generationTimeSeconds,
+      }),
+      supabaseStorage.createArtifact({
+        patent_id: patentId,
+        artifact_type: 'golden_circle',
+        content: goldenCircleResult.content,
+        tokens_used: goldenCircleResult.tokensUsed,
+        generation_time_seconds: goldenCircleResult.generationTimeSeconds,
+      }),
+    ]);
+
+    await supabaseStorage.updatePatentStatus(patentId, 'completed');
+    console.log('All artifacts generated for patent:', patentId);
+    
+    await NotificationService.sendPatentReady(userId, patentId, patentTitle);
+
+  } catch (error) {
+    console.error('Error generating remaining artifacts:', error);
+    await supabaseStorage.updatePatentStatus(patentId, 'failed', 'Failed to generate all artifacts');
+    await NotificationService.sendProcessingError(userId, patentId, patentTitle, (error as Error).message);
   }
 }
