@@ -1,0 +1,3307 @@
+Now I have a comprehensive understanding of the project. Let me create the detailed implementation instructions for the Replit agent.
+
+---
+
+# IP Scaffold Supabase Migration - Comprehensive Implementation Instructions for Replit Agent
+
+## Executive Summary
+
+This document provides step-by-step instructions to migrate IP Scaffold from a legacy PostgreSQL/Flask architecture to a modern Supabase-powered TypeScript/Express/React stack. The migration involves:
+
+1. Removing all Drizzle ORM and legacy PostgreSQL code
+2. Implementing Supabase for database, authentication, and file storage
+3. Creating a user dashboard with patent management
+4. Implementing error handling with Sentry integration
+5. Building an admin dashboard
+6. Setting up webhook notifications
+
+**Supabase Project**: `qkmfovzqjujrefuifptk.supabase.co`
+
+---
+
+## Phase 1: Foundation Setup
+
+### 1.1 Environment Variables Configuration
+
+**File to create/modify**: `.env`
+
+```bash
+# Supabase Configuration
+SUPABASE_URL=https://qkmfovzqjujrefuifptk.supabase.co
+SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# Sentry Configuration
+SENTRY_DSN=your_sentry_dsn_here
+SENTRY_ENVIRONMENT=development
+
+# Anthropic API (for AI generation)
+ANTHROPIC_API_KEY=your_anthropic_key_here
+
+# App Configuration
+APP_URL=https://your-replit-app.repl.co
+NODE_ENV=development
+PORT=3000
+
+# Session Configuration
+SESSION_SECRET=generate_a_secure_random_string_here
+```
+
+### 1.2 Package Dependencies
+
+**File to create/modify**: `package.json`
+
+```json
+{
+  "name": "ipscaffold",
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "@sentry/node": "^7.91.0",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "anthropic": "^0.12.0",
+    "docx": "^8.5.0",
+    "uuid": "^9.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/express-session": "^1.17.10",
+    "@types/cors": "^2.8.17",
+    "@types/multer": "^1.4.11",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  }
+}
+```
+
+### 1.3 Supabase Database Schema with RLS
+
+**Execute in Supabase SQL Editor** (Dashboard -> SQL Editor -> New Query)
+
+```sql
+-- ============================================
+-- IP SCAFFOLD SUPABASE SCHEMA
+-- Version: 2.0.0
+-- ============================================
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================
+-- 1. PROFILES TABLE (extends auth.users)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    credits INTEGER DEFAULT 100 NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for email lookups
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
+
+-- Enable RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for profiles
+CREATE POLICY "Users can view own profile" ON public.profiles
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile" ON public.profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Service role can manage all profiles" ON public.profiles
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 2. PATENTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.patents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT,
+    inventors TEXT,
+    assignee TEXT,
+    filing_date DATE,
+    issue_date DATE,
+    full_text TEXT NOT NULL,
+    pdf_path TEXT,
+    pdf_filename TEXT,
+    status TEXT DEFAULT 'processing' NOT NULL CHECK (status IN ('processing', 'elia15_complete', 'completed', 'failed', 'partial')),
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for patents
+CREATE INDEX IF NOT EXISTS idx_patents_user_id ON public.patents(user_id);
+CREATE INDEX IF NOT EXISTS idx_patents_status ON public.patents(status);
+CREATE INDEX IF NOT EXISTS idx_patents_created_at ON public.patents(created_at DESC);
+
+-- Enable RLS
+ALTER TABLE public.patents ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for patents
+CREATE POLICY "Users can view own patents" ON public.patents
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own patents" ON public.patents
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Users can update own patents" ON public.patents
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own patents" ON public.patents
+    FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all patents" ON public.patents
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 3. ARTIFACTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.artifacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patent_id UUID NOT NULL REFERENCES public.patents(id) ON DELETE CASCADE,
+    artifact_type TEXT NOT NULL CHECK (artifact_type IN ('elia15', 'business_narrative', 'golden_circle')),
+    content TEXT NOT NULL,
+    tokens_used INTEGER,
+    generation_time_seconds NUMERIC(10, 2),
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(patent_id, artifact_type)
+);
+
+-- Indexes for artifacts
+CREATE INDEX IF NOT EXISTS idx_artifacts_patent_id ON public.artifacts(patent_id);
+CREATE INDEX IF NOT EXISTS idx_artifacts_type ON public.artifacts(artifact_type);
+
+-- Enable RLS
+ALTER TABLE public.artifacts ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for artifacts (through patent ownership)
+CREATE POLICY "Users can view artifacts for own patents" ON public.artifacts
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.patents
+            WHERE patents.id = artifacts.patent_id
+            AND patents.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Service role can manage all artifacts" ON public.artifacts
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 4. CREDIT TRANSACTIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.credit_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    transaction_type TEXT NOT NULL CHECK (transaction_type IN ('signup_bonus', 'ip_processing', 'purchase', 'refund', 'admin_adjustment')),
+    description TEXT,
+    patent_id UUID REFERENCES public.patents(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for credit transactions
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON public.credit_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_type ON public.credit_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_created ON public.credit_transactions(created_at DESC);
+
+-- Enable RLS
+ALTER TABLE public.credit_transactions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for credit transactions
+CREATE POLICY "Users can view own transactions" ON public.credit_transactions
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all transactions" ON public.credit_transactions
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 5. WEBHOOK NOTIFICATIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.webhook_notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    notification_type TEXT NOT NULL CHECK (notification_type IN ('artifact_complete', 'processing_error', 'low_credits', 'patent_ready')),
+    payload JSONB NOT NULL DEFAULT '{}',
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for webhook notifications
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.webhook_notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.webhook_notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON public.webhook_notifications(created_at DESC);
+
+-- Enable RLS
+ALTER TABLE public.webhook_notifications ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for notifications
+CREATE POLICY "Users can view own notifications" ON public.webhook_notifications
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own notifications" ON public.webhook_notifications
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage all notifications" ON public.webhook_notifications
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 6. ADMIN AUDIT LOG TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.admin_audit_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admin_id UUID NOT NULL REFERENCES auth.users(id),
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id UUID,
+    details JSONB,
+    ip_address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for audit log
+CREATE INDEX IF NOT EXISTS idx_audit_log_admin_id ON public.admin_audit_log(admin_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created ON public.admin_audit_log(created_at DESC);
+
+-- Enable RLS (admin only access)
+ALTER TABLE public.admin_audit_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role can manage audit log" ON public.admin_audit_log
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 7. TRIGGERS AND FUNCTIONS
+-- ============================================
+
+-- Function to auto-create profile on user signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, email, credits)
+    VALUES (NEW.id, NEW.email, 100);
+    
+    -- Create signup bonus transaction
+    INSERT INTO public.credit_transactions (user_id, amount, balance_after, transaction_type, description)
+    VALUES (NEW.id, 100, 100, 'signup_bonus', 'Welcome bonus - 100 free credits');
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger for new user signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply updated_at trigger to tables
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
+CREATE TRIGGER update_profiles_updated_at
+    BEFORE UPDATE ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_patents_updated_at ON public.patents;
+CREATE TRIGGER update_patents_updated_at
+    BEFORE UPDATE ON public.patents
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 8. RPC FUNCTIONS FOR ADMIN
+-- ============================================
+
+-- Function to get users with statistics (admin only)
+CREATE OR REPLACE FUNCTION get_users_with_stats()
+RETURNS TABLE (
+    id UUID,
+    email TEXT,
+    credits INTEGER,
+    is_admin BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE,
+    patent_count BIGINT,
+    credits_used BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.id,
+        p.email,
+        p.credits,
+        p.is_admin,
+        p.created_at,
+        COALESCE(COUNT(DISTINCT pat.id), 0) as patent_count,
+        COALESCE(ABS(SUM(CASE WHEN ct.transaction_type = 'ip_processing' THEN ct.amount ELSE 0 END)), 0) as credits_used
+    FROM public.profiles p
+    LEFT JOIN public.patents pat ON p.id = pat.user_id
+    LEFT JOIN public.credit_transactions ct ON p.id = ct.user_id
+    GROUP BY p.id, p.email, p.credits, p.is_admin, p.created_at
+    ORDER BY p.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get system metrics (admin only)
+CREATE OR REPLACE FUNCTION get_system_metrics()
+RETURNS JSON AS $$
+DECLARE
+    result JSON;
+BEGIN
+    SELECT json_build_object(
+        'total_users', (SELECT COUNT(*) FROM public.profiles),
+        'total_patents', (SELECT COUNT(*) FROM public.patents),
+        'patents_today', (SELECT COUNT(*) FROM public.patents WHERE created_at >= CURRENT_DATE),
+        'total_credits_used', (SELECT COALESCE(ABS(SUM(amount)), 0) FROM public.credit_transactions WHERE transaction_type = 'ip_processing'),
+        'status_breakdown', (
+            SELECT json_agg(json_build_object('status', status, 'count', cnt))
+            FROM (SELECT status, COUNT(*) as cnt FROM public.patents GROUP BY status) s
+        ),
+        'active_users_7d', (SELECT COUNT(DISTINCT user_id) FROM public.patents WHERE created_at >= NOW() - INTERVAL '7 days')
+    ) INTO result;
+    
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- 9. STORAGE BUCKET SETUP
+-- ============================================
+-- Note: Run these in Supabase Dashboard -> Storage -> Create Bucket
+
+-- Bucket: patent-pdfs (for uploaded PDF files)
+-- Public: false
+-- File size limit: 10MB
+-- Allowed MIME types: application/pdf
+```
+
+### 1.4 Supabase Storage Bucket Configuration
+
+**In Supabase Dashboard -> Storage -> Create Bucket:**
+
+1. Create bucket named `patent-pdfs`
+   - Public: No (private)
+   - File size limit: 10485760 (10MB)
+   - Allowed MIME types: `application/pdf`
+
+2. Add RLS policy for the bucket:
+
+```sql
+-- Storage policies (execute in SQL Editor)
+CREATE POLICY "Users can upload own patent PDFs"
+ON storage.objects FOR INSERT
+WITH CHECK (
+    bucket_id = 'patent-pdfs'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+CREATE POLICY "Users can view own patent PDFs"
+ON storage.objects FOR SELECT
+USING (
+    bucket_id = 'patent-pdfs'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+CREATE POLICY "Users can delete own patent PDFs"
+ON storage.objects FOR DELETE
+USING (
+    bucket_id = 'patent-pdfs'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+```
+
+### 1.5 Supabase Auth Configuration
+
+**In Supabase Dashboard -> Authentication -> Providers:**
+
+1. **Email Provider:**
+   - Enable Email provider
+   - Disable "Confirm email" (for magic links to work immediately)
+   - Enable "Magic Link"
+
+2. **Google OAuth Provider:**
+   - Enable Google provider
+   - Add Client ID from Google Cloud Console
+   - Add Client Secret from Google Cloud Console
+   - Authorized redirect URI: `https://qkmfovzqjujrefuifptk.supabase.co/auth/v1/callback`
+
+**In Supabase Dashboard -> Authentication -> URL Configuration:**
+- Site URL: `https://your-replit-app.repl.co`
+- Redirect URLs: 
+  - `https://your-replit-app.repl.co/auth/callback`
+  - `https://your-replit-app.repl.co/dashboard`
+
+### 1.6 Sentry Setup
+
+**Create Sentry Project:**
+1. Go to https://sentry.io
+2. Create new project (Node.js)
+3. Copy DSN to `.env`
+
+**Testing Checklist Phase 1:**
+- [ ] Environment variables are set
+- [ ] Supabase project accessible
+- [ ] Database tables created
+- [ ] RLS policies active
+- [ ] Storage bucket created
+- [ ] Auth providers configured
+- [ ] Sentry project created
+
+---
+
+## Phase 2: Backend Core Implementation
+
+### 2.1 Project Structure
+
+Create the following directory structure:
+
+```
+src/
+├── server.ts              # Main Express server entry
+├── config/
+│   ├── index.ts           # Configuration loader
+│   └── supabase.ts        # Supabase client initialization
+├── middleware/
+│   ├── auth.ts            # Authentication middleware
+│   ├── errorHandler.ts    # Global error handler with Sentry
+│   ├── admin.ts           # Admin authorization middleware
+│   └── rateLimit.ts       # Rate limiting
+├── routes/
+│   ├── index.ts           # Route aggregator
+│   ├── auth.ts            # Authentication routes
+│   ├── patents.ts         # Patent CRUD routes
+│   ├── dashboard.ts       # Dashboard routes
+│   ├── admin.ts           # Admin routes
+│   └── webhooks.ts        # Webhook routes
+├── services/
+│   ├── supabase.ts        # Supabase service layer
+│   ├── ai.ts              # AI generation service
+│   ├── pdf.ts             # PDF parsing service
+│   ├── credits.ts         # Credit management
+│   ├── notifications.ts   # Webhook notification service
+│   └── errors.ts          # Error handling utilities
+├── types/
+│   └── index.ts           # TypeScript type definitions
+└── utils/
+    ├── retry.ts           # Retry logic with exponential backoff
+    └── validation.ts      # Zod validation schemas
+```
+
+### 2.2 Configuration Module
+
+**File: `src/config/index.ts`**
+
+```typescript
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const config = {
+  supabase: {
+    url: process.env.SUPABASE_URL!,
+    anonKey: process.env.SUPABASE_ANON_KEY!,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  },
+  sentry: {
+    dsn: process.env.SENTRY_DSN!,
+    environment: process.env.SENTRY_ENVIRONMENT || 'development',
+  },
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+  },
+  app: {
+    url: process.env.APP_URL!,
+    port: parseInt(process.env.PORT || '3000'),
+    nodeEnv: process.env.NODE_ENV || 'development',
+    sessionSecret: process.env.SESSION_SECRET!,
+  },
+  credits: {
+    costPerPatent: 10,
+    signupBonus: 100,
+    lowCreditWarningThreshold: 10,
+  },
+  upload: {
+    maxFileSizeMB: 10,
+    allowedMimeTypes: ['application/pdf'],
+  },
+  retry: {
+    maxAttempts: 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 10000,
+  },
+};
+```
+
+### 2.3 Supabase Client Initialization
+
+**File: `src/config/supabase.ts`**
+
+```typescript
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { config } from './index';
+
+// Client for authenticated user operations (uses anon key + user JWT)
+export const supabaseClient = createClient(
+  config.supabase.url,
+  config.supabase.anonKey
+);
+
+// Admin client for server-side operations (bypasses RLS)
+export const supabaseAdmin = createClient(
+  config.supabase.url,
+  config.supabase.serviceRoleKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
+
+// Create authenticated client for specific user
+export function createAuthenticatedClient(accessToken: string): SupabaseClient {
+  return createClient(config.supabase.url, config.supabase.anonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+}
+```
+
+### 2.4 Type Definitions
+
+**File: `src/types/index.ts`**
+
+```typescript
+export interface User {
+  id: string;
+  email: string;
+  credits: number;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Patent {
+  id: string;
+  user_id: string | null;
+  title: string | null;
+  inventors: string | null;
+  assignee: string | null;
+  filing_date: string | null;
+  issue_date: string | null;
+  full_text: string;
+  pdf_path: string | null;
+  pdf_filename: string | null;
+  status: PatentStatus;
+  error_message: string | null;
+  retry_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PatentStatus = 'processing' | 'elia15_complete' | 'completed' | 'failed' | 'partial';
+
+export interface Artifact {
+  id: string;
+  patent_id: string;
+  artifact_type: ArtifactType;
+  content: string;
+  tokens_used: number | null;
+  generation_time_seconds: number | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export type ArtifactType = 'elia15' | 'business_narrative' | 'golden_circle';
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: TransactionType;
+  description: string | null;
+  patent_id: string | null;
+  created_at: string;
+}
+
+export type TransactionType = 'signup_bonus' | 'ip_processing' | 'purchase' | 'refund' | 'admin_adjustment';
+
+export interface WebhookNotification {
+  id: string;
+  user_id: string;
+  notification_type: NotificationType;
+  payload: Record<string, any>;
+  read: boolean;
+  created_at: string;
+}
+
+export type NotificationType = 'artifact_complete' | 'processing_error' | 'low_credits' | 'patent_ready';
+
+// Error types
+export type ErrorCategory = 'network' | 'validation' | 'ai' | 'storage' | 'auth' | 'unknown';
+
+export interface AppError extends Error {
+  category: ErrorCategory;
+  statusCode: number;
+  isOperational: boolean;
+  context?: Record<string, any>;
+}
+
+// API response types
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: {
+    message: string;
+    code: string;
+    category: ErrorCategory;
+  };
+}
+
+// Dashboard types
+export interface DashboardPatent extends Patent {
+  artifact_count: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+```
+
+### 2.5 Error Handling Service
+
+**File: `src/services/errors.ts`**
+
+```typescript
+import * as Sentry from '@sentry/node';
+import { config } from '../config';
+import { AppError, ErrorCategory } from '../types';
+
+// Initialize Sentry
+Sentry.init({
+  dsn: config.sentry.dsn,
+  environment: config.sentry.environment,
+  tracesSampleRate: 1.0,
+  integrations: [
+    new Sentry.Integrations.Http({ tracing: true }),
+  ],
+});
+
+export { Sentry };
+
+// Custom error class
+export class ApplicationError extends Error implements AppError {
+  category: ErrorCategory;
+  statusCode: number;
+  isOperational: boolean;
+  context?: Record<string, any>;
+
+  constructor(
+    message: string,
+    category: ErrorCategory,
+    statusCode: number = 500,
+    isOperational: boolean = true,
+    context?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'ApplicationError';
+    this.category = category;
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    this.context = context;
+
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+// Error categorization
+export function categorizeError(error: Error): ErrorCategory {
+  const message = error.message.toLowerCase();
+  
+  if (message.includes('network') || message.includes('fetch') || message.includes('timeout')) {
+    return 'network';
+  }
+  if (message.includes('validation') || message.includes('invalid') || message.includes('required')) {
+    return 'validation';
+  }
+  if (message.includes('anthropic') || message.includes('ai') || message.includes('generation')) {
+    return 'ai';
+  }
+  if (message.includes('storage') || message.includes('upload') || message.includes('file')) {
+    return 'storage';
+  }
+  if (message.includes('auth') || message.includes('unauthorized') || message.includes('token')) {
+    return 'auth';
+  }
+  
+  return 'unknown';
+}
+
+// User-friendly error messages
+export const userFriendlyMessages: Record<ErrorCategory, string> = {
+  network: 'Connection issue. Please check your internet and try again.',
+  validation: 'Invalid input. Please check your data and try again.',
+  ai: 'AI service temporarily unavailable. Your patent has been saved and we will retry automatically.',
+  storage: 'File upload failed. Please try again with a smaller file.',
+  auth: 'Authentication required. Please log in again.',
+  unknown: 'An unexpected error occurred. Our team has been notified.',
+};
+
+// Log error to Sentry with context
+export function logError(
+  error: Error,
+  context?: Record<string, any>,
+  userId?: string
+): void {
+  Sentry.withScope((scope) => {
+    if (userId) {
+      scope.setUser({ id: userId });
+    }
+    if (context) {
+      scope.setExtras(context);
+    }
+    
+    const category = error instanceof ApplicationError ? error.category : categorizeError(error);
+    scope.setTag('error_category', category);
+    
+    Sentry.captureException(error);
+  });
+  
+  // Also log to console in development
+  if (config.app.nodeEnv === 'development') {
+    console.error('Error:', error);
+    console.error('Context:', context);
+  }
+}
+
+// Create specific error types
+export const Errors = {
+  insufficientCredits: (current: number, required: number) =>
+    new ApplicationError(
+      `Insufficient credits. You have ${current} but need ${required}.`,
+      'validation',
+      402,
+      true,
+      { currentCredits: current, requiredCredits: required }
+    ),
+  
+  patentNotFound: (patentId: string) =>
+    new ApplicationError(
+      'Patent not found',
+      'validation',
+      404,
+      true,
+      { patentId }
+    ),
+  
+  unauthorized: () =>
+    new ApplicationError(
+      'Authentication required',
+      'auth',
+      401,
+      true
+    ),
+  
+  forbidden: () =>
+    new ApplicationError(
+      'Access denied',
+      'auth',
+      403,
+      true
+    ),
+  
+  aiGenerationFailed: (artifactType: string, attempt: number) =>
+    new ApplicationError(
+      `Failed to generate ${artifactType} after ${attempt} attempts`,
+      'ai',
+      500,
+      true,
+      { artifactType, attempt }
+    ),
+  
+  pdfParsingFailed: (filename: string, reason: string) =>
+    new ApplicationError(
+      `Failed to parse PDF: ${reason}`,
+      'validation',
+      400,
+      true,
+      { filename, reason }
+    ),
+  
+  fileUploadFailed: (filename: string) =>
+    new ApplicationError(
+      `Failed to upload file: ${filename}`,
+      'storage',
+      500,
+      true,
+      { filename }
+    ),
+};
+```
+
+### 2.6 Retry Logic Utility
+
+**File: `src/utils/retry.ts`**
+
+```typescript
+import { config } from '../config';
+import { logError } from '../services/errors';
+
+interface RetryOptions {
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  onRetry?: (attempt: number, error: Error) => void;
+}
+
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const {
+    maxAttempts = config.retry.maxAttempts,
+    baseDelayMs = config.retry.baseDelayMs,
+    maxDelayMs = config.retry.maxDelayMs,
+    onRetry,
+  } = options;
+
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      if (attempt === maxAttempts) {
+        break;
+      }
+      
+      // Calculate exponential backoff with jitter
+      const delay = Math.min(
+        baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000,
+        maxDelayMs
+      );
+      
+      if (onRetry) {
+        onRetry(attempt, lastError);
+      }
+      
+      console.log(`Retry attempt ${attempt}/${maxAttempts} after ${delay}ms`);
+      await sleep(delay);
+    }
+  }
+  
+  throw lastError!;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Retry wrapper specifically for AI operations
+export async function withAIRetry<T>(
+  operation: () => Promise<T>,
+  context: { patentId: string; artifactType: string }
+): Promise<T> {
+  return withRetry(operation, {
+    maxAttempts: 3,
+    baseDelayMs: 2000,
+    maxDelayMs: 15000,
+    onRetry: (attempt, error) => {
+      logError(error, {
+        ...context,
+        retryAttempt: attempt,
+        operation: 'ai_generation',
+      });
+    },
+  });
+}
+```
+
+### 2.7 Supabase Service Layer
+
+**File: `src/services/supabase.ts`**
+
+```typescript
+import { supabaseAdmin, createAuthenticatedClient } from '../config/supabase';
+import { User, Patent, Artifact, CreditTransaction, DashboardPatent, PaginatedResponse } from '../types';
+import { Errors, logError } from './errors';
+import { config } from '../config';
+
+export class SupabaseService {
+  // ============================================
+  // USER OPERATIONS
+  // ============================================
+  
+  static async getUserProfile(userId: string): Promise<User | null> {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      logError(error, { userId, operation: 'getUserProfile' });
+      return null;
+    }
+    
+    return data;
+  }
+  
+  static async updateUserCredits(userId: string, newCredits: number): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .update({ credits: newCredits })
+      .eq('id', userId);
+    
+    if (error) {
+      throw error;
+    }
+  }
+
+  // ============================================
+  // PATENT OPERATIONS
+  // ============================================
+  
+  static async createPatent(data: Partial<Patent>): Promise<Patent> {
+    const { data: patent, error } = await supabaseAdmin
+      .from('patents')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return patent;
+  }
+  
+  static async getPatentById(patentId: string): Promise<Patent | null> {
+    const { data, error } = await supabaseAdmin
+      .from('patents')
+      .select('*')
+      .eq('id', patentId)
+      .single();
+    
+    if (error) {
+      return null;
+    }
+    
+    return data;
+  }
+  
+  static async getUserPatents(
+    userId: string,
+    options: { page?: number; pageSize?: number; search?: string } = {}
+  ): Promise<PaginatedResponse<DashboardPatent>> {
+    const { page = 1, pageSize = 10, search = '' } = options;
+    const offset = (page - 1) * pageSize;
+    
+    let query = supabaseAdmin
+      .from('patents')
+      .select('*, artifacts(id)', { count: 'exact' })
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    // Apply search filter
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,assignee.ilike.%${search}%,inventors.ilike.%${search}%`);
+    }
+    
+    // Apply pagination
+    query = query.range(offset, offset + pageSize - 1);
+    
+    const { data, error, count } = await query;
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Transform to include artifact count
+    const patents: DashboardPatent[] = (data || []).map(p => ({
+      ...p,
+      artifact_count: Array.isArray(p.artifacts) ? p.artifacts.length : 0,
+      artifacts: undefined, // Remove artifacts array from response
+    }));
+    
+    return {
+      data: patents,
+      total: count || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((count || 0) / pageSize),
+    };
+  }
+  
+  static async getRecentPatents(userId: string, limit: number = 3): Promise<DashboardPatent[]> {
+    const { data, error } = await supabaseAdmin
+      .from('patents')
+      .select('*, artifacts(id)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return (data || []).map(p => ({
+      ...p,
+      artifact_count: Array.isArray(p.artifacts) ? p.artifacts.length : 0,
+      artifacts: undefined,
+    }));
+  }
+  
+  static async updatePatentStatus(
+    patentId: string,
+    status: Patent['status'],
+    errorMessage?: string
+  ): Promise<void> {
+    const updateData: Partial<Patent> = { status };
+    if (errorMessage) {
+      updateData.error_message = errorMessage;
+    }
+    
+    const { error } = await supabaseAdmin
+      .from('patents')
+      .update(updateData)
+      .eq('id', patentId);
+    
+    if (error) {
+      throw error;
+    }
+  }
+  
+  static async assignPatentToUser(patentId: string, userId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('patents')
+      .update({ user_id: userId })
+      .eq('id', patentId);
+    
+    if (error) {
+      throw error;
+    }
+  }
+  
+  static async deletePatent(patentId: string, userId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('patents')
+      .delete()
+      .eq('id', patentId)
+      .eq('user_id', userId);
+    
+    if (error) {
+      throw error;
+    }
+  }
+  
+  static async incrementRetryCount(patentId: string): Promise<number> {
+    const patent = await this.getPatentById(patentId);
+    if (!patent) throw Errors.patentNotFound(patentId);
+    
+    const newCount = (patent.retry_count || 0) + 1;
+    
+    const { error } = await supabaseAdmin
+      .from('patents')
+      .update({ retry_count: newCount })
+      .eq('id', patentId);
+    
+    if (error) throw error;
+    
+    return newCount;
+  }
+
+  // ============================================
+  // ARTIFACT OPERATIONS
+  // ============================================
+  
+  static async createArtifact(data: Partial<Artifact>): Promise<Artifact> {
+    const { data: artifact, error } = await supabaseAdmin
+      .from('artifacts')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return artifact;
+  }
+  
+  static async getPatentArtifacts(patentId: string): Promise<Artifact[]> {
+    const { data, error } = await supabaseAdmin
+      .from('artifacts')
+      .select('*')
+      .eq('patent_id', patentId);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  }
+  
+  static async getArtifactByType(patentId: string, type: Artifact['artifact_type']): Promise<Artifact | null> {
+    const { data, error } = await supabaseAdmin
+      .from('artifacts')
+      .select('*')
+      .eq('patent_id', patentId)
+      .eq('artifact_type', type)
+      .single();
+    
+    if (error) {
+      return null;
+    }
+    
+    return data;
+  }
+
+  // ============================================
+  // CREDIT OPERATIONS
+  // ============================================
+  
+  static async createCreditTransaction(data: Partial<CreditTransaction>): Promise<CreditTransaction> {
+    const { data: transaction, error } = await supabaseAdmin
+      .from('credit_transactions')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return transaction;
+  }
+  
+  static async getUserTransactions(userId: string, limit: number = 50): Promise<CreditTransaction[]> {
+    const { data, error } = await supabaseAdmin
+      .from('credit_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  }
+
+  // ============================================
+  // STORAGE OPERATIONS
+  // ============================================
+  
+  static async uploadPDF(
+    userId: string,
+    file: Buffer,
+    filename: string
+  ): Promise<string> {
+    const path = `${userId}/${Date.now()}_${filename}`;
+    
+    const { data, error } = await supabaseAdmin.storage
+      .from('patent-pdfs')
+      .upload(path, file, {
+        contentType: 'application/pdf',
+        upsert: false,
+      });
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data.path;
+  }
+  
+  static async deletePDF(path: string): Promise<void> {
+    const { error } = await supabaseAdmin.storage
+      .from('patent-pdfs')
+      .remove([path]);
+    
+    if (error) {
+      throw error;
+    }
+  }
+  
+  static async getPDFSignedUrl(path: string, expiresIn: number = 3600): Promise<string> {
+    const { data, error } = await supabaseAdmin.storage
+      .from('patent-pdfs')
+      .createSignedUrl(path, expiresIn);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data.signedUrl;
+  }
+
+  // ============================================
+  // ADMIN OPERATIONS
+  // ============================================
+  
+  static async getAllUsers(): Promise<any[]> {
+    const { data, error } = await supabaseAdmin.rpc('get_users_with_stats');
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  }
+  
+  static async getAllPatents(options: { page?: number; pageSize?: number; status?: string } = {}): Promise<PaginatedResponse<Patent & { user_email?: string }>> {
+    const { page = 1, pageSize = 20, status } = options;
+    const offset = (page - 1) * pageSize;
+    
+    let query = supabaseAdmin
+      .from('patents')
+      .select('*, profiles!patents_user_id_fkey(email)', { count: 'exact' })
+      .order('created_at', { ascending: false });
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    query = query.range(offset, offset + pageSize - 1);
+    
+    const { data, error, count } = await query;
+    
+    if (error) {
+      throw error;
+    }
+    
+    const patents = (data || []).map(p => ({
+      ...p,
+      user_email: p.profiles?.email,
+      profiles: undefined,
+    }));
+    
+    return {
+      data: patents,
+      total: count || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((count || 0) / pageSize),
+    };
+  }
+  
+  static async getSystemMetrics(): Promise<any> {
+    const { data, error } = await supabaseAdmin.rpc('get_system_metrics');
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data;
+  }
+  
+  static async adjustUserCredits(
+    adminId: string,
+    userId: string,
+    amount: number,
+    reason: string
+  ): Promise<void> {
+    const user = await this.getUserProfile(userId);
+    if (!user) throw new Error('User not found');
+    
+    const newBalance = user.credits + amount;
+    
+    // Update credits
+    await this.updateUserCredits(userId, newBalance);
+    
+    // Log transaction
+    await this.createCreditTransaction({
+      user_id: userId,
+      amount,
+      balance_after: newBalance,
+      transaction_type: 'admin_adjustment',
+      description: `Admin adjustment: ${reason}`,
+    });
+    
+    // Log audit
+    await supabaseAdmin.from('admin_audit_log').insert({
+      admin_id: adminId,
+      action: 'adjust_credits',
+      target_type: 'user',
+      target_id: userId,
+      details: { amount, reason, new_balance: newBalance },
+    });
+  }
+}
+```
+
+### 2.8 Credit Management Service
+
+**File: `src/services/credits.ts`**
+
+```typescript
+import { SupabaseService } from './supabase';
+import { NotificationService } from './notifications';
+import { Errors, logError } from './errors';
+import { config } from '../config';
+
+export class CreditService {
+  static async checkAndDeductCredits(
+    userId: string,
+    patentId: string,
+    patentTitle: string
+  ): Promise<void> {
+    const user = await SupabaseService.getUserProfile(userId);
+    
+    if (!user) {
+      throw Errors.unauthorized();
+    }
+    
+    if (user.credits < config.credits.costPerPatent) {
+      throw Errors.insufficientCredits(user.credits, config.credits.costPerPatent);
+    }
+    
+    const newBalance = user.credits - config.credits.costPerPatent;
+    
+    // Deduct credits
+    await SupabaseService.updateUserCredits(userId, newBalance);
+    
+    // Log transaction
+    await SupabaseService.createCreditTransaction({
+      user_id: userId,
+      amount: -config.credits.costPerPatent,
+      balance_after: newBalance,
+      transaction_type: 'ip_processing',
+      description: `Processed patent: ${patentTitle || 'Untitled'}`,
+      patent_id: patentId,
+    });
+    
+    // Check for low credits warning
+    if (newBalance <= config.credits.lowCreditWarningThreshold) {
+      await NotificationService.sendLowCreditsWarning(userId, newBalance);
+    }
+  }
+  
+  static async refundCredits(
+    userId: string,
+    patentId: string,
+    patentTitle: string,
+    reason: string
+  ): Promise<void> {
+    const user = await SupabaseService.getUserProfile(userId);
+    
+    if (!user) {
+      logError(new Error('User not found for refund'), { userId, patentId });
+      return;
+    }
+    
+    const newBalance = user.credits + config.credits.costPerPatent;
+    
+    // Add credits back
+    await SupabaseService.updateUserCredits(userId, newBalance);
+    
+    // Log transaction
+    await SupabaseService.createCreditTransaction({
+      user_id: userId,
+      amount: config.credits.costPerPatent,
+      balance_after: newBalance,
+      transaction_type: 'refund',
+      description: `Refund for ${patentTitle || 'Untitled'}: ${reason}`,
+      patent_id: patentId,
+    });
+  }
+  
+  static async getUserCreditInfo(userId: string): Promise<{
+    credits: number;
+    transactions: any[];
+  }> {
+    const [user, transactions] = await Promise.all([
+      SupabaseService.getUserProfile(userId),
+      SupabaseService.getUserTransactions(userId),
+    ]);
+    
+    return {
+      credits: user?.credits || 0,
+      transactions,
+    };
+  }
+}
+```
+
+### 2.9 AI Generation Service
+
+**File: `src/services/ai.ts`**
+
+```typescript
+import Anthropic from '@anthropic-ai/sdk';
+import { config } from '../config';
+import { SupabaseService } from './supabase';
+import { NotificationService } from './notifications';
+import { CreditService } from './credits';
+import { withAIRetry } from '../utils/retry';
+import { Errors, logError } from './errors';
+import { ArtifactType } from '../types';
+
+const anthropic = new Anthropic({
+  apiKey: config.anthropic.apiKey,
+});
+
+const MODEL = 'claude-sonnet-4-20250514';
+
+interface GenerationResult {
+  content: string;
+  tokensUsed: number;
+  generationTime: number;
+}
+
+export class AIService {
+  // ============================================
+  // PROMPT TEMPLATES
+  // ============================================
+  
+  private static getELIA15Prompt(title: string, fullText: string): string {
+    return `ELIA15: You are a professional skilled in simplifying complex scientific and technical information. Your task is to explain the content of the provided patent to a professional audience in a clear and engaging manner, using language and analogies that would be understandable to a 15-year-old. Please follow this structure:
+
+1. **Introduction:**
+   - Introduce the problem the invention aims to solve in straightforward terms.
+   - Use analogies or relatable examples to make the problem clear.
+
+2. **The Invention:**
+   - Describe the invention concisely, explaining what it does.
+   - Use clear language, avoiding unnecessary jargon.
+
+3. **Detailed Functioning:**
+   - Outline the main components of the invention and their functions.
+   - Explain how these components interact to solve the problem.
+
+4. **Importance:**
+   - Highlight why the invention is important and how it improves existing solutions.
+   - Discuss the practical benefits and applications of the invention.
+
+5. **Claims:**
+   - Summarize the key claims of the invention, explaining what aspects are protected.
+   - Use analogies to illustrate these claims.
+
+6. **Visuals and Diagrams:**
+   - If the invention includes drawings, explain how they help in understanding the invention.
+   - Describe the drawings in simple terms, relating them to the explained concepts.
+
+7. **Relatable Example:**
+   - Use a relatable analogy to illustrate how the invention works.
+   - Make the analogy engaging and easy to understand.
+
+8. **Why It Matters:**
+   - Discuss why understanding this invention is important.
+   - Mention other areas where the invention can be useful.
+
+Patent Title: ${title}
+Patent Full Text:
+${fullText}`;
+  }
+  
+  private static getBusinessNarrativePrompt(fullText: string, elia15Content: string): string {
+    return `Generate a business narrative that effectively communicates the value of this intellectual property (IP) for commercialization. Follow this structure:
+
+Essential Sections:
+1. Problem Definition – Clearly articulate the pain point or unmet need.
+2. Solution (Your IP) – Introduce how your innovation uniquely solves the problem.
+3. Why It Matters – Highlight key advantages over existing solutions.
+4. Market Opportunity – Define potential customers, industry demand, and scalability.
+5. Go-to-Market Strategy – Explain the path from development to commercialization.
+6. Funding Requirements – Outline financial needs, milestones, and ROI.
+7. Technical & Scientific Justification – Support claims with data, research, and references.
+
+Context for this business narrative:
+- You have already created this simplified explanation (ELIA15):
+${elia15Content}
+
+- Here is the full patent text:
+${fullText}
+
+Use the ELIA15 to understand the technology clearly, then create a compelling business narrative that would resonate with investors, partners, and potential licensees.
+
+Key Guidelines:
+- Define the problem in a simple, relatable way
+- Present the IP as a clear, transformative solution
+- Demonstrate market opportunity with specific examples
+- Highlight commercialization path & go-to-market strategy
+- Provide specific funding requirements
+- Address potential risks & challenges
+- Make it compelling and actionable`;
+  }
+  
+  private static getGoldenCirclePrompt(elia15Content: string, businessNarrativeContent: string): string {
+    return `This is the Golden Circle framework based on Simon Sinek's work. Create a Golden Circle analysis for this patent that defines the WHY, HOW, and WHAT.
+
+Framework:
+- WHAT: What does this technology do? What tangible product or good does it create? What intangible service does it provide?
+- HOW: How does this innovation achieve its objective? What is the secret sauce or methodology that makes it unique?
+- WHY: Why does this innovation exist beyond making money? What is the overarching purpose? Why should customers care?
+
+Context:
+- ELIA15 explanation:
+${elia15Content}
+
+- Business Narrative:
+${businessNarrativeContent}
+
+Create a concise but compelling Golden Circle that captures:
+1. WHY this technology should exist (purpose, belief, cause)
+2. HOW it uniquely delivers on that purpose (differentiation, approach)
+3. WHAT it actually produces or enables (products, services, outcomes)
+
+Format your response with clear sections for WHY, HOW, and WHAT. Each section should be 2-4 paragraphs.`;
+  }
+
+  // ============================================
+  // GENERATION METHODS
+  // ============================================
+  
+  private static async generate(prompt: string, maxTokens: number): Promise<GenerationResult> {
+    const startTime = Date.now();
+    
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    
+    const content = response.content[0].type === 'text' ? response.content[0].text : '';
+    const tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
+    const generationTime = (Date.now() - startTime) / 1000;
+    
+    return { content, tokensUsed, generationTime };
+  }
+  
+  static async generateELIA15(patentId: string, title: string, fullText: string): Promise<void> {
+    const prompt = this.getELIA15Prompt(title, fullText);
+    
+    const result = await withAIRetry(
+      () => this.generate(prompt, 4000),
+      { patentId, artifactType: 'elia15' }
+    );
+    
+    await SupabaseService.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'elia15',
+      content: result.content,
+      tokens_used: result.tokensUsed,
+      generation_time_seconds: result.generationTime,
+    });
+    
+    await SupabaseService.updatePatentStatus(patentId, 'elia15_complete');
+  }
+  
+  static async generateBusinessNarrative(patentId: string, fullText: string, elia15Content: string): Promise<void> {
+    const prompt = this.getBusinessNarrativePrompt(fullText, elia15Content);
+    
+    const result = await withAIRetry(
+      () => this.generate(prompt, 5000),
+      { patentId, artifactType: 'business_narrative' }
+    );
+    
+    await SupabaseService.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'business_narrative',
+      content: result.content,
+      tokens_used: result.tokensUsed,
+      generation_time_seconds: result.generationTime,
+    });
+  }
+  
+  static async generateGoldenCircle(patentId: string, elia15Content: string, businessNarrativeContent: string): Promise<void> {
+    const prompt = this.getGoldenCirclePrompt(elia15Content, businessNarrativeContent);
+    
+    const result = await withAIRetry(
+      () => this.generate(prompt, 3000),
+      { patentId, artifactType: 'golden_circle' }
+    );
+    
+    await SupabaseService.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'golden_circle',
+      content: result.content,
+      tokens_used: result.tokensUsed,
+      generation_time_seconds: result.generationTime,
+    });
+    
+    await SupabaseService.updatePatentStatus(patentId, 'completed');
+  }
+
+  // ============================================
+  // FULL GENERATION PIPELINE
+  // ============================================
+  
+  static async generateAllArtifacts(patentId: string, userId?: string): Promise<void> {
+    const patent = await SupabaseService.getPatentById(patentId);
+    
+    if (!patent) {
+      throw Errors.patentNotFound(patentId);
+    }
+    
+    try {
+      // Generate ELIA15
+      await this.generateELIA15(patentId, patent.title || 'Untitled', patent.full_text);
+      
+      // Notify artifact complete
+      if (userId) {
+        await NotificationService.sendArtifactComplete(userId, patentId, 'elia15', patent.title);
+      }
+      
+      // Get ELIA15 content for next generation
+      const elia15 = await SupabaseService.getArtifactByType(patentId, 'elia15');
+      
+      if (!elia15) {
+        throw new Error('ELIA15 artifact not found after generation');
+      }
+      
+      // Generate Business Narrative
+      await this.generateBusinessNarrative(patentId, patent.full_text, elia15.content);
+      
+      if (userId) {
+        await NotificationService.sendArtifactComplete(userId, patentId, 'business_narrative', patent.title);
+      }
+      
+      // Get Business Narrative for Golden Circle
+      const businessNarrative = await SupabaseService.getArtifactByType(patentId, 'business_narrative');
+      
+      if (!businessNarrative) {
+        throw new Error('Business narrative artifact not found after generation');
+      }
+      
+      // Generate Golden Circle
+      await this.generateGoldenCircle(patentId, elia15.content, businessNarrative.content);
+      
+      // Send patent ready notification
+      if (userId) {
+        await NotificationService.sendPatentReady(userId, patentId, patent.title);
+      }
+      
+    } catch (error) {
+      logError(error as Error, { patentId, userId, operation: 'generateAllArtifacts' }, userId);
+      
+      // Update status to partial or failed
+      const artifacts = await SupabaseService.getPatentArtifacts(patentId);
+      const newStatus = artifacts.length > 0 ? 'partial' : 'failed';
+      
+      await SupabaseService.updatePatentStatus(
+        patentId,
+        newStatus,
+        (error as Error).message
+      );
+      
+      // Send error notification
+      if (userId) {
+        await NotificationService.sendProcessingError(userId, patentId, patent.title, (error as Error).message);
+      }
+      
+      // Refund credits if completely failed
+      if (newStatus === 'failed' && userId) {
+        await CreditService.refundCredits(userId, patentId, patent.title || 'Untitled', 'Processing failed');
+      }
+      
+      throw error;
+    }
+  }
+
+  // ============================================
+  // RETRY FAILED ARTIFACTS
+  // ============================================
+  
+  static async retryFailedArtifacts(patentId: string, userId: string): Promise<void> {
+    const patent = await SupabaseService.getPatentById(patentId);
+    
+    if (!patent) {
+      throw Errors.patentNotFound(patentId);
+    }
+    
+    if (patent.user_id !== userId) {
+      throw Errors.forbidden();
+    }
+    
+    // Check retry count
+    const retryCount = await SupabaseService.incrementRetryCount(patentId);
+    
+    if (retryCount > config.retry.maxAttempts) {
+      throw new Error('Maximum retry attempts exceeded');
+    }
+    
+    // Get existing artifacts
+    const artifacts = await SupabaseService.getPatentArtifacts(patentId);
+    const existingTypes = new Set(artifacts.map(a => a.artifact_type));
+    
+    // Reset status
+    await SupabaseService.updatePatentStatus(patentId, 'processing');
+    
+    try {
+      // Generate missing artifacts
+      if (!existingTypes.has('elia15')) {
+        await this.generateELIA15(patentId, patent.title || 'Untitled', patent.full_text);
+      }
+      
+      const elia15 = await SupabaseService.getArtifactByType(patentId, 'elia15');
+      
+      if (!existingTypes.has('business_narrative') && elia15) {
+        await this.generateBusinessNarrative(patentId, patent.full_text, elia15.content);
+      }
+      
+      const businessNarrative = await SupabaseService.getArtifactByType(patentId, 'business_narrative');
+      
+      if (!existingTypes.has('golden_circle') && elia15 && businessNarrative) {
+        await this.generateGoldenCircle(patentId, elia15.content, businessNarrative.content);
+      }
+      
+      // Verify completion
+      const finalArtifacts = await SupabaseService.getPatentArtifacts(patentId);
+      
+      if (finalArtifacts.length === 3) {
+        await SupabaseService.updatePatentStatus(patentId, 'completed');
+        await NotificationService.sendPatentReady(userId, patentId, patent.title);
+      } else {
+        await SupabaseService.updatePatentStatus(patentId, 'partial');
+      }
+      
+    } catch (error) {
+      const artifacts = await SupabaseService.getPatentArtifacts(patentId);
+      const newStatus = artifacts.length > 0 ? 'partial' : 'failed';
+      await SupabaseService.updatePatentStatus(patentId, newStatus, (error as Error).message);
+      throw error;
+    }
+  }
+}
+```
+
+### 2.10 Notification Service
+
+**File: `src/services/notifications.ts`**
+
+```typescript
+import { supabaseAdmin } from '../config/supabase';
+import { NotificationType, ArtifactType } from '../types';
+import { logError } from './errors';
+
+export class NotificationService {
+  private static async createNotification(
+    userId: string,
+    type: NotificationType,
+    payload: Record<string, any>
+  ): Promise<void> {
+    try {
+      await supabaseAdmin.from('webhook_notifications').insert({
+        user_id: userId,
+        notification_type: type,
+        payload,
+      });
+    } catch (error) {
+      logError(error as Error, { userId, type, operation: 'createNotification' });
+    }
+  }
+  
+  static async sendArtifactComplete(
+    userId: string,
+    patentId: string,
+    artifactType: ArtifactType,
+    patentTitle: string | null
+  ): Promise<void> {
+    await this.createNotification(userId, 'artifact_complete', {
+      patent_id: patentId,
+      patent_title: patentTitle,
+      artifact_type: artifactType,
+      message: `${artifactType.replace('_', ' ')} has been generated for "${patentTitle || 'your patent'}"`,
+    });
+  }
+  
+  static async sendProcessingError(
+    userId: string,
+    patentId: string,
+    patentTitle: string | null,
+    errorMessage: string
+  ): Promise<void> {
+    await this.createNotification(userId, 'processing_error', {
+      patent_id: patentId,
+      patent_title: patentTitle,
+      error_message: errorMessage,
+      message: `Error processing "${patentTitle || 'your patent'}". You can retry from your dashboard.`,
+      retry_available: true,
+    });
+  }
+  
+  static async sendLowCreditsWarning(userId: string, currentCredits: number): Promise<void> {
+    await this.createNotification(userId, 'low_credits', {
+      current_credits: currentCredits,
+      message: `You have ${currentCredits} credits remaining. Each patent analysis requires 10 credits.`,
+    });
+  }
+  
+  static async sendPatentReady(
+    userId: string,
+    patentId: string,
+    patentTitle: string | null
+  ): Promise<void> {
+    await this.createNotification(userId, 'patent_ready', {
+      patent_id: patentId,
+      patent_title: patentTitle,
+      message: `All artifacts for "${patentTitle || 'your patent'}" are ready! View them in your dashboard.`,
+    });
+  }
+  
+  static async getUserNotifications(
+    userId: string,
+    unreadOnly: boolean = false
+  ): Promise<any[]> {
+    let query = supabaseAdmin
+      .from('webhook_notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (unreadOnly) {
+      query = query.eq('read', false);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  }
+  
+  static async markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
+    await supabaseAdmin
+      .from('webhook_notifications')
+      .update({ read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId);
+  }
+  
+  static async markAllAsRead(userId: string): Promise<void> {
+    await supabaseAdmin
+      .from('webhook_notifications')
+      .update({ read: true })
+      .eq('user_id', userId)
+      .eq('read', false);
+  }
+}
+```
+
+### 2.11 PDF Parsing Service
+
+**File: `src/services/pdf.ts`**
+
+```typescript
+import pdfParse from 'pdf-parse';
+import { Errors, logError } from './errors';
+
+interface ParsedPatent {
+  title: string | null;
+  inventors: string | null;
+  assignee: string | null;
+  filingDate: string | null;
+  issueDate: string | null;
+  fullText: string;
+}
+
+export class PDFService {
+  static async parsePDF(buffer: Buffer, filename: string): Promise<ParsedPatent> {
+    try {
+      const data = await pdfParse(buffer);
+      
+      if (!data.text || data.text.trim().length === 0) {
+        throw Errors.pdfParsingFailed(filename, 'PDF contains no extractable text');
+      }
+      
+      const fullText = data.text;
+      
+      return {
+        title: this.extractTitle(fullText),
+        inventors: this.extractInventors(fullText),
+        assignee: this.extractAssignee(fullText),
+        filingDate: this.extractFilingDate(fullText),
+        issueDate: this.extractIssueDate(fullText),
+        fullText,
+      };
+    } catch (error) {
+      if ((error as any).category) {
+        throw error;
+      }
+      throw Errors.pdfParsingFailed(filename, (error as Error).message);
+    }
+  }
+  
+  private static extractTitle(text: string): string | null {
+    const header = text.slice(0, 2000);
+    
+    // Pattern 1: "Title: ..."
+    const titleMatch = header.match(/(?:Title|TITLE):\s*(.+?)(?:\n|$)/i);
+    if (titleMatch) {
+      return titleMatch[1].trim();
+    }
+    
+    // Pattern 2: Look for patent number followed by title
+    const patentTitleMatch = header.match(/(?:US\s*\d{1,3}(?:,\d{3})*\s*(?:B\d|A\d)?)\s*\n\s*(.+?)(?:\n|$)/);
+    if (patentTitleMatch) {
+      return patentTitleMatch[1].trim();
+    }
+    
+    // Pattern 3: Second non-empty line (common patent format)
+    const lines = text.split('\n').filter(l => l.trim().length > 0);
+    if (lines.length >= 2) {
+      return lines[1].trim().slice(0, 200);
+    }
+    
+    return null;
+  }
+  
+  private static extractInventors(text: string): string | null {
+    const match = text.match(/Inventor[s]?:\s*(.+?)(?:\n\n|Assignee|Filed)/is);
+    if (match) {
+      return match[1].trim().replace(/\n/g, ', ');
+    }
+    return null;
+  }
+  
+  private static extractAssignee(text: string): string | null {
+    const match = text.match(/Assignee:\s*(.+?)(?:\n|$)/i);
+    if (match) {
+      return match[1].trim();
+    }
+    return null;
+  }
+  
+  private static extractFilingDate(text: string): string | null {
+    const match = text.match(/(?:Filed|Filing Date):\s*([A-Za-z]+\.?\s+\d{1,2},?\s+\d{4})/i);
+    if (match) {
+      try {
+        const date = new Date(match[1]);
+        return date.toISOString().split('T')[0];
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  
+  private static extractIssueDate(text: string): string | null {
+    const match = text.match(/(?:Patent No\.|Issued|Grant Date).*?([A-Za-z]+\.?\s+\d{1,2},?\s+\d{4})/i);
+    if (match) {
+      try {
+        const date = new Date(match[1]);
+        return date.toISOString().split('T')[0];
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+```
+
+**Testing Checklist Phase 2:**
+- [ ] Supabase service connects successfully
+- [ ] Can create/read/update/delete patents
+- [ ] Can create/read artifacts
+- [ ] Credit transactions work
+- [ ] AI generation produces valid output
+- [ ] PDF parsing extracts text
+- [ ] Notifications are created
+- [ ] Error handling captures issues to Sentry
+
+---
+
+## Phase 3: Authentication System
+
+### 3.1 Authentication Middleware
+
+**File: `src/middleware/auth.ts`**
+
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { supabaseAdmin, createAuthenticatedClient } from '../config/supabase';
+import { User } from '../types';
+import { Errors, logError } from '../services/errors';
+
+// Extend Express Request to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+      accessToken?: string;
+    }
+  }
+}
+
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    // Get token from Authorization header or session
+    const authHeader = req.headers.authorization;
+    const sessionToken = req.session?.accessToken;
+    
+    const token = authHeader?.replace('Bearer ', '') || sessionToken;
+    
+    if (!token) {
+      res.status(401).json({
+        success: false,
+        error: {
+          message: 'Authentication required',
+          code: 'UNAUTHORIZED',
+          category: 'auth',
+        },
+      });
+      return;
+    }
+    
+    // Verify token with Supabase
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    if (error || !user) {
+      res.status(401).json({
+        success: false,
+        error: {
+          message: 'Invalid or expired token',
+          code: 'INVALID_TOKEN',
+          category: 'auth',
+        },
+      });
+      return;
+    }
+    
+    // Get user profile
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    if (!profile) {
+      res.status(401).json({
+        success: false,
+        error: {
+          message: 'User profile not found',
+          code: 'PROFILE_NOT_FOUND',
+          category: 'auth',
+        },
+      });
+      return;
+    }
+    
+    req.user = profile;
+    req.accessToken = token;
+    next();
+  } catch (error) {
+    logError(error as Error, { operation: 'requireAuth' });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Authentication error',
+        code: 'AUTH_ERROR',
+        category: 'auth',
+      },
+    });
+  }
+}
+
+// Optional auth - sets user if token present, continues otherwise
+export async function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const authHeader = req.headers.authorization;
+    const sessionToken = req.session?.accessToken;
+    const token = authHeader?.replace('Bearer ', '') || sessionToken;
+    
+    if (token) {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      
+      if (user) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          req.user = profile;
+          req.accessToken = token;
+        }
+      }
+    }
+    
+    next();
+  } catch (error) {
+    // Continue without auth on error
+    next();
+  }
+}
+```
+
+### 3.2 Admin Middleware
+
+**File: `src/middleware/admin.ts`**
+
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { Errors } from '../services/errors';
+
+export async function requireAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: {
+        message: 'Authentication required',
+        code: 'UNAUTHORIZED',
+        category: 'auth',
+      },
+    });
+    return;
+  }
+  
+  if (!req.user.is_admin) {
+    res.status(403).json({
+      success: false,
+      error: {
+        message: 'Admin access required',
+        code: 'FORBIDDEN',
+        category: 'auth',
+      },
+    });
+    return;
+  }
+  
+  next();
+}
+```
+
+### 3.3 Error Handler Middleware
+
+**File: `src/middleware/errorHandler.ts`**
+
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { ApplicationError, logError, userFriendlyMessages, categorizeError } from '../services/errors';
+
+export function errorHandler(
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  // Log to Sentry
+  logError(error, {
+    path: req.path,
+    method: req.method,
+    body: req.body,
+    query: req.query,
+  }, req.user?.id);
+  
+  // Determine error details
+  let statusCode = 500;
+  let category = 'unknown';
+  let message = userFriendlyMessages.unknown;
+  
+  if (error instanceof ApplicationError) {
+    statusCode = error.statusCode;
+    category = error.category;
+    message = error.isOperational ? error.message : userFriendlyMessages[error.category];
+  } else {
+    category = categorizeError(error);
+    message = userFriendlyMessages[category as keyof typeof userFriendlyMessages];
+  }
+  
+  res.status(statusCode).json({
+    success: false,
+    error: {
+      message,
+      code: error.name || 'INTERNAL_ERROR',
+      category,
+    },
+  });
+}
+```
+
+### 3.4 Authentication Routes
+
+**File: `src/routes/auth.ts`**
+
+```typescript
+import { Router, Request, Response } from 'express';
+import { supabaseAdmin } from '../config/supabase';
+import { config } from '../config';
+import { SupabaseService } from '../services/supabase';
+import { AIService } from '../services/ai';
+import { logError } from '../services/errors';
+
+const router = Router();
+
+// Send magic link
+router.post('/magic-link', async (req: Request, res: Response) => {
+  try {
+    const { email, patentId } = req.body;
+    
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email is required', code: 'VALIDATION_ERROR', category: 'validation' },
+      });
+      return;
+    }
+    
+    // Store pending patent ID in session if provided
+    if (patentId) {
+      req.session.pendingPatentId = patentId;
+    }
+    
+    // Send magic link via Supabase
+    const { error } = await supabaseAdmin.auth.signInWithOtp({
+      email: email.toLowerCase().trim(),
+      options: {
+        emailRedirectTo: `${config.app.url}/auth/callback`,
+      },
+    });
+    
+    if (error) {
+      throw error;
+    }
+    
+    res.json({
+      success: true,
+      data: { message: 'Magic link sent! Check your email.' },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'sendMagicLink' });
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to send magic link', code: 'EMAIL_ERROR', category: 'network' },
+    });
+  }
+});
+
+// Google OAuth initiation
+router.get('/google', async (req: Request, res: Response) => {
+  try {
+    const { patentId } = req.query;
+    
+    if (patentId) {
+      req.session.pendingPatentId = patentId as string;
+    }
+    
+    const { data, error } = await supabaseAdmin.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${config.app.url}/auth/callback`,
+      },
+    });
+    
+    if (error) {
+      throw error;
+    }
+    
+    res.redirect(data.url);
+  } catch (error) {
+    logError(error as Error, { operation: 'googleOAuth' });
+    res.redirect('/?error=oauth_failed');
+  }
+});
+
+// OAuth callback handler
+router.post('/callback', async (req: Request, res: Response) => {
+  try {
+    const { access_token, refresh_token } = req.body;
+    
+    if (!access_token) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Access token required', code: 'VALIDATION_ERROR', category: 'validation' },
+      });
+      return;
+    }
+    
+    // Verify token and get user
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(access_token);
+    
+    if (error || !user) {
+      throw error || new Error('User not found');
+    }
+    
+    // Store in session
+    req.session.accessToken = access_token;
+    req.session.refreshToken = refresh_token;
+    req.session.userId = user.id;
+    
+    // Handle pending patent assignment
+    const pendingPatentId = req.session.pendingPatentId;
+    if (pendingPatentId) {
+      const patent = await SupabaseService.getPatentById(pendingPatentId);
+      
+      if (patent && !patent.user_id) {
+        // Assign patent to user
+        await SupabaseService.assignPatentToUser(pendingPatentId, user.id);
+        
+        // Start background artifact generation if needed
+        if (patent.status === 'elia15_complete') {
+          // Generate remaining artifacts in background
+          AIService.generateAllArtifacts(pendingPatentId, user.id).catch((err) => {
+            logError(err, { patentId: pendingPatentId, userId: user.id });
+          });
+        }
+      }
+      
+      delete req.session.pendingPatentId;
+    }
+    
+    // Get user profile
+    const profile = await SupabaseService.getUserProfile(user.id);
+    
+    res.json({
+      success: true,
+      data: {
+        user: profile,
+        redirectTo: pendingPatentId ? `/patent/${pendingPatentId}` : '/dashboard',
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'authCallback' });
+    res.status(500).json({
+      success: false,
+      error: { message: 'Authentication failed', code: 'AUTH_ERROR', category: 'auth' },
+    });
+  }
+});
+
+// Get current user
+router.get('/me', async (req: Request, res: Response) => {
+  try {
+    const token = req.session?.accessToken;
+    
+    if (!token) {
+      res.json({ success: true, data: { user: null } });
+      return;
+    }
+    
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    
+    if (!user) {
+      res.json({ success: true, data: { user: null } });
+      return;
+    }
+    
+    const profile = await SupabaseService.getUserProfile(user.id);
+    
+    res.json({
+      success: true,
+      data: { user: profile },
+    });
+  } catch (error) {
+    res.json({ success: true, data: { user: null } });
+  }
+});
+
+// Logout
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    const token = req.session?.accessToken;
+    
+    if (token) {
+      await supabaseAdmin.auth.admin.signOut(token);
+    }
+    
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destroy error:', err);
+      }
+    });
+    
+    res.json({ success: true, data: { message: 'Logged out successfully' } });
+  } catch (error) {
+    logError(error as Error, { operation: 'logout' });
+    res.json({ success: true, data: { message: 'Logged out' } });
+  }
+});
+
+export default router;
+```
+
+**Testing Checklist Phase 3:**
+- [ ] Magic link sends email
+- [ ] Magic link login works
+- [ ] Google OAuth redirects correctly
+- [ ] Callback sets session
+- [ ] Protected routes require auth
+- [ ] Admin routes require admin flag
+- [ ] Logout clears session
+
+---
+
+## Phase 4: Patent & Dashboard Routes
+
+### 4.1 Patent Routes
+
+**File: `src/routes/patents.ts`**
+
+```typescript
+import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import { requireAuth, optionalAuth } from '../middleware/auth';
+import { SupabaseService } from '../services/supabase';
+import { PDFService } from '../services/pdf';
+import { AIService } from '../services/ai';
+import { CreditService } from '../services/credits';
+import { Errors, logError } from '../services/errors';
+import { config } from '../config';
+
+const router = Router();
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: config.upload.maxFileSizeMB * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    if (config.upload.allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+});
+
+// Upload patent PDF
+router.post('/upload', optionalAuth, upload.single('pdf'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'PDF file is required', code: 'VALIDATION_ERROR', category: 'validation' },
+      });
+      return;
+    }
+    
+    // Check credits if authenticated
+    if (req.user) {
+      if (req.user.credits < config.credits.costPerPatent) {
+        res.status(402).json({
+          success: false,
+          error: {
+            message: `Insufficient credits. You have ${req.user.credits} but need ${config.credits.costPerPatent}.`,
+            code: 'INSUFFICIENT_CREDITS',
+            category: 'validation',
+          },
+        });
+        return;
+      }
+    }
+    
+    // Parse PDF
+    const parsedData = await PDFService.parsePDF(req.file.buffer, req.file.originalname);
+    
+    // Upload PDF to Supabase Storage (if user is authenticated)
+    let pdfPath: string | null = null;
+    if (req.user) {
+      pdfPath = await SupabaseService.uploadPDF(
+        req.user.id,
+        req.file.buffer,
+        req.file.originalname
+      );
+    }
+    
+    // Create patent record
+    const patent = await SupabaseService.createPatent({
+      user_id: req.user?.id || null,
+      title: parsedData.title,
+      inventors: parsedData.inventors,
+      assignee: parsedData.assignee,
+      filing_date: parsedData.filingDate,
+      issue_date: parsedData.issueDate,
+      full_text: parsedData.fullText,
+      pdf_path: pdfPath,
+      pdf_filename: req.file.originalname,
+      status: 'processing',
+    });
+    
+    // Deduct credits if authenticated
+    if (req.user) {
+      await CreditService.checkAndDeductCredits(
+        req.user.id,
+        patent.id,
+        patent.title || 'Untitled'
+      );
+    }
+    
+    // Generate ELIA15 (synchronously for preview)
+    await AIService.generateELIA15(patent.id, patent.title || 'Untitled', parsedData.fullText);
+    
+    // Start background generation for authenticated users
+    if (req.user) {
+      AIService.generateAllArtifacts(patent.id, req.user.id).catch((err) => {
+        logError(err, { patentId: patent.id, userId: req.user!.id });
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        patentId: patent.id,
+        status: 'elia15_complete',
+        requiresAuth: !req.user,
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'uploadPatent' }, req.user?.id);
+    
+    const appError = error as any;
+    res.status(appError.statusCode || 500).json({
+      success: false,
+      error: {
+        message: appError.message || 'Upload failed',
+        code: appError.code || 'UPLOAD_ERROR',
+        category: appError.category || 'unknown',
+      },
+    });
+  }
+});
+
+// Get patent preview (ELIA15 only, public)
+router.get('/:id/preview', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const patent = await SupabaseService.getPatentById(req.params.id);
+    
+    if (!patent) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Patent not found', code: 'NOT_FOUND', category: 'validation' },
+      });
+      return;
+    }
+    
+    const elia15 = await SupabaseService.getArtifactByType(patent.id, 'elia15');
+    
+    res.json({
+      success: true,
+      data: {
+        patent: {
+          id: patent.id,
+          title: patent.title,
+          assignee: patent.assignee,
+          status: patent.status,
+        },
+        elia15Content: elia15?.content || null,
+        isOwner: req.user?.id === patent.user_id,
+        requiresAuth: !req.user && !patent.user_id,
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { patentId: req.params.id, operation: 'getPreview' });
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load preview', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get patent detail (authenticated, owner only)
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const patent = await SupabaseService.getPatentById(req.params.id);
+    
+    if (!patent) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Patent not found', code: 'NOT_FOUND', category: 'validation' },
+      });
+      return;
+    }
+    
+    if (patent.user_id !== req.user!.id && !req.user!.is_admin) {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Access denied', code: 'FORBIDDEN', category: 'auth' },
+      });
+      return;
+    }
+    
+    const artifacts = await SupabaseService.getPatentArtifacts(patent.id);
+    
+    res.json({
+      success: true,
+      data: {
+        patent,
+        artifacts: artifacts.reduce((acc, a) => {
+          acc[a.artifact_type] = a.content;
+          return acc;
+        }, {} as Record<string, string>),
+        artifactCount: artifacts.length,
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { patentId: req.params.id, operation: 'getPatent' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load patent', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Delete patent
+router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const patent = await SupabaseService.getPatentById(req.params.id);
+    
+    if (!patent) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Patent not found', code: 'NOT_FOUND', category: 'validation' },
+      });
+      return;
+    }
+    
+    if (patent.user_id !== req.user!.id && !req.user!.is_admin) {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Access denied', code: 'FORBIDDEN', category: 'auth' },
+      });
+      return;
+    }
+    
+    // Delete PDF from storage if exists
+    if (patent.pdf_path) {
+      await SupabaseService.deletePDF(patent.pdf_path).catch((err) => {
+        logError(err, { pdfPath: patent.pdf_path, operation: 'deletePDF' });
+      });
+    }
+    
+    await SupabaseService.deletePatent(patent.id, req.user!.id);
+    
+    res.json({
+      success: true,
+      data: { message: 'Patent deleted successfully' },
+    });
+  } catch (error) {
+    logError(error as Error, { patentId: req.params.id, operation: 'deletePatent' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to delete patent', code: 'DELETE_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Retry failed artifacts
+router.post('/:id/retry', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await AIService.retryFailedArtifacts(req.params.id, req.user!.id);
+    
+    res.json({
+      success: true,
+      data: { message: 'Retry initiated. You will be notified when complete.' },
+    });
+  } catch (error) {
+    logError(error as Error, { patentId: req.params.id, operation: 'retryArtifacts' }, req.user?.id);
+    
+    const appError = error as any;
+    res.status(appError.statusCode || 500).json({
+      success: false,
+      error: {
+        message: appError.message || 'Retry failed',
+        code: 'RETRY_ERROR',
+        category: appError.category || 'unknown',
+      },
+    });
+  }
+});
+
+export default router;
+```
+
+### 4.2 Dashboard Routes
+
+**File: `src/routes/dashboard.ts`**
+
+```typescript
+import { Router, Request, Response } from 'express';
+import { requireAuth } from '../middleware/auth';
+import { SupabaseService } from '../services/supabase';
+import { CreditService } from '../services/credits';
+import { NotificationService } from '../services/notifications';
+import { logError } from '../services/errors';
+
+const router = Router();
+
+// Get dashboard data
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 10;
+    const search = (req.query.search as string) || '';
+    
+    const [patents, creditInfo, notifications] = await Promise.all([
+      SupabaseService.getUserPatents(req.user!.id, { page, pageSize, search }),
+      CreditService.getUserCreditInfo(req.user!.id),
+      NotificationService.getUserNotifications(req.user!.id, true), // unread only
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: req.user!.id,
+          email: req.user!.email,
+          credits: creditInfo.credits,
+        },
+        patents,
+        unreadNotifications: notifications.length,
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getDashboard' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load dashboard', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get recent patents (for homepage hybrid mode)
+router.get('/recent', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const patents = await SupabaseService.getRecentPatents(req.user!.id, 3);
+    
+    res.json({
+      success: true,
+      data: { patents },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getRecentPatents' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load recent patents', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get notifications
+router.get('/notifications', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const notifications = await NotificationService.getUserNotifications(req.user!.id);
+    
+    res.json({
+      success: true,
+      data: { notifications },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getNotifications' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load notifications', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Mark notification as read
+router.patch('/notifications/:id/read', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await NotificationService.markNotificationAsRead(req.params.id, req.user!.id);
+    
+    res.json({
+      success: true,
+      data: { message: 'Notification marked as read' },
+    });
+  } catch (error) {
+    logError(error as Error, { notificationId: req.params.id, operation: 'markAsRead' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to update notification', code: 'UPDATE_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Mark all notifications as read
+router.post('/notifications/read-all', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await NotificationService.markAllAsRead(req.user!.id);
+    
+    res.json({
+      success: true,
+      data: { message: 'All notifications marked as read' },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'markAllAsRead' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to update notifications', code: 'UPDATE_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get credit history
+router.get('/credits', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const creditInfo = await CreditService.getUserCreditInfo(req.user!.id);
+    
+    res.json({
+      success: true,
+      data: creditInfo,
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getCreditHistory' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load credit history', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+export default router;
+```
+
+**Testing Checklist Phase 4:**
+- [ ] PDF upload works
+- [ ] PDF parsing extracts metadata
+- [ ] ELIA15 generates on upload
+- [ ] Patent preview loads without auth
+- [ ] Patent detail requires auth
+- [ ] Dashboard shows paginated patents
+- [ ] Search filters patents
+- [ ] Delete removes patent and PDF
+- [ ] Retry regenerates failed artifacts
+- [ ] Notifications load correctly
+
+---
+
+## Phase 5: Admin Dashboard
+
+### 5.1 Admin Routes
+
+**File: `src/routes/admin.ts`**
+
+```typescript
+import { Router, Request, Response } from 'express';
+import { requireAuth } from '../middleware/auth';
+import { requireAdmin } from '../middleware/admin';
+import { SupabaseService } from '../services/supabase';
+import { logError } from '../services/errors';
+
+const router = Router();
+
+// All admin routes require auth + admin
+router.use(requireAuth, requireAdmin);
+
+// Get admin dashboard metrics
+router.get('/dashboard', async (req: Request, res: Response) => {
+  try {
+    const metrics = await SupabaseService.getSystemMetrics();
+    
+    res.json({
+      success: true,
+      data: { metrics },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getAdminDashboard' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load dashboard', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get all users
+router.get('/users', async (req: Request, res: Response) => {
+  try {
+    const users = await SupabaseService.getAllUsers();
+    
+    res.json({
+      success: true,
+      data: { users },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getAdminUsers' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load users', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get user detail
+router.get('/users/:id', async (req: Request, res: Response) => {
+  try {
+    const [user, patents, transactions] = await Promise.all([
+      SupabaseService.getUserProfile(req.params.id),
+      SupabaseService.getUserPatents(req.params.id, { pageSize: 100 }),
+      SupabaseService.getUserTransactions(req.params.id),
+    ]);
+    
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'User not found', code: 'NOT_FOUND', category: 'validation' },
+      });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        user,
+        patents: patents.data,
+        transactions,
+        stats: {
+          totalPatents: patents.total,
+          completedPatents: patents.data.filter(p => p.status === 'completed').length,
+          failedPatents: patents.data.filter(p => p.status === 'failed').length,
+        },
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { userId: req.params.id, operation: 'getAdminUserDetail' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load user', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Adjust user credits
+router.post('/users/:id/credits', async (req: Request, res: Response) => {
+  try {
+    const { amount, reason } = req.body;
+    
+    if (typeof amount !== 'number' || !reason) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Amount and reason are required', code: 'VALIDATION_ERROR', category: 'validation' },
+      });
+      return;
+    }
+    
+    await SupabaseService.adjustUserCredits(
+      req.user!.id,
+      req.params.id,
+      amount,
+      reason
+    );
+    
+    res.json({
+      success: true,
+      data: { message: 'Credits adjusted successfully' },
+    });
+  } catch (error) {
+    logError(error as Error, { userId: req.params.id, operation: 'adjustCredits' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to adjust credits', code: 'UPDATE_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get all patents (admin view)
+router.get('/patents', async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const status = req.query.status as string;
+    
+    const patents = await SupabaseService.getAllPatents({ page, pageSize, status });
+    
+    res.json({
+      success: true,
+      data: { patents },
+    });
+  } catch (error) {
+    logError(error as Error, { operation: 'getAdminPatents' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load patents', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+// Get patent detail (admin view)
+router.get('/patents/:id', async (req: Request, res: Response) => {
+  try {
+    const patent = await SupabaseService.getPatentById(req.params.id);
+    
+    if (!patent) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Patent not found', code: 'NOT_FOUND', category: 'validation' },
+      });
+      return;
+    }
+    
+    const [artifacts, user] = await Promise.all([
+      SupabaseService.getPatentArtifacts(patent.id),
+      patent.user_id ? SupabaseService.getUserProfile(patent.user_id) : null,
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        patent,
+        artifacts,
+        user,
+        stats: {
+          totalTokens: artifacts.reduce((sum, a) => sum + (a.tokens_used || 0), 0),
+          totalTime: artifacts.reduce((sum, a) => sum + (a.generation_time_seconds || 0), 0),
+        },
+      },
+    });
+  } catch (error) {
+    logError(error as Error, { patentId: req.params.id, operation: 'getAdminPatentDetail' }, req.user?.id);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load patent', code: 'LOAD_ERROR', category: 'unknown' },
+    });
+  }
+});
+
+export default router;
+```
+
+**Testing Checklist Phase 5:**
+- [ ] Admin routes require admin flag
+- [ ] Dashboard metrics load
+- [ ] User list shows all users
+- [ ] User detail shows patents and transactions
+- [ ] Credit adjustment works
+- [ ] Patent list shows all patents
+- [ ] Can filter patents by status
+
+---
+
+## Phase 6: Main Server Setup
+
+### 6.1 Express Server
+
+**File: `src/server.ts`**
+
+```typescript
+import express from 'express';
+import session from 'express-session';
+import cors from 'cors';
+import { config } from './config';
+import { Sentry } from './services/errors';
+import { errorHandler } from './middleware/errorHandler';
+
+// Import routes
+import authRoutes from './routes/auth';
+import patentRoutes from './routes/patents';
+import dashboardRoutes from './routes/dashboard';
+import adminRoutes from './routes/admin';
+
+const app = express();
+
+// Sentry request handler (must be first)
+app.use(Sentry.Handlers.requestHandler());
+
+// Middleware
+app.use(cors({
+  origin: config.app.url,
+  credentials: true,
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session configuration
+app.use(session({
+  secret: config.app.sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: config.app.nodeEnv === 'production',
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  },
+}));
+
+// Extend session types
+declare module 'express-session' {
+  interface SessionData {
+    accessToken?: string;
+    refreshToken?: string;
+    userId?: string;
+    pendingPatentId?: string;
+  }
+}
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/patents', patentRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      environment: config.app.nodeEnv,
+    },
+  });
+});
+
+// Sentry error handler (must be before custom error handler)
+app.use(Sentry.Handlers.errorHandler());
+
+// Custom error handler
+app.use(errorHandler);
+
+// Start server
+app.listen(config.app.port, () => {
+  console.log(`Server running on port ${config.app.port}`);
+  console.log(`Environment: ${config.app.nodeEnv}`);
+});
+
+export default app;
+```
+
+---
+
+## Phase 7: Frontend Integration Notes
+
+The frontend (React) should integrate with these API endpoints:
+
+### API Endpoints Summary
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/auth/magic-link` | POST | No | Send magic link email |
+| `/api/auth/google` | GET | No | Initiate Google OAuth |
+| `/api/auth/callback` | POST | No | Handle auth callback |
+| `/api/auth/me` | GET | Optional | Get current user |
+| `/api/auth/logout` | POST | Yes | Logout |
+| `/api/patents/upload` | POST | Optional | Upload patent PDF |
+| `/api/patents/:id/preview` | GET | Optional | Get ELIA15 preview |
+| `/api/patents/:id` | GET | Yes | Get full patent detail |
+| `/api/patents/:id` | DELETE | Yes | Delete patent |
+| `/api/patents/:id/retry` | POST | Yes | Retry failed artifacts |
+| `/api/dashboard` | GET | Yes | Get dashboard data |
+| `/api/dashboard/recent` | GET | Yes | Get recent 3 patents |
+| `/api/dashboard/notifications` | GET | Yes | Get notifications |
+| `/api/dashboard/notifications/:id/read` | PATCH | Yes | Mark notification read |
+| `/api/dashboard/credits` | GET | Yes | Get credit history |
+| `/api/admin/dashboard` | GET | Admin | Admin metrics |
+| `/api/admin/users` | GET | Admin | All users |
+| `/api/admin/users/:id` | GET | Admin | User detail |
+| `/api/admin/users/:id/credits` | POST | Admin | Adjust credits |
+| `/api/admin/patents` | GET | Admin | All patents |
+| `/api/admin/patents/:id` | GET | Admin | Patent detail |
+
+### Frontend Auth Flow
+
+1. **Anonymous Upload:**
+   - User uploads PDF without login
+   - ELIA15 generates and displays
+   - Show email gate with magic link or Google OAuth
+   - On successful auth, redirect to dashboard
+
+2. **Authenticated Upload:**
+   - Check credits before upload
+   - Skip email gate
+   - Redirect to patent detail after ELIA15
+
+3. **Dashboard:**
+   - Paginated patent list (10 per page)
+   - Search by title/assignee/inventors
+   - Status badges with colors
+   - Retry button for failed/partial patents
+
+4. **Homepage Hybrid Mode:**
+   - If logged in: Show recent 3 patents + "Go to Dashboard"
+   - If anonymous: Show upload form + "Log In" button
+
+---
+
+## Phase 8: Deployment Checklist
+
+### Pre-Deployment
+
+- [ ] All environment variables set in Replit Secrets
+- [ ] Supabase tables created with RLS policies
+- [ ] Storage bucket created with policies
+- [ ] Auth providers configured (Email + Google)
+- [ ] Sentry project configured
+- [ ] Build passes without errors
+
+### Testing
+
+- [ ] Anonymous upload works
+- [ ] Magic link authentication works
+- [ ] Google OAuth works
+- [ ] Dashboard loads with patents
+- [ ] Search and pagination work
+- [ ] Delete patent works
+- [ ] Retry failed artifacts works
+- [ ] Admin dashboard loads (for admin users)
+- [ ] Credit deduction works
+- [ ] Notifications appear
+- [ ] Error handling shows user-friendly messages
+- [ ] Sentry captures errors
+
+### Security
+
+- [ ] RLS policies prevent unauthorized access
+- [ ] Admin routes protected
+- [ ] File uploads validated
+- [ ] Session cookies secure in production
+- [ ] Environment variables not exposed
+
+---
+
+## Critical Files for Implementation
+
+1. **`src/config/supabase.ts`** - Supabase client initialization with both admin and user clients
+2. **`src/services/supabase.ts`** - Core data access layer for all database operations
+3. **`src/services/ai.ts`** - AI generation pipeline with retry logic
+4. **`src/services/errors.ts`** - Error categorization and Sentry integration
+5. **`src/middleware/auth.ts`** - Authentication middleware for protected routes
+
+---
+
+This comprehensive guide provides all the code and configuration needed to migrate IP Scaffold to Supabase. The Replit agent should execute each phase sequentially, verifying the testing checklist before proceeding to the next phase.
