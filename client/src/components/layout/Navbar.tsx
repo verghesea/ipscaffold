@@ -65,8 +65,12 @@ export function Navbar() {
               </button>
             </>
           ) : (
-            <Link href="/" className="text-sm font-medium text-primary-900 hover:text-accent-600 transition-colors">
-              About
+            <Link 
+              href="/login" 
+              className="text-sm font-medium px-4 py-2 bg-primary-900 text-white rounded-lg hover:bg-primary-800 transition-colors"
+              data-testid="link-login"
+            >
+              Sign In
             </Link>
           )}
         </div>

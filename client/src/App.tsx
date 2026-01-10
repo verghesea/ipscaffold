@@ -9,6 +9,7 @@ import { PreviewPage } from "@/pages/PreviewPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { PatentDetailPage } from "@/pages/PatentDetailPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
+import LoginPage from "@/pages/LoginPage";
 import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/not-found";
 
@@ -16,6 +17,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/preview/:id" component={PreviewPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/patent/:id" component={PatentDetailPage} />
