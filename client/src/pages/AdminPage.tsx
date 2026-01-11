@@ -9,7 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { getAuthHeaders } from '@/lib/api';
-import { Users, FileText, CreditCard, TrendingUp, Shield, ArrowLeft } from 'lucide-react';
+import { Users, FileText, CreditCard, TrendingUp, Shield, ArrowLeft, Gift, Plus, Loader2 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface SystemMetrics {
   total_users: number;
@@ -35,6 +37,17 @@ interface Patent {
   created_at: string;
 }
 
+interface PromoCode {
+  id: string;
+  code: string;
+  credit_amount: number;
+  max_redemptions: number | null;
+  current_redemptions: number;
+  expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 export default function AdminPage() {
   const [, navigate] = useLocation();
   const { user, profile } = useAuth();
@@ -42,6 +55,10 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [creditAmount, setCreditAmount] = useState('');
   const [creditDescription, setCreditDescription] = useState('');
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false);
+  const [newPromoCode, setNewPromoCode] = useState('');
+  const [newPromoCredits, setNewPromoCredits] = useState('');
+  const [newPromoMaxRedemptions, setNewPromoMaxRedemptions] = useState('');
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<SystemMetrics>({
     queryKey: ['admin-metrics'],
@@ -71,6 +88,50 @@ export default function AdminPage() {
       return res.json();
     },
     enabled: !!profile?.is_admin,
+  });
+
+  const { data: promoCodesData, isLoading: promoCodesLoading } = useQuery<PromoCode[]>({
+    queryKey: ['admin-promo-codes'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/promo-codes', { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Failed to fetch promo codes');
+      return res.json();
+    },
+    enabled: !!profile?.is_admin,
+  });
+
+  const createPromoCodeMutation = useMutation({
+    mutationFn: async ({ code, creditAmount, maxRedemptions }: { code: string; creditAmount: number; maxRedemptions: number | null }) => {
+      const res = await fetch('/api/admin/promo-codes', {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, creditAmount, maxRedemptions }),
+      });
+      if (!res.ok) throw new Error('Failed to create promo code');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-promo-codes'] });
+      setPromoDialogOpen(false);
+      setNewPromoCode('');
+      setNewPromoCredits('');
+      setNewPromoMaxRedemptions('');
+    },
+  });
+
+  const togglePromoCodeMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const res = await fetch(`/api/admin/promo-codes/${id}`, {
+        method: 'PATCH',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      });
+      if (!res.ok) throw new Error('Failed to update promo code');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-promo-codes'] });
+    },
   });
 
   const adjustCreditsMutation = useMutation({
@@ -227,6 +288,7 @@ export default function AdminPage() {
           <TabsList data-testid="tabs-admin">
             <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             <TabsTrigger value="patents" data-testid="tab-patents">Patents</TabsTrigger>
+            <TabsTrigger value="promo-codes" data-testid="tab-promo-codes">Promo Codes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6">
@@ -370,6 +432,138 @@ export default function AdminPage() {
                             </td>
                             <td className="py-3 px-4 text-muted-foreground text-sm">
                               {new Date(p.created_at).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="promo-codes" className="mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="font-playfair">Promo Codes</CardTitle>
+                <Dialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" data-testid="button-create-promo">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Code
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Promo Code</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <Label>Code</Label>
+                        <Input
+                          value={newPromoCode}
+                          onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())}
+                          placeholder="e.g., WELCOME50"
+                          data-testid="input-promo-code"
+                        />
+                      </div>
+                      <div>
+                        <Label>Credits to Award</Label>
+                        <Input
+                          type="number"
+                          value={newPromoCredits}
+                          onChange={(e) => setNewPromoCredits(e.target.value)}
+                          placeholder="e.g., 50"
+                          data-testid="input-promo-credits"
+                        />
+                      </div>
+                      <div>
+                        <Label>Max Redemptions (optional)</Label>
+                        <Input
+                          type="number"
+                          value={newPromoMaxRedemptions}
+                          onChange={(e) => setNewPromoMaxRedemptions(e.target.value)}
+                          placeholder="Leave empty for unlimited"
+                          data-testid="input-promo-max-redemptions"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (newPromoCode && newPromoCredits) {
+                            createPromoCodeMutation.mutate({
+                              code: newPromoCode,
+                              creditAmount: parseInt(newPromoCredits),
+                              maxRedemptions: newPromoMaxRedemptions ? parseInt(newPromoMaxRedemptions) : null,
+                            });
+                          }
+                        }}
+                        disabled={!newPromoCode || !newPromoCredits || createPromoCodeMutation.isPending}
+                        className="w-full"
+                        data-testid="button-submit-promo"
+                      >
+                        {createPromoCodeMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          'Create Promo Code'
+                        )}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {promoCodesLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading promo codes...</div>
+                ) : !promoCodesData || promoCodesData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Gift className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-muted-foreground">No promo codes yet. Create your first one!</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4">Code</th>
+                          <th className="text-left py-3 px-4">Credits</th>
+                          <th className="text-left py-3 px-4">Redemptions</th>
+                          <th className="text-left py-3 px-4">Status</th>
+                          <th className="text-left py-3 px-4">Created</th>
+                          <th className="text-left py-3 px-4">Active</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {promoCodesData.map((promo) => (
+                          <tr key={promo.id} className="border-b hover:bg-muted/50" data-testid={`row-promo-${promo.id}`}>
+                            <td className="py-3 px-4 font-mono font-medium">{promo.code}</td>
+                            <td className="py-3 px-4">{promo.credit_amount}</td>
+                            <td className="py-3 px-4">
+                              {promo.current_redemptions}
+                              {promo.max_redemptions && ` / ${promo.max_redemptions}`}
+                            </td>
+                            <td className="py-3 px-4">
+                              {promo.is_active ? (
+                                <Badge variant="default">Active</Badge>
+                              ) : (
+                                <Badge variant="secondary">Inactive</Badge>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-muted-foreground text-sm">
+                              {new Date(promo.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="py-3 px-4">
+                              <Switch
+                                checked={promo.is_active}
+                                onCheckedChange={(checked) => 
+                                  togglePromoCodeMutation.mutate({ id: promo.id, isActive: checked })
+                                }
+                                disabled={togglePromoCodeMutation.isPending}
+                                data-testid={`switch-promo-${promo.id}`}
+                              />
                             </td>
                           </tr>
                         ))}

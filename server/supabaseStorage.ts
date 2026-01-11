@@ -250,6 +250,110 @@ export class SupabaseStorage {
       details,
     });
   }
+
+  async getPromoCodes(): Promise<any[]> {
+    const { data, error } = await supabaseAdmin
+      .from('promo_codes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) return [];
+    return data || [];
+  }
+
+  async createPromoCode(promoCode: {
+    code: string;
+    creditAmount: number;
+    maxRedemptions: number | null;
+    expiresAt: Date | null;
+    createdBy: number;
+  }): Promise<any> {
+    const { data, error } = await supabaseAdmin
+      .from('promo_codes')
+      .insert({
+        code: promoCode.code,
+        credit_amount: promoCode.creditAmount,
+        max_redemptions: promoCode.maxRedemptions,
+        expires_at: promoCode.expiresAt?.toISOString(),
+        created_by: promoCode.createdBy,
+      })
+      .select()
+      .single();
+    
+    if (error) throw new Error(`Failed to create promo code: ${error.message}`);
+    return data;
+  }
+
+  async updatePromoCodeStatus(id: string, isActive: boolean): Promise<void> {
+    await supabaseAdmin
+      .from('promo_codes')
+      .update({ is_active: isActive })
+      .eq('id', id);
+  }
+
+  async redeemPromoCode(userId: string, code: string): Promise<{ creditsAwarded: number }> {
+    const { data: promoCode, error: codeError } = await supabaseAdmin
+      .from('promo_codes')
+      .select('*')
+      .eq('code', code)
+      .eq('is_active', true)
+      .single();
+    
+    if (codeError || !promoCode) {
+      throw new Error('Invalid or expired promo code');
+    }
+
+    if (promoCode.expires_at && new Date(promoCode.expires_at) < new Date()) {
+      throw new Error('This promo code has expired');
+    }
+
+    if (promoCode.max_redemptions && promoCode.current_redemptions >= promoCode.max_redemptions) {
+      throw new Error('This promo code has reached its redemption limit');
+    }
+
+    const { data: existingRedemption } = await supabaseAdmin
+      .from('promo_code_redemptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('promo_code_id', promoCode.id)
+      .single();
+
+    if (existingRedemption) {
+      throw new Error('You have already redeemed this code');
+    }
+
+    const profile = await this.getProfile(userId);
+    if (!profile) throw new Error('User not found');
+
+    const newBalance = profile.credits + promoCode.credit_amount;
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({ credits: newBalance })
+      .eq('id', userId);
+
+    await supabaseAdmin
+      .from('promo_codes')
+      .update({ current_redemptions: promoCode.current_redemptions + 1 })
+      .eq('id', promoCode.id);
+
+    await supabaseAdmin.from('promo_code_redemptions').insert({
+      user_id: userId,
+      promo_code_id: promoCode.id,
+      credits_awarded: promoCode.credit_amount,
+    });
+
+    await this.createCreditTransaction({
+      user_id: userId,
+      amount: promoCode.credit_amount,
+      balance_after: newBalance,
+      transaction_type: 'promo_code',
+      description: `Redeemed promo code: ${code}`,
+      patent_id: null,
+    });
+
+    return { creditsAwarded: promoCode.credit_amount };
+  }
 }
 
 export const supabaseStorage = new SupabaseStorage();

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact, getAuthHeaders } from '@/lib/api';
-import { ArrowLeft, Download, FileText, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function PatentDetailPage() {
   const [, params] = useRoute('/patent/:id');
@@ -38,6 +42,27 @@ export function PatentDetailPage() {
     }
   };
 
+  const handleRetry = async () => {
+    if (!params?.id) return;
+    setRetrying(true);
+    try {
+      await api.retryPatent(params.id);
+      toast({ 
+        title: 'Retry Started', 
+        description: 'Processing has been restarted. Check back shortly.' 
+      });
+      loadPatent(params.id);
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to retry processing', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -53,140 +78,236 @@ export function PatentDetailPage() {
 
   if (!patent) return null;
 
-  const artifactLabels: Record<string, string> = {
-    elia15: 'ELIA15 Explanation',
-    business_narrative: 'Business Narrative',
-    golden_circle: 'Golden Circle Framework',
+  const artifactConfig: Record<string, { label: string; icon: React.ElementType; description: string }> = {
+    elia15: { 
+      label: 'ELIA15', 
+      icon: Lightbulb,
+      description: 'Explained Like I Am 15 - A simplified explanation of the patent'
+    },
+    business_narrative: { 
+      label: 'Business Narrative', 
+      icon: TrendingUp,
+      description: 'Investor-ready pitch content for commercialization'
+    },
+    golden_circle: { 
+      label: 'Golden Circle', 
+      icon: Target,
+      description: "Strategic WHY/HOW/WHAT framework based on Simon Sinek's methodology"
+    },
   };
+
+  const getStatusBadge = (status: string) => {
+    const configs: Record<string, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+      processing: { text: 'Processing', variant: 'secondary' },
+      elia15_complete: { text: 'Generating...', variant: 'secondary' },
+      completed: { text: 'Complete', variant: 'default' },
+      failed: { text: 'Failed', variant: 'destructive' },
+      partial: { text: 'Partial', variant: 'outline' },
+    };
+    const config = configs[status] || configs.processing;
+    return <Badge variant={config.variant}>{config.text}</Badge>;
+  };
+
+  const formatContent = (content: string) => {
+    return content.split('\n').map((line, i) => {
+      if (line.startsWith('# ')) {
+        return (
+          <h2 key={i} className="text-2xl font-display font-bold text-primary-900 mt-8 mb-4 first:mt-0">
+            {line.replace('# ', '')}
+          </h2>
+        );
+      }
+      if (line.startsWith('## ')) {
+        return (
+          <h3 key={i} className="text-xl font-display font-bold text-primary-900 mt-6 mb-3">
+            {line.replace('## ', '')}
+          </h3>
+        );
+      }
+      if (line.startsWith('### ')) {
+        return (
+          <h4 key={i} className="text-lg font-display font-semibold text-primary-900 mt-4 mb-2">
+            {line.replace('### ', '')}
+          </h4>
+        );
+      }
+      if (line.trim().startsWith('- ')) {
+        return (
+          <li key={i} className="ml-6 mb-2 text-muted-foreground leading-relaxed">
+            {line.replace(/^[\s]*- /, '')}
+          </li>
+        );
+      }
+      if (line.trim().match(/^\d+\./)) {
+        return (
+          <li key={i} className="ml-6 mb-2 text-muted-foreground leading-relaxed list-decimal">
+            {line.replace(/^\d+\.\s*/, '')}
+          </li>
+        );
+      }
+      if (line.trim() === '') {
+        return <div key={i} className="h-2" />;
+      }
+      if (line.startsWith('**') && line.endsWith('**')) {
+        return (
+          <p key={i} className="mb-3 font-semibold text-primary-900 leading-relaxed">
+            {line.replace(/\*\*/g, '')}
+          </p>
+        );
+      }
+      return (
+        <p key={i} className="mb-3 text-muted-foreground leading-relaxed">
+          {line}
+        </p>
+      );
+    });
+  };
+
+  const defaultTab = artifacts.length > 0 ? artifacts[0].type : 'elia15';
 
   return (
     <Layout>
-      <div className="min-h-screen bg-background py-12">
+      <div className="min-h-screen bg-background py-8">
         <div className="container mx-auto px-6">
-          {/* Header */}
-          <div className="mb-8">
-            <button
-              onClick={() => setLocation('/dashboard')}
-              className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary-900 transition-colors mb-6"
-              data-testid="button-back-dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </button>
+          <button
+            onClick={() => setLocation('/dashboard')}
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary-900 transition-colors mb-6"
+            data-testid="button-back-dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </button>
 
-            <div className="space-y-4">
-              <h1 className="font-display text-4xl md:text-5xl font-bold text-primary-900 leading-tight" data-testid="text-patent-title">
-                {patent.title || 'Untitled Patent'}
-              </h1>
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                {patent.inventors && (
-                  <p>
-                    <span className="font-medium">Inventors:</span> {patent.inventors}
-                  </p>
-                )}
-                {patent.assignee && (
-                  <span className="px-1">•</span>
-                )}
-                {patent.assignee && (
-                  <p>
-                    <span className="font-medium">Assignee:</span> {patent.assignee}
-                  </p>
-                )}
-                {patent.filingDate && (
-                  <>
-                    <span className="px-1">•</span>
-                    <p>
-                      <span className="font-medium">Filed:</span> {patent.filingDate}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {(patent.status === 'failed' || patent.status === 'partial') && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
-              <div className="flex items-start gap-4">
-                <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="font-display text-lg font-bold text-red-900 mb-2">
-                    {patent.status === 'failed' ? 'Processing Failed' : 'Partial Completion'}
-                  </h3>
-                  <p className="text-red-700 mb-4">
-                    {patent.status === 'failed' 
-                      ? 'We encountered an error while processing this patent. You can retry the processing.'
-                      : 'Some artifacts could not be generated. You can retry to complete the remaining artifacts.'}
-                  </p>
-                  <Button
-                    onClick={async () => {
-                      setRetrying(true);
-                      try {
-                        const res = await fetch(`/api/patent/${patent.id}/retry`, {
-                          method: 'POST',
-                          headers: getAuthHeaders(),
-                        });
-                        if (!res.ok) throw new Error('Retry failed');
-                        toast({ title: 'Retry Started', description: 'Processing has been restarted. Check back shortly.' });
-                        if (params?.id) loadPatent(params.id);
-                      } catch (error) {
-                        toast({ title: 'Error', description: 'Failed to retry processing', variant: 'destructive' });
-                      } finally {
-                        setRetrying(false);
-                      }
-                    }}
-                    disabled={retrying}
-                    className="bg-red-600 hover:bg-red-700"
-                    data-testid="button-retry"
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
-                    {retrying ? 'Retrying...' : 'Retry Processing'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Artifacts */}
-          <div className="space-y-12">
-            {artifacts.length === 0 && patent.status !== 'failed' && patent.status !== 'partial' ? (
-              <div className="text-center py-16 bg-card border border-border rounded-lg">
-                <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                <h3 className="font-display text-2xl font-bold text-primary-900 mb-2">Generating artifacts...</h3>
-                <p className="text-muted-foreground">Your analysis is being generated. Check back soon.</p>
-              </div>
-            ) : artifacts.length === 0 ? null : (
-              artifacts.map((artifact, index) => (
-                <div key={artifact.type} className="space-y-6">
-                  {/* Artifact Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">
-                        Artifact {String(index + 1).padStart(2, '0')} / {artifacts.length.toString().padStart(2, '0')}
-                      </span>
-                      <div className="h-px bg-border flex-1 w-24" />
+          <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1">
+              <Card className="sticky top-24">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <CardTitle className="font-display text-xl leading-tight" data-testid="text-patent-title">
+                      {patent.title || 'Untitled Patent'}
+                    </CardTitle>
+                    {getStatusBadge(patent.status)}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3 text-sm">
+                    {patent.inventors && (
+                      <div>
+                        <span className="font-medium text-primary-900">Inventors</span>
+                        <p className="text-muted-foreground">{patent.inventors}</p>
+                      </div>
+                    )}
+                    {patent.assignee && (
+                      <div>
+                        <span className="font-medium text-primary-900">Assignee</span>
+                        <p className="text-muted-foreground">{patent.assignee}</p>
+                      </div>
+                    )}
+                    {patent.filingDate && (
+                      <div>
+                        <span className="font-medium text-primary-900">Filing Date</span>
+                        <p className="text-muted-foreground">{patent.filingDate}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium text-primary-900">Artifacts Generated</span>
+                      <p className="text-muted-foreground">{artifacts.length} / 3</p>
                     </div>
                   </div>
 
-                  {/* Artifact Content */}
-                  <div className="bg-card border border-border p-8 md:p-12" data-testid={`artifact-${artifact.type}`}>
-                    <h2 className="font-display text-3xl font-bold text-primary-900 mb-8">
-                      {artifactLabels[artifact.type] || artifact.type}
-                    </h2>
-                    
-                    <div className="prose prose-lg max-w-none prose-headings:font-display prose-headings:text-primary-900 prose-p:text-muted-foreground prose-strong:text-primary-900">
-                      {artifact.content.split('\n').map((line, i) => {
-                        if (line.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold mt-8 mb-4">{line.replace('# ', '')}</h2>;
-                        if (line.startsWith('## ')) return <h3 key={i} className="text-xl font-bold mt-6 mb-3">{line.replace('## ', '')}</h3>;
-                        if (line.startsWith('### ')) return <h4 key={i} className="text-lg font-bold mt-4 mb-2">{line.replace('### ', '')}</h4>;
-                        if (line.trim().startsWith('- ')) return <li key={i} className="ml-6 mb-2">{line.replace(/^- /, '')}</li>;
-                        if (line.trim() === '') return <br key={i} />;
-                        return <p key={i} className="mb-4 leading-relaxed">{line}</p>;
-                      })}
+                  {(patent.status === 'failed' || patent.status === 'partial') && (
+                    <div className="pt-4 border-t">
+                      <Button
+                        onClick={handleRetry}
+                        disabled={retrying}
+                        variant="destructive"
+                        className="w-full"
+                        data-testid="button-retry"
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
+                        {retrying ? 'Retrying...' : 'Retry Processing'}
+                      </Button>
                     </div>
-                  </div>
-                </div>
-              ))
-            )}
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="lg:col-span-2">
+              {artifacts.length === 0 && patent.status !== 'failed' && patent.status !== 'partial' ? (
+                <Card>
+                  <CardContent className="py-16 text-center">
+                    <div className="animate-spin w-8 h-8 border-2 border-primary-900 border-t-transparent rounded-full mx-auto mb-4" />
+                    <h3 className="font-display text-xl font-bold text-primary-900 mb-2">Generating artifacts...</h3>
+                    <p className="text-muted-foreground">Your analysis is being generated. Check back soon.</p>
+                  </CardContent>
+                </Card>
+              ) : artifacts.length === 0 ? (
+                <Card>
+                  <CardContent className="py-16 text-center">
+                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                    <h3 className="font-display text-xl font-bold text-primary-900 mb-2">No artifacts available</h3>
+                    <p className="text-muted-foreground">Processing failed. Use the retry button to try again.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Tabs defaultValue={defaultTab} className="w-full">
+                  <TabsList className="w-full grid grid-cols-3 mb-6">
+                    {['elia15', 'business_narrative', 'golden_circle'].map((type) => {
+                      const config = artifactConfig[type];
+                      const hasArtifact = artifacts.some(a => a.type === type);
+                      const Icon = config.icon;
+                      return (
+                        <TabsTrigger 
+                          key={type} 
+                          value={type} 
+                          disabled={!hasArtifact}
+                          className="flex items-center gap-2"
+                          data-testid={`tab-${type}`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="hidden sm:inline">{config.label}</span>
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+
+                  {artifacts.map((artifact) => {
+                    const config = artifactConfig[artifact.type] || { 
+                      label: artifact.type, 
+                      icon: Lightbulb,
+                      description: '' 
+                    };
+                    const Icon = config.icon;
+
+                    return (
+                      <TabsContent key={artifact.type} value={artifact.type}>
+                        <Card data-testid={`artifact-${artifact.type}`}>
+                          <CardHeader className="border-b">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-primary-100 rounded-lg">
+                                <Icon className="w-5 h-5 text-primary-900" />
+                              </div>
+                              <div>
+                                <CardTitle className="font-display text-xl">{config.label}</CardTitle>
+                                <p className="text-sm text-muted-foreground">{config.description}</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-6 md:p-8">
+                            <ScrollArea className="max-h-[600px] pr-4">
+                              <div className="prose prose-lg max-w-none">
+                                {formatContent(artifact.content)}
+                              </div>
+                            </ScrollArea>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
+              )}
+            </div>
           </div>
         </div>
       </div>

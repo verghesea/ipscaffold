@@ -104,3 +104,42 @@ export const insertCreditTransactionSchema = createInsertSchema(creditTransactio
 export const selectCreditTransactionSchema = createSelectSchema(creditTransactions);
 export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
+
+// Promo codes for free credits
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  creditAmount: integer("credit_amount").notNull(),
+  maxRedemptions: integer("max_redemptions"),
+  currentRedemptions: integer("current_redemptions").notNull().default(0),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
+  id: true,
+  currentRedemptions: true,
+  createdAt: true,
+});
+export const selectPromoCodeSchema = createSelectSchema(promoCodes);
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+export type PromoCode = typeof promoCodes.$inferSelect;
+
+// Promo code redemptions
+export const promoCodeRedemptions = pgTable("promo_code_redemptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  promoCodeId: integer("promo_code_id").notNull().references(() => promoCodes.id, { onDelete: "cascade" }),
+  creditsAwarded: integer("credits_awarded").notNull(),
+  redeemedAt: timestamp("redeemed_at").notNull().defaultNow(),
+});
+
+export const insertPromoCodeRedemptionSchema = createInsertSchema(promoCodeRedemptions).omit({
+  id: true,
+  redeemedAt: true,
+});
+export const selectPromoCodeRedemptionSchema = createSelectSchema(promoCodeRedemptions);
+export type InsertPromoCodeRedemption = z.infer<typeof insertPromoCodeRedemptionSchema>;
+export type PromoCodeRedemption = typeof promoCodeRedemptions.$inferSelect;

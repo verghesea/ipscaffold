@@ -1,14 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { api, type Patent } from '@/lib/api';
-import { FileText, Clock, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
+import { FileText, Clock, CheckCircle, AlertCircle, Upload, Loader2, Plus, Gift } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function DashboardPage() {
   const [, setLocation] = useLocation();
   const [patents, setPatents] = useState<Patent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [isRedeemingCode, setIsRedeemingCode] = useState(false);
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -31,19 +42,117 @@ export function DashboardPage() {
     }
   };
 
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setIsDragging(true);
+    } else if (e.type === 'dragleave') {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const processFile = async (file: File) => {
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 10MB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const result = await api.uploadPatent(file);
+      toast({
+        title: "Success!",
+        description: "Patent uploaded and analysis started.",
+      });
+      setLocation(`/preview/${result.patentId}`);
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      processFile(file);
+    }
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  };
+
+  const handleRedeemCode = async () => {
+    if (!promoCode.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a promo code',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsRedeemingCode(true);
+    try {
+      const result = await api.redeemPromoCode(promoCode.trim().toUpperCase());
+      toast({
+        title: 'Success!',
+        description: `${result.creditsAwarded} credits added to your account!`,
+      });
+      setPromoCode('');
+      setPromoDialogOpen(false);
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: 'Invalid code',
+        description: error.message || 'This code is invalid or has expired.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRedeemingCode(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const configs = {
       processing: { icon: Clock, text: 'Processing', className: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
       elia15_complete: { icon: Clock, text: 'Generating...', className: 'text-blue-600 bg-blue-50 border-blue-200' },
       completed: { icon: CheckCircle, text: 'Complete', className: 'text-green-600 bg-green-50 border-green-200' },
       failed: { icon: AlertCircle, text: 'Failed', className: 'text-red-600 bg-red-50 border-red-200' },
+      partial: { icon: AlertCircle, text: 'Partial', className: 'text-orange-600 bg-orange-50 border-orange-200' },
     };
     
     const config = configs[status as keyof typeof configs] || configs.processing;
     const Icon = config.icon;
     
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium ${config.className}`}>
+      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${config.className}`}>
         <Icon className="w-3 h-3" />
         {config.text}
       </div>
@@ -67,75 +176,174 @@ export function DashboardPage() {
     <Layout>
       <div className="min-h-screen bg-background py-12">
         <div className="container mx-auto px-6">
-          {/* Header */}
-          <div className="mb-12 space-y-4">
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-primary-900" data-testid="text-dashboard-title">
-              Your Patents
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              View and manage all your patent analyses
-            </p>
-          </div>
-
-          {/* Patents Grid */}
-          {patents.length === 0 ? (
-            <div className="text-center py-16 bg-card border border-border rounded-lg">
-              <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-              <h3 className="font-display text-2xl font-bold text-primary-900 mb-2">No patents yet</h3>
-              <p className="text-muted-foreground mb-6">Upload your first patent to get started</p>
-              <button
-                onClick={() => setLocation('/')}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-primary-900 text-white hover:bg-primary-800 transition-colors"
-                data-testid="button-upload-first"
-              >
-                Upload Patent
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {patents.map((patent) => (
-                <div
-                  key={patent.id}
-                  onClick={() => setLocation(`/patent/${patent.id}`)}
-                  className="bg-card border border-border hover:border-accent-400/50 p-6 space-y-4 transition-all cursor-pointer group"
-                  data-testid={`card-patent-${patent.id}`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-display text-xl font-bold text-primary-900 group-hover:text-primary-700 transition-colors line-clamp-2" data-testid={`text-title-${patent.id}`}>
-                        {patent.title || 'Untitled Patent'}
-                      </h3>
-                    </div>
-                    {getStatusBadge(patent.status)}
-                  </div>
-
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    {patent.assignee && (
-                      <p className="line-clamp-1">
-                        <span className="font-medium">Assignee:</span> {patent.assignee}
-                      </p>
-                    )}
-                    {patent.filingDate && (
-                      <p>
-                        <span className="font-medium">Filed:</span> {patent.filingDate}
-                      </p>
-                    )}
-                    <p>
-                      <span className="font-medium">Artifacts:</span> {patent.artifactCount || 0} / 3
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-border flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(patent.createdAt || '').toLocaleDateString()}
-                    </span>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary-900 group-hover:translate-x-1 transition-all" />
-                  </div>
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Main Content */}
+            <div className="flex-1">
+              {/* Header */}
+              <div className="mb-8 flex items-center justify-between">
+                <div>
+                  <h1 className="font-display text-3xl md:text-4xl font-bold text-primary-900" data-testid="text-dashboard-title">
+                    Your Patents
+                  </h1>
+                  <p className="text-muted-foreground mt-1">
+                    View and manage all your patent analyses
+                  </p>
                 </div>
-              ))}
+                <Dialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2" data-testid="button-redeem-code">
+                      <Gift className="w-4 h-4" />
+                      Redeem Code
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Redeem Promo Code</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="promo-code">Enter your code</Label>
+                        <Input
+                          id="promo-code"
+                          placeholder="PROMO123"
+                          value={promoCode}
+                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                          disabled={isRedeemingCode}
+                          data-testid="input-promo-code"
+                        />
+                      </div>
+                      <Button 
+                        onClick={handleRedeemCode} 
+                        className="w-full"
+                        disabled={isRedeemingCode}
+                        data-testid="button-submit-promo"
+                      >
+                        {isRedeemingCode ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Redeeming...
+                          </>
+                        ) : (
+                          'Redeem Credits'
+                        )}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Patents Table */}
+              {patents.length === 0 ? (
+                <Card>
+                  <CardContent className="py-16 text-center">
+                    <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                    <h3 className="font-display text-2xl font-bold text-primary-900 mb-2">No patents yet</h3>
+                    <p className="text-muted-foreground mb-6">Upload your first patent to get started</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[40%]">Title</TableHead>
+                        <TableHead>Assignee</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Artifacts</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {patents.map((patent) => (
+                        <TableRow 
+                          key={patent.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setLocation(`/patent/${patent.id}`)}
+                          data-testid={`row-patent-${patent.id}`}
+                        >
+                          <TableCell className="font-medium">
+                            <span className="line-clamp-1" data-testid={`text-title-${patent.id}`}>
+                              {patent.title || 'Untitled Patent'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <span className="line-clamp-1">{patent.assignee || '-'}</span>
+                          </TableCell>
+                          <TableCell>{getStatusBadge(patent.status)}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {patent.artifactCount || 0} / 3
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {new Date(patent.createdAt || '').toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
             </div>
-          )}
+
+            {/* Upload Sidebar */}
+            <div className="lg:w-80">
+              <Card className="sticky top-24">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Plus className="w-5 h-5" />
+                    Upload Patent
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    className={`
+                      relative border-2 border-dashed rounded-lg p-6 text-center transition-all
+                      ${isDragging 
+                        ? 'border-accent-500 bg-accent-50' 
+                        : 'border-border hover:border-accent-400/50 hover:bg-muted/30'
+                      }
+                      ${isUploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'}
+                    `}
+                    data-testid="upload-drop-zone"
+                  >
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileSelect}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isUploading}
+                      data-testid="input-file-upload"
+                    />
+                    
+                    {isUploading ? (
+                      <div className="space-y-3">
+                        <Loader2 className="w-10 h-10 text-accent-500 mx-auto animate-spin" />
+                        <p className="text-sm text-muted-foreground">Analyzing patent...</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <Upload className={`w-10 h-10 mx-auto ${isDragging ? 'text-accent-500' : 'text-muted-foreground'}`} />
+                        <div>
+                          <p className="text-sm font-medium text-primary-900">
+                            Drop PDF here
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            or click to browse
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Max 10MB per file
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

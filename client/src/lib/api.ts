@@ -136,4 +136,36 @@ export const api = {
     clearStoredTokens();
     await fetch('/api/logout', { method: 'POST' });
   },
+
+  async redeemPromoCode(code: string): Promise<{ creditsAwarded: number }> {
+    const response = await fetch('/api/promo/redeem', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ code }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to redeem code');
+    }
+    
+    return response.json();
+  },
+
+  async retryPatent(id: string): Promise<{ success: boolean }> {
+    const response = await fetch(`/api/patent/${id}/retry`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to retry');
+    }
+    
+    return response.json();
+  },
 };

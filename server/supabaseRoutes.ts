@@ -566,6 +566,74 @@ export async function registerRoutes(
     }
   });
 
+  // Promo code redemption
+  app.post('/api/promo/redeem', requireAuth, async (req, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: 'Promo code is required' });
+      }
+      
+      const result = await supabaseStorage.redeemPromoCode(req.user!.id, code.toUpperCase());
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error('Promo redemption error:', error);
+      res.status(400).json({ error: error.message || 'Failed to redeem promo code' });
+    }
+  });
+
+  // Admin: Create promo code
+  app.post('/api/admin/promo-codes', requireAdmin, async (req, res) => {
+    try {
+      const { code, creditAmount, maxRedemptions, expiresAt } = req.body;
+      
+      if (!code || !creditAmount) {
+        return res.status(400).json({ error: 'Code and credit amount are required' });
+      }
+      
+      const promoCode = await supabaseStorage.createPromoCode({
+        code: code.toUpperCase(),
+        creditAmount,
+        maxRedemptions: maxRedemptions || null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        createdBy: parseInt(req.user!.id),
+      });
+      
+      await supabaseStorage.createAuditLog(req.user!.id, 'create_promo_code', 'promo_code', promoCode.id.toString(), { code, creditAmount });
+      res.json(promoCode);
+      
+    } catch (error) {
+      console.error('Promo creation error:', error);
+      res.status(500).json({ error: 'Failed to create promo code' });
+    }
+  });
+
+  // Admin: List promo codes
+  app.get('/api/admin/promo-codes', requireAdmin, async (req, res) => {
+    try {
+      const promoCodes = await supabaseStorage.getPromoCodes();
+      res.json(promoCodes);
+    } catch (error) {
+      console.error('Promo list error:', error);
+      res.status(500).json({ error: 'Failed to list promo codes' });
+    }
+  });
+
+  // Admin: Toggle promo code active status
+  app.patch('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
+    try {
+      const { isActive } = req.body;
+      await supabaseStorage.updatePromoCodeStatus(req.params.id, isActive);
+      await supabaseStorage.createAuditLog(req.user!.id, 'update_promo_code', 'promo_code', req.params.id, { isActive });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Promo update error:', error);
+      res.status(500).json({ error: 'Failed to update promo code' });
+    }
+  });
+
   return httpServer;
 }
 
