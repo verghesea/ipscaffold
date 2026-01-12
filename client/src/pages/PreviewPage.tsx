@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api } from '@/lib/api';
-import { ArrowRight, Lock, Check, Loader2 } from 'lucide-react';
+import { ArrowRight, Lock, Check, Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Layout } from '@/components/layout/Layout';
 
@@ -121,6 +121,20 @@ export function PreviewPage() {
               <div className="flex items-center gap-4 mb-8">
                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">Artifact 01 / 03</span>
                  <div className="h-px bg-border flex-1" />
+              </div>
+              
+              <div className="bg-amber-50 border-l-4 border-amber-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <Lightbulb className="w-6 h-6 text-amber-600 mt-1" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-amber-600 font-playfair">
+                      ELIA15 Preview
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Simplified explanation of your patent
+                    </p>
+                  </div>
+                </div>
               </div>
               
               <div className="max-h-[500px] overflow-y-auto px-4 py-6 border border-border rounded-lg bg-card scrollbar-thin">

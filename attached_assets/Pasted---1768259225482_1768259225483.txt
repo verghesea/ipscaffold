@@ -1,0 +1,64 @@
+---                                                                                                                                                    
+  PHASE 6: Test Promo Codes                                                                                                                              
+                                                                                                                                                         
+  Task Overview                                                                                                                                          
+                                                                                                                                                         
+  Now that promo code tables exist, verify the entire promo code flow works correctly.                                                                   
+                                                                                                                                                         
+  Testing Steps                                                                                                                                          
+                                                                                                                                                         
+  1. Create a Promo Code                                                                                                                                 
+  - Login as admin                                                                                                                                       
+  - Go to Admin Dashboard → Promo Codes tab                                                                                                              
+  - Click "Create Promo Code"                                                                                                                            
+  - Enter:                                                                                                                                               
+    - Code: BETA50                                                                                                                                       
+    - Credits: 50                                                                                                                                        
+    - Max Redemptions: 10                                                                                                                                
+  - Verify code appears in table                                                                                                                         
+  - Check "Active" status shows correctly                                                                                                                
+                                                                                                                                                         
+  2. Test Code Redemption (if implemented)                                                                                                               
+  - Logout                                                                                                                                               
+  - Login as regular user                                                                                                                                
+  - Navigate to redemption page/section                                                                                                                  
+  - Enter code BETA50                                                                                                                                    
+  - Verify credits increase by 50                                                                                                                        
+  - Check transaction log shows redemption                                                                                                               
+                                                                                                                                                         
+  3. Test Code Limits                                                                                                                                    
+  - Try redeeming same code again                                                                                                                        
+  - Should show error: "Already redeemed"                                                                                                                
+  - Check admin panel shows 1/10 redemptions                                                                                                             
+                                                                                                                                                         
+  4. Test Toggle Active/Inactive                                                                                                                         
+  - In admin panel, toggle code to inactive                                                                                                              
+  - Try to redeem as user                                                                                                                                
+  - Should show error: "Code is inactive"                                                                                                                
+  - Toggle back to active                                                                                                                                
+  - Redemption should work again                                                                                                                         
+                                                                                                                                                         
+  5. Verify Database                                                                                                                                     
+  Check in Supabase Dashboard → Table Editor:                                                                                                            
+  - promo_codes table has your code                                                                                                                      
+  - promo_code_redemptions table shows redemption records                                                                                                
+  - credit_transactions table shows credit addition                                                                                                      
+                                                                                                                                                         
+  If Issues Found                                                                                                                                        
+                                                                                                                                                         
+  Promo code not showing in table:                                                                                                                       
+  - Check browser console for errors                                                                                                                     
+  - Verify /api/admin/promo-codes endpoint returns data                                                                                                  
+  - Check RLS policies in Supabase                                                                                                                       
+                                                                                                                                                         
+  Can't create promo code:                                                                                                                               
+  - Check browser network tab for error                                                                                                                  
+  - Verify admin status (is_admin = true)                                                                                                                
+  - Check Supabase logs for errors                                                                                                                       
+                                                                                                                                                         
+  Redemption fails:                                                                                                                                      
+  - Verify redeemPromoCode function exists in supabaseStorage.ts                                                                                         
+  - Check for typos in SQL queries                                                                                                                       
+  - Verify RLS policies allow inserts                                                                                                                    
+                                                                                                                                                         
+  ---                                   

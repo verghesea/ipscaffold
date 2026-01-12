@@ -1,0 +1,147 @@
+  ---                                                                                                                                                    
+  PHASE 5: Analytics Integration (Umami)                                                                                                                 
+                                                                                                                                                         
+  Task Overview                                                                                                                                          
+                                                                                                                                                         
+  Integrate Umami analytics to track user behavior, page views, and custom events.                                                                       
+                                                                                                                                                         
+  Option A: Use Umami Cloud (Easiest)                                                                                                                    
+                                                                                                                                                         
+  Step 1: Create Umami Account                                                                                                                           
+  1. Go to https://cloud.umami.is                                                                                                                        
+  2. Sign up for free account                                                                                                                            
+  3. Add your website: ipscaffold.replit.app                                                                                                             
+  4. Get your tracking code                                                                                                                              
+                                                                                                                                                         
+  Step 2: Add Tracking Script                                                                                                                            
+                                                                                                                                                         
+  Modify client/index.html:                                                                                                                              
+                                                                                                                                                         
+  <!DOCTYPE html>                                                                                                                                        
+  <html lang="en">                                                                                                                                       
+    <head>                                                                                                                                               
+      <meta charset="UTF-8" />                                                                                                                           
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />                                                                           
+      <title>IP Scaffold</title>                                                                                                                         
+                                                                                                                                                         
+      <!-- Umami Analytics -->                                                                                                                           
+      <script                                                                                                                                            
+        async                                                                                                                                            
+        src="https://cloud.umami.is/script.js"                                                                                                           
+        data-website-id="YOUR_WEBSITE_ID_HERE"                                                                                                           
+      ></script>                                                                                                                                         
+    </head>                                                                                                                                              
+    <body>                                                                                                                                               
+      <div id="root"></div>                                                                                                                              
+      <script type="module" src="/src/main.tsx"></script>                                                                                                
+    </body>                                                                                                                                              
+  </html>                                                                                                                                                
+                                                                                                                                                         
+  Step 3: Add Custom Event Tracking                                                                                                                      
+                                                                                                                                                         
+  Create client/src/lib/analytics.ts:                                                                                                                    
+                                                                                                                                                         
+  // Utility for tracking custom events                                                                                                                  
+  export const trackEvent = (eventName: string, eventData?: Record<string, any>) => {                                                                    
+    if (typeof window !== 'undefined' && (window as any).umami) {                                                                                        
+      (window as any).umami.track(eventName, eventData);                                                                                                 
+    }                                                                                                                                                    
+  };                                                                                                                                                     
+                                                                                                                                                         
+  // Specific tracking functions                                                                                                                         
+  export const analytics = {                                                                                                                             
+    trackPatentUpload: (title: string) => {                                                                                                              
+      trackEvent('patent-upload', { title });                                                                                                            
+    },                                                                                                                                                   
+                                                                                                                                                         
+    trackArtifactView: (artifactType: string) => {                                                                                                       
+      trackEvent('artifact-view', { type: artifactType });                                                                                               
+    },                                                                                                                                                   
+                                                                                                                                                         
+    trackDownload: (format: string, artifactType: string) => {                                                                                           
+      trackEvent('download', { format, artifactType });                                                                                                  
+    },                                                                                                                                                   
+                                                                                                                                                         
+    trackMagicLinkSent: (email: string) => {                                                                                                             
+      trackEvent('magic-link-sent', { email });                                                                                                          
+    },                                                                                                                                                   
+                                                                                                                                                         
+    trackLogin: () => {                                                                                                                                  
+      trackEvent('login-success');                                                                                                                       
+    },                                                                                                                                                   
+                                                                                                                                                         
+    trackPromoCodeRedeemed: (code: string, credits: number) => {                                                                                         
+      trackEvent('promo-redeemed', { code, credits });                                                                                                   
+    }                                                                                                                                                    
+  };                                                                                                                                                     
+                                                                                                                                                         
+  Step 4: Add Tracking to Components                                                                                                                     
+                                                                                                                                                         
+  In client/src/pages/LandingPage.tsx:                                                                                                                   
+  import { analytics } from '@/lib/analytics';                                                                                                           
+                                                                                                                                                         
+  // After successful upload:                                                                                                                            
+  analytics.trackPatentUpload(patent.title);                                                                                                             
+                                                                                                                                                         
+  In client/src/pages/PatentDetailPage.tsx:                                                                                                              
+  import { analytics } from '@/lib/analytics';                                                                                                           
+                                                                                                                                                         
+  // When user switches tabs:                                                                                                                            
+  <TabsTrigger                                                                                                                                           
+    onClick={() => analytics.trackArtifactView(key)}                                                                                                     
+  >                                                                                                                                                      
+                                                                                                                                                         
+  In client/src/pages/AuthCallbackPage.tsx:                                                                                                              
+  import { analytics } from '@/lib/analytics';                                                                                                           
+                                                                                                                                                         
+  // After successful login:                                                                                                                             
+  analytics.trackLogin();                                                                                                                                
+                                                                                                                                                         
+  Step 5: Add Analytics Tab to Admin Dashboard                                                                                                           
+                                                                                                                                                         
+  In client/src/pages/AdminPage.tsx:                                                                                                                     
+                                                                                                                                                         
+  Add new tab:                                                                                                                                           
+  <TabsList>                                                                                                                                             
+    <TabsTrigger value="overview">Overview</TabsTrigger>                                                                                                 
+    <TabsTrigger value="users">Users</TabsTrigger>                                                                                                       
+    <TabsTrigger value="patents">Patents</TabsTrigger>                                                                                                   
+    <TabsTrigger value="promo">Promo Codes</TabsTrigger>                                                                                                 
+    <TabsTrigger value="analytics">Analytics</TabsTrigger>                                                                                               
+  </TabsList>                                                                                                                                            
+                                                                                                                                                         
+  {/* Add analytics tab content */}                                                                                                                      
+  <TabsContent value="analytics">                                                                                                                        
+    <Card>                                                                                                                                               
+      <CardHeader>                                                                                                                                       
+        <CardTitle className="font-playfair">Analytics Dashboard</CardTitle>                                                                             
+        <p className="text-sm text-muted-foreground">                                                                                                    
+          Real-time usage statistics from Umami                                                                                                          
+        </p>                                                                                                                                             
+      </CardHeader>                                                                                                                                      
+      <CardContent>                                                                                                                                      
+        {/* Option 1: Embed Umami dashboard */}                                                                                                          
+        <div className="rounded-lg border overflow-hidden">                                                                                              
+          <iframe                                                                                                                                        
+            src="https://cloud.umami.is/share/YOUR_SHARE_TOKEN"                                                                                          
+            className="w-full h-[600px] border-0"                                                                                                        
+            title="Analytics Dashboard"                                                                                                                  
+          />                                                                                                                                             
+        </div>                                                                                                                                           
+                                                                                                                                                         
+        {/* Option 2: Or link to external dashboard */}                                                                                                  
+        <div className="text-center py-8">                                                                                                               
+          <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground mb-4" />                                                                        
+          <h3 className="text-lg font-semibold mb-2">View Full Analytics</h3>                                                                            
+          <p className="text-sm text-muted-foreground mb-4">                                                                                             
+            Access detailed analytics in your Umami dashboard                                                                                            
+          </p>                                                                                                                                           
+          <Button asChild>                                                                                                                               
+            <a href="https://cloud.umami.is" target="_blank" rel="noopener noreferrer">                                                                  
+              Open Umami Dashboard                                                                                                                       
+            </a>                                                                                                                                         
+          </Button>                                                                                                                                      
+        </div>                                                                                                                                           
+      </CardContent>                                                                                                                                     
+    </Card>                                                                                                                                              
+  </TabsContent>    

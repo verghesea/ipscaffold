@@ -1,13 +1,46 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact, getAuthHeaders } from '@/lib/api';
-import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+
+const ARTIFACT_TYPES = {
+  elia15: {
+    icon: Lightbulb,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    label: 'ELIA15',
+    description: 'Simplified Explanation',
+    emoji: '💡',
+    tagline: "Explain Like I'm 15"
+  },
+  business_narrative: {
+    icon: TrendingUp,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    label: 'Business Narrative',
+    description: 'Investor-Ready Pitch',
+    emoji: '📈',
+    tagline: 'Commercial Strategy'
+  },
+  golden_circle: {
+    icon: Target,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    label: 'Golden Circle',
+    description: 'Strategic Framework',
+    emoji: '🎯',
+    tagline: 'Why • How • What'
+  }
+} as const;
 
 export function PatentDetailPage() {
   const [, params] = useRoute('/patent/:id');
@@ -76,24 +109,6 @@ export function PatentDetailPage() {
   }
 
   if (!patent) return null;
-
-  const artifactConfig: Record<string, { label: string; icon: React.ElementType; description: string }> = {
-    elia15: { 
-      label: 'ELIA15', 
-      icon: Lightbulb,
-      description: 'Explained Like I Am 15 - A simplified explanation of the patent'
-    },
-    business_narrative: { 
-      label: 'Business Narrative', 
-      icon: TrendingUp,
-      description: 'Investor-ready pitch content for commercialization'
-    },
-    golden_circle: { 
-      label: 'Golden Circle', 
-      icon: Target,
-      description: "Strategic WHY/HOW/WHAT framework based on Simon Sinek's methodology"
-    },
-  };
 
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -252,55 +267,64 @@ export function PatentDetailPage() {
               ) : (
                 <Tabs defaultValue={defaultTab} className="w-full">
                   <TabsList className="w-full grid grid-cols-3 mb-6">
-                    {['elia15', 'business_narrative', 'golden_circle'].map((type) => {
-                      const config = artifactConfig[type];
-                      const hasArtifact = artifacts.some(a => a.type === type);
-                      const Icon = config.icon;
+                    {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta]) => {
+                      const Icon = meta.icon;
+                      const hasArtifact = artifacts.some(a => a.type === key);
                       return (
                         <TabsTrigger 
-                          key={type} 
-                          value={type} 
+                          key={key} 
+                          value={key} 
                           disabled={!hasArtifact}
-                          className="flex items-center gap-2"
-                          data-testid={`tab-${type}`}
+                          className="flex items-center gap-2 data-[state=active]:border-b-2"
+                          data-testid={`tab-${key}`}
                         >
-                          <Icon className="w-4 h-4" />
-                          <span className="hidden sm:inline">{config.label}</span>
+                          <Icon className={`w-4 h-4 ${meta.color}`} />
+                          <span className="hidden sm:inline">{meta.label}</span>
+                          <span className="sm:hidden">{meta.emoji}</span>
                         </TabsTrigger>
                       );
                     })}
                   </TabsList>
 
-                  {artifacts.map((artifact) => {
-                    const config = artifactConfig[artifact.type] || { 
-                      label: artifact.type, 
-                      icon: Lightbulb,
-                      description: '' 
-                    };
-                    const Icon = config.icon;
+                  {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta]) => {
+                    const Icon = meta.icon;
+                    const artifact = artifacts.find(a => a.type === key);
 
                     return (
-                      <TabsContent key={artifact.type} value={artifact.type}>
-                        <Card data-testid={`artifact-${artifact.type}`}>
-                          <CardHeader className="border-b">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-primary-100 rounded-lg">
-                                <Icon className="w-5 h-5 text-primary-900" />
-                              </div>
-                              <div>
-                                <CardTitle className="font-display text-xl">{config.label}</CardTitle>
-                                <p className="text-sm text-muted-foreground">{config.description}</p>
-                              </div>
+                      <TabsContent key={key} value={key} className="mt-6">
+                        <div className={`${meta.bgColor} ${meta.borderColor} border-l-4 rounded-lg p-4 mb-4`}>
+                          <div className="flex items-start gap-3">
+                            <Icon className={`w-6 h-6 ${meta.color} mt-1`} />
+                            <div>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{meta.tagline}</p>
+                              <h3 className={`text-lg font-semibold ${meta.color} font-playfair`}>
+                                {meta.label}
+                              </h3>
+                              <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
                             </div>
-                          </CardHeader>
-                          <CardContent className="p-0">
-                            <div className="max-h-[600px] overflow-y-auto px-6 py-6 md:px-8 md:py-8 scrollbar-thin">
-                              <div className="prose prose-sm max-w-none">
-                                {formatContent(artifact.content)}
+                          </div>
+                        </div>
+
+                        {artifact ? (
+                          <Card data-testid={`artifact-${key}`}>
+                            <CardContent className="p-0">
+                              <div className="max-h-[600px] overflow-y-auto px-6 py-6 md:px-8 md:py-8 scrollbar-thin">
+                                <div className="prose prose-sm max-w-none">
+                                  {formatContent(artifact.content)}
+                                </div>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card className="text-center py-8">
+                            <CardContent>
+                              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground mb-2" />
+                              <p className="text-sm text-muted-foreground">
+                                Generating {meta.label}...
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )}
                       </TabsContent>
                     );
                   })}

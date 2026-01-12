@@ -1,0 +1,162 @@
+PHASE 4: Visual Language for Artifact Sections                                                                                                         
+                                                                                                                                                         
+  Task Overview                                                                                                                                          
+                                                                                                                                                         
+  Add icons, colors, and visual indicators to differentiate the three artifact types (ELIA15, Business Narrative, Golden Circle). Make it immediately    
+  clear what each artifact is.                                                                                                                           
+                                                                                                                                                         
+  Files to Modify                                                                                                                                        
+                                                                                                                                                         
+  1. client/src/pages/PatentDetailPage.tsx                                                                                                               
+                                                                                                                                                         
+  Add artifact metadata constant near the top:                                                                                                           
+                                                                                                                                                         
+  import { Lightbulb, TrendingUp, Target } from 'lucide-react';                                                                                          
+                                                                                                                                                         
+  const ARTIFACT_TYPES = {                                                                                                                               
+    elia15: {                                                                                                                                            
+      icon: Lightbulb,                                                                                                                                   
+      color: 'text-amber-600',                                                                                                                           
+      bgColor: 'bg-amber-50',                                                                                                                            
+      borderColor: 'border-amber-200',                                                                                                                   
+      label: 'ELIA15',                                                                                                                                   
+      description: 'Simplified Explanation',                                                                                                             
+      emoji: '💡',                                                                                                                                       
+      tagline: 'Explain Like I\'m 15'                                                                                                                    
+    },                                                                                                                                                   
+    business_narrative: {                                                                                                                                
+      icon: TrendingUp,                                                                                                                                  
+      color: 'text-blue-600',                                                                                                                            
+      bgColor: 'bg-blue-50',                                                                                                                             
+      borderColor: 'border-blue-200',                                                                                                                    
+      label: 'Business Narrative',                                                                                                                       
+      description: 'Investor-Ready Pitch',                                                                                                               
+      emoji: '📈',                                                                                                                                       
+      tagline: 'Commercial Strategy'                                                                                                                     
+    },                                                                                                                                                   
+    golden_circle: {                                                                                                                                     
+      icon: Target,                                                                                                                                      
+      color: 'text-purple-600',                                                                                                                          
+      bgColor: 'bg-purple-50',                                                                                                                           
+      borderColor: 'border-purple-200',                                                                                                                  
+      label: 'Golden Circle',                                                                                                                            
+      description: 'Strategic Framework',                                                                                                                
+      emoji: '🎯',                                                                                                                                       
+      tagline: 'Why • How • What'                                                                                                                        
+    }                                                                                                                                                    
+  } as const;                                                                                                                                            
+                                                                                                                                                         
+  Update tabs to use visual language:                                                                                                                    
+                                                                                                                                                         
+  <Tabs defaultValue="elia15" className="w-full">                                                                                                        
+    <TabsList className="grid w-full grid-cols-3">                                                                                                       
+      {Object.entries(ARTIFACT_TYPES).map(([key, meta]) => {                                                                                             
+        const Icon = meta.icon;                                                                                                                          
+        return (                                                                                                                                         
+          <TabsTrigger                                                                                                                                   
+            key={key}                                                                                                                                    
+            value={key}                                                                                                                                  
+            className="data-[state=active]:border-b-2 data-[state=active]:border-current"                                                                
+            style={{                                                                                                                                     
+              '--tab-color': meta.color.replace('text-', '')                                                                                             
+            } as React.CSSProperties}                                                                                                                    
+          >                                                                                                                                              
+            <div className="flex items-center gap-2">                                                                                                    
+              <Icon className={`w-4 h-4 ${meta.color}`} />                                                                                               
+              <span className="hidden sm:inline">{meta.label}</span>                                                                                     
+              <span className="sm:hidden">{meta.emoji}</span>                                                                                            
+            </div>                                                                                                                                       
+          </TabsTrigger>                                                                                                                                 
+        );                                                                                                                                               
+      })}                                                                                                                                                
+    </TabsList>                                                                                                                                          
+                                                                                                                                                         
+    {Object.entries(ARTIFACT_TYPES).map(([key, meta]) => {                                                                                               
+      const Icon = meta.icon;                                                                                                                            
+      const artifact = artifacts.find(a => a.type === key);                                                                                              
+                                                                                                                                                         
+      return (                                                                                                                                           
+        <TabsContent key={key} value={key} className="mt-6">                                                                                             
+          {/* Header with visual language */}                                                                                                            
+          <div className={`${meta.bgColor} ${meta.borderColor} border-l-4 rounded-lg p-4 mb-4`}>                                                         
+            <div className="flex items-start gap-3">                                                                                                     
+              <Icon className={`w-6 h-6 ${meta.color} mt-1`} />                                                                                          
+              <div>                                                                                                                                      
+                <h3 className={`text-lg font-semibold ${meta.color} font-playfair`}>                                                                     
+                  {meta.label}                                                                                                                           
+                </h3>                                                                                                                                    
+                <p className="text-sm text-muted-foreground">{meta.tagline}</p>                                                                          
+              </div>                                                                                                                                     
+            </div>                                                                                                                                       
+          </div>                                                                                                                                         
+                                                                                                                                                         
+          {/* Content */}                                                                                                                                
+          {artifact ? (                                                                                                                                  
+            <div className="max-h-[600px] overflow-y-auto px-4 py-6">                                                                                    
+              <div className="prose prose-sm max-w-none">                                                                                                
+                {artifact.content}                                                                                                                       
+              </div>                                                                                                                                     
+            </div>                                                                                                                                       
+          ) : (                                                                                                                                          
+            <Card className="text-center py-8">                                                                                                          
+              <CardContent>                                                                                                                              
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground mb-2" />                                                          
+                <p className="text-sm text-muted-foreground">                                                                                            
+                  Generating {meta.label}...                                                                                                             
+                </p>                                                                                                                                     
+              </CardContent>                                                                                                                             
+            </Card>                                                                                                                                      
+          )}                                                                                                                                             
+                                                                                                                                                         
+          {/* Download button with color theming */}                                                                                                     
+          {artifact && (                                                                                                                                 
+            <div className="mt-4 flex gap-2">                                                                                                            
+              <Button className={meta.bgColor + ' ' + meta.color + ' hover:opacity-80'}>                                                                 
+                Download PDF                                                                                                                             
+              </Button>                                                                                                                                  
+              <Button variant="outline">                                                                                                                 
+                Download DOCX                                                                                                                            
+              </Button>                                                                                                                                  
+            </div>                                                                                                                                       
+          )}                                                                                                                                             
+        </TabsContent>                                                                                                                                   
+      );                                                                                                                                                 
+    })}                                                                                                                                                  
+  </Tabs>                                                                                                                                                
+                                                                                                                                                         
+  2. client/src/pages/PreviewPage.tsx                                                                                                                    
+                                                                                                                                                         
+  Add the same visual language to the ELIA15 preview:                                                                                                    
+                                                                                                                                                         
+  import { Lightbulb } from 'lucide-react';                                                                                                              
+                                                                                                                                                         
+  // In the ELIA15 display section:                                                                                                                      
+  <div className="bg-amber-50 border-l-4 border-amber-200 rounded-lg p-4 mb-6">                                                                          
+    <div className="flex items-start gap-3">                                                                                                             
+      <Lightbulb className="w-6 h-6 text-amber-600 mt-1" />                                                                                              
+      <div>                                                                                                                                              
+        <h3 className="text-lg font-semibold text-amber-600 font-playfair">                                                                              
+          ELIA15 Preview                                                                                                                                 
+        </h3>                                                                                                                                            
+        <p className="text-sm text-muted-foreground">                                                                                                    
+          Simplified explanation of your patent                                                                                                          
+        </p>                                                                                                                                             
+      </div>                                                                                                                                             
+    </div>                                                                                                                                               
+  </div>                                                                                                                                                 
+                                                                                                                                                         
+  {/* Then the scrollable content */}                                                                                                                    
+  <div className="max-h-[500px] overflow-y-auto px-4 py-6">                                                                                              
+    <div className="prose prose-sm max-w-none">                                                                                                          
+      {elia15}                                                                                                                                           
+    </div>                                                                                                                                               
+  </div>                                                                                                                                                 
+                                                                                                                                                         
+  Testing Criteria                                                                                                                                       
+                                                                                                                                                         
+  - Each artifact type has distinct color scheme                                                                                                         
+  - Icons appear correctly                                                                                                                               
+  - Color coding is consistent (amber/blue/purple)                                                                                                       
+  - Headers explain what each artifact is                                                                                                                
+  - Mobile view still readable                                                                                                                           
+  - Accessibility: sufficient color contrast      
