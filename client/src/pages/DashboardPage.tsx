@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { api, type Patent } from '@/lib/api';
-import { FileText, Clock, CheckCircle, AlertCircle, Upload, Loader2, Plus, Gift } from 'lucide-react';
+import { FileText, Clock, CheckCircle, AlertCircle, Upload, Loader2, Plus, Gift, Grid, List } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,6 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { createAvatar } from '@dicebear/core';
+import { shapes } from '@dicebear/collection';
 
 export function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -20,6 +23,7 @@ export function DashboardPage() {
   const [promoCode, setPromoCode] = useState('');
   const [isRedeemingCode, setIsRedeemingCode] = useState(false);
   const [promoDialogOpen, setPromoDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -189,7 +193,26 @@ export function DashboardPage() {
                     View and manage all your patent analyses
                   </p>
                 </div>
-                <Dialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen}>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1 bg-muted rounded-lg p-1">
+                    <Button
+                      variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('grid')}
+                      data-testid="button-view-grid"
+                    >
+                      <Grid className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === 'table' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('table')}
+                      data-testid="button-view-table"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Dialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="gap-2" data-testid="button-redeem-code">
                       <Gift className="w-4 h-4" />
@@ -230,17 +253,87 @@ export function DashboardPage() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </div>
               </div>
 
-              {/* Patents Table */}
+              {/* Patents Display */}
               {patents.length === 0 ? (
-                <Card>
-                  <CardContent className="py-16 text-center">
-                    <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                    <h3 className="font-display text-2xl font-bold text-primary-900 mb-2">No patents yet</h3>
-                    <p className="text-muted-foreground mb-6">Upload your first patent to get started</p>
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold font-playfair mb-2">No Patents Yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Upload your first patent to get started
+                    </p>
+                    <Button onClick={() => setLocation('/')}>
+                      Upload Patent
+                    </Button>
                   </CardContent>
                 </Card>
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {patents.map((patent) => {
+                    const avatarSvg = createAvatar(shapes, {
+                      seed: patent.id,
+                      backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffd5dc', 'ffdfbf'],
+                    }).toString();
+
+                    return (
+                      <Card
+                        key={patent.id}
+                        className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
+                        onClick={() => setLocation(`/patent/${patent.id}`)}
+                        data-testid={`card-patent-${patent.id}`}
+                      >
+                        <div className="h-48 relative bg-gradient-to-br from-primary/10 to-primary/5">
+                          <div
+                            className="w-full h-full opacity-30 group-hover:opacity-40 transition"
+                            dangerouslySetInnerHTML={{ __html: avatarSvg }}
+                          />
+
+                          <Badge
+                            className="absolute top-3 right-3"
+                            variant={
+                              patent.status === 'completed' ? 'default' :
+                              patent.status === 'failed' ? 'destructive' :
+                              patent.status === 'processing' ? 'secondary' : 'outline'
+                            }
+                          >
+                            {patent.status === 'elia15_complete' ? 'In Progress' : patent.status}
+                          </Badge>
+
+                          <div className="absolute bottom-3 left-3 right-3">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-primary h-full transition-all"
+                                style={{ width: `${((patent.artifactCount || 0) / 3) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <CardContent className="p-4">
+                          <h3 className="font-semibold font-playfair text-lg mb-2 line-clamp-2 group-hover:text-primary transition">
+                            {patent.title || 'Untitled Patent'}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
+                            {patent.assignee || 'Unknown Assignee'}
+                          </p>
+
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <FileText className="w-3 h-3" />
+                              {patent.artifactCount || 0}/3 artifacts
+                            </span>
+                            <span>
+                              {new Date(patent.createdAt || '').toLocaleDateString()}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               ) : (
                 <Card>
                   <Table>
