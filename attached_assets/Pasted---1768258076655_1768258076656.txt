@@ -1,0 +1,62 @@
+ ---                                                                                                                                                    
+  PHASE 1: Fix Scrolling in Artifact Views                                                                                                               
+                                                                                                                                                         
+  Task Overview                                                                                                                                          
+                                                                                                                                                         
+  The artifact content (ELIA15, Business Narrative, Golden Circle) is getting cut off with no ability to scroll. Add proper scrolling to all artifact    
+  display sections.                                                                                                                                      
+                                                                                                                                                         
+  Files to Modify                                                                                                                                        
+                                                                                                                                                         
+  1. client/src/pages/PatentDetailPage.tsx                                                                                                               
+                                                                                                                                                         
+  Find the section where artifacts are rendered and update the content display area:                                                                     
+                                                                                                                                                         
+  Changes needed:                                                                                                                                        
+  - Locate the div/section that displays the artifact content                                                                                            
+  - Add scrolling container with max height                                                                                                              
+  - Add proper prose styling for markdown content                                                                                                        
+                                                                                                                                                         
+  Code pattern to implement:                                                                                                                             
+  // Find where artifact content is displayed, likely in a tab or section                                                                                
+  // Replace or wrap the content display with:                                                                                                           
+                                                                                                                                                         
+  <div className="max-h-[600px] overflow-y-auto px-4 py-6">                                                                                              
+    <div className="prose prose-sm max-w-none">                                                                                                          
+      {artifact.content}                                                                                                                                 
+    </div>                                                                                                                                               
+  </div>                                                                                                                                                 
+                                                                                                                                                         
+  Additional improvements:                                                                                                                               
+  - Add custom scrollbar styling for better UX:                                                                                                          
+  <div className="max-h-[600px] overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">                             
+                                                                                                                                                         
+  - If using tabs, ensure each tab content has scrolling:                                                                                                
+  <TabsContent value="elia15" className="mt-6">                                                                                                          
+    <div className="max-h-[600px] overflow-y-auto px-4 py-6">                                                                                            
+      <div className="prose prose-sm max-w-none">                                                                                                        
+        {artifacts.find(a => a.type === 'elia15')?.content}                                                                                              
+      </div>                                                                                                                                             
+    </div>                                                                                                                                               
+  </TabsContent>                                                                                                                                         
+                                                                                                                                                         
+  2. client/src/pages/PreviewPage.tsx                                                                                                                    
+                                                                                                                                                         
+  Find where ELIA15 is displayed in the preview and add the same scrolling container:                                                                    
+                                                                                                                                                         
+  // Locate ELIA15 content display                                                                                                                       
+  <div className="max-h-[500px] overflow-y-auto px-4 py-6">                                                                                              
+    <div className="prose prose-sm max-w-none">                                                                                                          
+      {elia15Content}                                                                                                                                    
+    </div>                                                                                                                                               
+  </div>                                                                                                                                                 
+                                                                                                                                                         
+  Testing Criteria                                                                                                                                       
+                                                                                                                                                         
+  - Navigate to a patent detail page                                                                                                                     
+  - Switch between ELIA15, Business Narrative, and Golden Circle tabs                                                                                    
+  - Verify content scrolls smoothly when it exceeds viewport                                                                                             
+  - Check on mobile (responsive)                                                                                                                         
+  - Ensure no horizontal scrolling                                                                                                                       
+                                                                                                                                                         
+  ---                              
