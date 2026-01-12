@@ -3,6 +3,7 @@ import { UploadCloud, FileText, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { analytics } from '@/lib/analytics';
 
 export function UploadArea() {
   const [isDragging, setIsDragging] = useState(false);
@@ -44,6 +45,8 @@ export function UploadArea() {
     try {
       const result = await api.uploadPatent(file);
       setIsUploading(false);
+      
+      analytics.trackPatentUpload(file.name);
       
       toast({
         title: "Upload successful",

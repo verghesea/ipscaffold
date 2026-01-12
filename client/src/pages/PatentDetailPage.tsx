@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact, getAuthHeaders } from '@/lib/api';
 import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loader2 } from 'lucide-react';
+import { analytics } from '@/lib/analytics';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -277,6 +278,7 @@ export function PatentDetailPage() {
                           disabled={!hasArtifact}
                           className="flex items-center gap-2 data-[state=active]:border-b-2"
                           data-testid={`tab-${key}`}
+                          onClick={() => analytics.trackArtifactView(key)}
                         >
                           <Icon className={`w-4 h-4 ${meta.color}`} />
                           <span className="hidden sm:inline">{meta.label}</span>

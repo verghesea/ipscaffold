@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { createAvatar } from '@dicebear/core';
 import { shapes } from '@dicebear/collection';
+import { analytics } from '@/lib/analytics';
 
 export function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -125,6 +126,7 @@ export function DashboardPage() {
     setIsRedeemingCode(true);
     try {
       const result = await api.redeemPromoCode(promoCode.trim().toUpperCase());
+      analytics.trackPromoCodeRedeemed(promoCode.trim().toUpperCase(), result.creditsAwarded);
       toast({
         title: 'Success!',
         description: `${result.creditsAwarded} credits added to your account!`,

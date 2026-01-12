@@ -313,6 +313,7 @@ export default function AdminPage() {
             <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             <TabsTrigger value="patents" data-testid="tab-patents">Patents</TabsTrigger>
             <TabsTrigger value="promo-codes" data-testid="tab-promo-codes">Promo Codes</TabsTrigger>
+            <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6">
@@ -595,6 +596,34 @@ export default function AdminPage() {
                     </table>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-playfair">Analytics Dashboard</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Real-time usage statistics from Umami
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">View Full Analytics</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Access detailed analytics in your Umami dashboard
+                  </p>
+                  <Button asChild data-testid="button-open-umami">
+                    <a href="https://cloud.umami.is" target="_blank" rel="noopener noreferrer">
+                      Open Umami Dashboard
+                    </a>
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-4">
+                    Note: Set up your Umami Cloud account and replace YOUR_WEBSITE_ID in index.html with your actual website ID.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

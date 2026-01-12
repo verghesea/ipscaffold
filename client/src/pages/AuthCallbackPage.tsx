@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { createClient } from '@supabase/supabase-js';
 import { setStoredTokens } from '@/lib/api';
+import { analytics } from '@/lib/analytics';
 
 export default function AuthCallbackPage() {
   const [, setLocation] = useLocation();
@@ -64,6 +65,7 @@ export default function AuthCallbackPage() {
 
           setStatus('success');
           setMessage('Login successful! Redirecting...');
+          analytics.trackLogin();
 
           setTimeout(() => {
             if (patentId) {
@@ -103,6 +105,7 @@ export default function AuthCallbackPage() {
 
           setStatus('success');
           setMessage('Login successful! Redirecting...');
+          analytics.trackLogin();
 
           setTimeout(() => {
             if (patentId) {
@@ -147,6 +150,7 @@ export default function AuthCallbackPage() {
 
         setStatus('success');
         setMessage('Login successful! Redirecting...');
+        analytics.trackLogin();
 
         setTimeout(() => {
           if (patentId) {
