@@ -48,11 +48,23 @@ interface PromoCode {
   created_at: string;
 }
 
+interface UserDetails extends User {
+  patents: Patent[];
+  transactions: Array<{
+    id: string;
+    amount: number;
+    balance_after: number;
+    description: string;
+    created_at: string;
+  }>;
+}
+
 export default function AdminPage() {
   const [, navigate] = useLocation();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [creditAmount, setCreditAmount] = useState('');
   const [creditDescription, setCreditDescription] = useState('');
   const [promoDialogOpen, setPromoDialogOpen] = useState(false);
@@ -98,6 +110,18 @@ export default function AdminPage() {
       return res.json();
     },
     enabled: !!profile?.is_admin,
+  });
+
+  const { data: userDetails, isLoading: userDetailsLoading } = useQuery<UserDetails | null>({
+    queryKey: ['admin-user-details', selectedUserId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/users/${selectedUserId}/details`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to fetch user details');
+      return res.json();
+    },
+    enabled: !!selectedUserId && !!profile?.is_admin,
   });
 
   const createPromoCodeMutation = useMutation({
@@ -313,17 +337,17 @@ export default function AdminPage() {
                       </thead>
                       <tbody>
                         {usersData?.users.map((u) => (
-                          <tr key={u.id} className="border-b hover:bg-muted/50" data-testid={`row-user-${u.id}`}>
-                            <td className="py-3 px-4">{u.email}</td>
-                            <td className="py-3 px-4">{u.credits}</td>
-                            <td className="py-3 px-4">
+                          <tr key={u.id} className="border-b hover:bg-muted/50 cursor-pointer transition" data-testid={`row-user-${u.id}`}>
+                            <td className="py-3 px-4" onClick={() => setSelectedUserId(u.id)}>{u.email}</td>
+                            <td className="py-3 px-4" onClick={() => setSelectedUserId(u.id)}>{u.credits}</td>
+                            <td className="py-3 px-4" onClick={() => setSelectedUserId(u.id)}>
                               {u.is_admin ? (
                                 <Badge variant="outline" className="text-amber-600 border-amber-600">Admin</Badge>
                               ) : (
                                 <Badge variant="secondary">User</Badge>
                               )}
                             </td>
-                            <td className="py-3 px-4 text-muted-foreground text-sm">
+                            <td className="py-3 px-4 text-muted-foreground text-sm" onClick={() => setSelectedUserId(u.id)}>
                               {new Date(u.created_at).toLocaleDateString()}
                             </td>
                             <td className="py-3 px-4">
@@ -575,6 +599,131 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* User Profile Dialog */}
+        <Dialog open={!!selectedUserId} onOpenChange={() => setSelectedUserId(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto scrollbar-thin">
+            <DialogHeader>
+              <DialogTitle className="font-playfair text-2xl">User Profile</DialogTitle>
+            </DialogHeader>
+
+            {userDetailsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : userDetails ? (
+              <div className="space-y-6">
+                {/* Basic Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="font-medium">{userDetails.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">User ID</Label>
+                    <p className="font-mono text-sm truncate">{userDetails.id}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Credits</Label>
+                    <p className="text-2xl font-bold text-primary">{userDetails.credits}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Admin Status</Label>
+                    <Badge variant={userDetails.is_admin ? "default" : "secondary"}>
+                      {userDetails.is_admin ? "Admin" : "User"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Member Since</Label>
+                    <p>{new Date(userDetails.created_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+
+                {/* Patents */}
+                <div>
+                  <Label className="text-lg font-semibold">Patents ({userDetails.patents?.length || 0})</Label>
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
+                    {userDetails.patents?.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No patents yet</p>
+                    ) : (
+                      userDetails.patents?.map((patent: Patent) => (
+                        <div key={patent.id} className="border rounded-lg p-3 hover:bg-muted/50">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{patent.title || 'Untitled Patent'}</p>
+                            </div>
+                            <Badge variant={
+                              patent.status === 'completed' ? 'default' :
+                              patent.status === 'failed' ? 'destructive' : 'secondary'
+                            }>
+                              {patent.status}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(patent.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Credit Transactions */}
+                <div>
+                  <Label className="text-lg font-semibold">Recent Transactions</Label>
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
+                    {!userDetails.transactions?.length ? (
+                      <p className="text-sm text-muted-foreground">No transactions yet</p>
+                    ) : (
+                      userDetails.transactions?.slice(0, 10).map((txn) => (
+                        <div key={txn.id} className="flex justify-between items-center border-b pb-2">
+                          <div>
+                            <p className="text-sm font-medium">{txn.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(txn.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-semibold ${txn.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {txn.amount > 0 ? '+' : ''}{txn.amount}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Balance: {txn.balance_after}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button onClick={() => {
+                    const userForCredits = usersData?.users.find(u => u.id === selectedUserId);
+                    if (userForCredits) {
+                      setSelectedUser(userForCredits);
+                      setSelectedUserId(null);
+                    }
+                  }} data-testid="button-profile-adjust-credits">
+                    Adjust Credits
+                  </Button>
+                  {userDetails.id !== user?.id && (
+                    <Button variant="outline" onClick={() => {
+                      toggleAdminMutation.mutate({
+                        userId: userDetails.id,
+                        isAdmin: !userDetails.is_admin
+                      });
+                      queryClient.invalidateQueries({ queryKey: ['admin-user-details', selectedUserId] });
+                    }} data-testid="button-profile-toggle-admin">
+                      {userDetails.is_admin ? 'Remove Admin' : 'Make Admin'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

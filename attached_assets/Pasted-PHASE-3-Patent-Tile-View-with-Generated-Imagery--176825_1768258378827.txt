@@ -1,0 +1,151 @@
+PHASE 3: Patent Tile View with Generated Imagery                                                                                                       
+                                                                                                                                                         
+  Task Overview                                                                                                                                          
+                                                                                                                                                         
+  Replace the table view of patents on the dashboard with a beautiful tile/card grid view. Add unique visual patterns for each patent using DiceBear     
+  avatars.                                                                                                                                               
+                                                                                                                                                         
+  Files to Modify                                                                                                                                        
+                                                                                                                                                         
+  1. Install DiceBear (if not already installed)                                                                                                         
+                                                                                                                                                         
+  Add to package.json dependencies:                                                                                                                      
+  "@dicebear/core": "^9.2.2",                                                                                                                            
+  "@dicebear/collection": "^9.2.2"                                                                                                                       
+                                                                                                                                                         
+  Run: npm install                                                                                                                                       
+                                                                                                                                                         
+  2. client/src/pages/DashboardPage.tsx                                                                                                                  
+                                                                                                                                                         
+  Add imports:                                                                                                                                           
+  import { createAvatar } from '@dicebear/core';                                                                                                         
+  import { shapes } from '@dicebear/collection';                                                                                                         
+                                                                                                                                                         
+  Replace the table with a grid:                                                                                                                         
+                                                                                                                                                         
+  Find the patents table and replace with:                                                                                                               
+                                                                                                                                                         
+  {/* Replace table with grid */}                                                                                                                        
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">                                                                                 
+    {patents.map((patent) => {                                                                                                                           
+      // Generate unique pattern for this patent                                                                                                         
+      const avatarSvg = createAvatar(shapes, {                                                                                                           
+        seed: patent.id,                                                                                                                                 
+        backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffd5dc', 'ffdfbf'],                                                                             
+      }).toString();                                                                                                                                     
+                                                                                                                                                         
+      return (                                                                                                                                           
+        <Card                                                                                                                                            
+          key={patent.id}                                                                                                                                
+          className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group"                                                                
+          onClick={() => navigate(`/patent/${patent.id}`)}                                                                                               
+        >                                                                                                                                                
+          {/* Thumbnail/Pattern */}                                                                                                                      
+          <div className="h-48 relative bg-gradient-to-br from-primary/10 to-primary/5">                                                                 
+            <div                                                                                                                                         
+              className="w-full h-full opacity-30 group-hover:opacity-40 transition"                                                                     
+              dangerouslySetInnerHTML={{ __html: avatarSvg }}                                                                                            
+            />                                                                                                                                           
+                                                                                                                                                         
+            {/* Status Badge */}                                                                                                                         
+            <Badge                                                                                                                                       
+              className="absolute top-3 right-3"                                                                                                         
+              variant={                                                                                                                                  
+                patent.status === 'completed' ? 'default' :                                                                                              
+                patent.status === 'failed' ? 'destructive' :                                                                                             
+                patent.status === 'processing' ? 'secondary' : 'outline'                                                                                 
+              }                                                                                                                                          
+            >                                                                                                                                            
+              {patent.status === 'elia15_complete' ? 'In Progress' : patent.status}                                                                      
+            </Badge>                                                                                                                                     
+                                                                                                                                                         
+            {/* Artifact Progress */}                                                                                                                    
+            <div className="absolute bottom-3 left-3 right-3">                                                                                           
+              <div className="bg-white/90 backdrop-blur-sm rounded-full h-2 overflow-hidden">                                                            
+                <div                                                                                                                                     
+                  className="bg-primary h-full transition-all"                                                                                           
+                  style={{ width: `${(patent.artifactCount / 3) * 100}%` }}                                                                              
+                />                                                                                                                                       
+              </div>                                                                                                                                     
+            </div>                                                                                                                                       
+          </div>                                                                                                                                         
+                                                                                                                                                         
+          {/* Content */}                                                                                                                                
+          <CardContent className="p-4">                                                                                                                  
+            <h3 className="font-semibold font-playfair text-lg mb-2 line-clamp-2 group-hover:text-primary transition">                                   
+              {patent.title || 'Untitled Patent'}                                                                                                        
+            </h3>                                                                                                                                        
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-1">                                                                              
+              {patent.assignee || 'Unknown Assignee'}                                                                                                    
+            </p>                                                                                                                                         
+                                                                                                                                                         
+            <div className="flex items-center justify-between text-xs text-muted-foreground">                                                            
+              <span className="flex items-center gap-1">                                                                                                 
+                <FileText className="w-3 h-3" />                                                                                                         
+                {patent.artifactCount}/3 artifacts                                                                                                       
+              </span>                                                                                                                                    
+              <span>                                                                                                                                     
+                {new Date(patent.createdAt).toLocaleDateString()}                                                                                        
+              </span>                                                                                                                                    
+            </div>                                                                                                                                       
+          </CardContent>                                                                                                                                 
+        </Card>                                                                                                                                          
+      );                                                                                                                                                 
+    })}                                                                                                                                                  
+  </div>                                                                                                                                                 
+                                                                                                                                                         
+  Add empty state:                                                                                                                                       
+  {patents.length === 0 && (                                                                                                                             
+    <Card className="text-center py-12">                                                                                                                 
+      <CardContent>                                                                                                                                      
+        <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />                                                                            
+        <h3 className="text-xl font-semibold font-playfair mb-2">No Patents Yet</h3>                                                                     
+        <p className="text-muted-foreground mb-4">                                                                                                       
+          Upload your first patent to get started                                                                                                        
+        </p>                                                                                                                                             
+        <Button onClick={() => navigate('/')}>                                                                                                           
+          Upload Patent                                                                                                                                  
+        </Button>                                                                                                                                        
+      </CardContent>                                                                                                                                     
+    </Card>                                                                                                                                              
+  )}                                                                                                                                                     
+                                                                                                                                                         
+  Add view toggle (optional):                                                                                                                            
+  // Add state at top of component                                                                                                                       
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');                                                                                    
+                                                                                                                                                         
+  // Add toggle buttons in header                                                                                                                        
+  <div className="flex gap-2">                                                                                                                           
+    <Button                                                                                                                                              
+      variant={viewMode === 'grid' ? 'default' : 'outline'}                                                                                              
+      size="sm"                                                                                                                                          
+      onClick={() => setViewMode('grid')}                                                                                                                
+    >                                                                                                                                                    
+      <Grid className="w-4 h-4" />                                                                                                                       
+    </Button>                                                                                                                                            
+    <Button                                                                                                                                              
+      variant={viewMode === 'table' ? 'default' : 'outline'}                                                                                             
+      size="sm"                                                                                                                                          
+      onClick={() => setViewMode('table')}                                                                                                               
+    >                                                                                                                                                    
+      <List className="w-4 h-4" />                                                                                                                       
+    </Button>                                                                                                                                            
+  </div>                                                                                                                                                 
+                                                                                                                                                         
+  // Then conditionally render:                                                                                                                          
+  {viewMode === 'grid' ? (                                                                                                                               
+    // Grid view code from above                                                                                                                         
+  ) : (                                                                                                                                                  
+    // Keep existing table view                                                                                                                          
+  )}                                                                                                                                                     
+                                                                                                                                                         
+  Testing Criteria                                                                                                                                       
+                                                                                                                                                         
+  - Dashboard shows patents as cards/tiles                                                                                                               
+  - Each patent has unique visual pattern                                                                                                                
+  - Clicking card navigates to patent detail                                                                                                             
+  - Status badge displays correctly                                                                                                                      
+  - Progress bar shows artifact completion                                                                                                               
+  - Responsive on mobile (single column)                                                                                                                 
+  - Empty state shows when no patents                                                                                                                    
+                              

@@ -508,6 +508,29 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/users/:id/details', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      
+      const profile = await supabaseStorage.getProfile(userId);
+      if (!profile) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      const patents = await supabaseStorage.getPatentsByUser(userId);
+      const transactions = await supabaseStorage.getCreditTransactionsByUser(userId);
+      
+      res.json({
+        ...profile,
+        patents,
+        transactions,
+      });
+    } catch (error) {
+      console.error('Admin user details error:', error);
+      res.status(500).json({ error: 'Failed to load user details' });
+    }
+  });
+
   app.post('/api/patent/:id/retry', requireAuth, async (req, res) => {
     try {
       const patent = await supabaseStorage.getPatent(req.params.id);
