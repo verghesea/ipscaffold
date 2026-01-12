@@ -265,7 +265,7 @@ export function DashboardPage() {
                     <p className="text-muted-foreground mb-4">
                       Upload your first patent to get started
                     </p>
-                    <Button onClick={() => setLocation('/')}>
+                    <Button onClick={() => setLocation('/')} data-testid="button-upload-patent-empty">
                       Upload Patent
                     </Button>
                   </CardContent>
