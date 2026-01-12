@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function PatentDetailPage() {
   const [, params] = useRoute('/patent/:id');
@@ -294,12 +293,12 @@ export function PatentDetailPage() {
                               </div>
                             </div>
                           </CardHeader>
-                          <CardContent className="p-6 md:p-8">
-                            <ScrollArea className="max-h-[600px] pr-4">
-                              <div className="prose prose-lg max-w-none">
+                          <CardContent className="p-0">
+                            <div className="max-h-[600px] overflow-y-auto px-6 py-6 md:px-8 md:py-8 scrollbar-thin">
+                              <div className="prose prose-sm max-w-none">
                                 {formatContent(artifact.content)}
                               </div>
-                            </ScrollArea>
+                            </div>
                           </CardContent>
                         </Card>
                       </TabsContent>

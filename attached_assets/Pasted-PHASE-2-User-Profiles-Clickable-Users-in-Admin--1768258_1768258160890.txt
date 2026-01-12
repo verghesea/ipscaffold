@@ -1,0 +1,210 @@
+PHASE 2: User Profiles & Clickable Users in Admin                                                                                                      
+                                                                                                                                                         
+  Task Overview                                                                                                                                          
+                                                                                                                                                         
+  Make users in the admin panel clickable to view detailed user profiles. Add a modal/dialog that shows user details, patents, and transaction history.  
+                                                                                                                                                         
+  Files to Modify                                                                                                                                        
+                                                                                                                                                         
+  1. client/src/pages/AdminPage.tsx                                                                                                                      
+                                                                                                                                                         
+  Add state for selected user:                                                                                                                           
+  // Near the top of the component, add:                                                                                                                 
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);                                                                             
+                                                                                                                                                         
+  Add query to fetch user details:                                                                                                                       
+  // After existing queries, add:                                                                                                                        
+  const { data: userDetails, isLoading: userDetailsLoading } = useQuery({                                                                                
+    queryKey: ['admin-user-details', selectedUserId],                                                                                                    
+    queryFn: async () => {                                                                                                                               
+      if (!selectedUserId) return null;                                                                                                                  
+      const res = await fetch(`/api/admin/users/${selectedUserId}/details`, {                                                                            
+        headers: getAuthHeaders()                                                                                                                        
+      });                                                                                                                                                
+      if (!res.ok) throw new Error('Failed to fetch user details');                                                                                      
+      return res.json();                                                                                                                                 
+    },                                                                                                                                                   
+    enabled: !!selectedUserId && !!profile?.is_admin,                                                                                                    
+  });                                                                                                                                                    
+                                                                                                                                                         
+  Make user rows clickable:                                                                                                                              
+  Find the users table and add click handler:                                                                                                            
+  // In the users table mapping:                                                                                                                         
+  {usersData?.users.map((user) => (                                                                                                                      
+    <tr                                                                                                                                                  
+      key={user.id}                                                                                                                                      
+      onClick={() => setSelectedUserId(user.id)}                                                                                                         
+      className="hover:bg-muted/50 cursor-pointer transition"                                                                                            
+    >                                                                                                                                                    
+      {/* existing table cells */}                                                                                                                       
+    </tr>                                                                                                                                                
+  ))}                                                                                                                                                    
+                                                                                                                                                         
+  Add user details dialog:                                                                                                                               
+  // Add this dialog component after the main content:                                                                                                   
+  <Dialog open={!!selectedUserId} onOpenChange={() => setSelectedUserId(null)}>                                                                          
+    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">                                                                                   
+      <DialogHeader>                                                                                                                                     
+        <DialogTitle className="font-playfair text-2xl">User Profile</DialogTitle>                                                                       
+      </DialogHeader>                                                                                                                                    
+                                                                                                                                                         
+      {userDetailsLoading ? (                                                                                                                            
+        <div className="flex justify-center py-8">                                                                                                       
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />                                                                                      
+        </div>                                                                                                                                           
+      ) : userDetails ? (                                                                                                                                
+        <div className="space-y-6">                                                                                                                      
+          {/* Basic Info */}                                                                                                                             
+          <div className="grid grid-cols-2 gap-4">                                                                                                       
+            <div>                                                                                                                                        
+              <Label className="text-muted-foreground">Email</Label>                                                                                     
+              <p className="font-medium">{userDetails.email}</p>                                                                                         
+            </div>                                                                                                                                       
+            <div>                                                                                                                                        
+              <Label className="text-muted-foreground">User ID</Label>                                                                                   
+              <p className="font-mono text-sm">{userDetails.id}</p>                                                                                      
+            </div>                                                                                                                                       
+            <div>                                                                                                                                        
+              <Label className="text-muted-foreground">Credits</Label>                                                                                   
+              <p className="text-2xl font-bold text-primary">{userDetails.credits}</p>                                                                   
+            </div>                                                                                                                                       
+            <div>                                                                                                                                        
+              <Label className="text-muted-foreground">Admin Status</Label>                                                                              
+              <Badge variant={userDetails.is_admin ? "default" : "secondary"}>                                                                           
+                {userDetails.is_admin ? "Admin" : "User"}                                                                                                
+              </Badge>                                                                                                                                   
+            </div>                                                                                                                                       
+            <div>                                                                                                                                        
+              <Label className="text-muted-foreground">Member Since</Label>                                                                              
+              <p>{new Date(userDetails.created_at).toLocaleDateString()}</p>                                                                             
+            </div>                                                                                                                                       
+          </div>                                                                                                                                         
+                                                                                                                                                         
+          {/* Patents */}                                                                                                                                
+          <div>                                                                                                                                          
+            <Label className="text-lg font-semibold">Patents ({userDetails.patents?.length || 0})</Label>                                                
+            <div className="mt-2 space-y-2">                                                                                                             
+              {userDetails.patents?.map((patent: any) => (                                                                                               
+                <div key={patent.id} className="border rounded-lg p-3 hover:bg-muted/50">                                                                
+                  <div className="flex justify-between items-start">                                                                                     
+                    <div className="flex-1">                                                                                                             
+                      <p className="font-medium">{patent.title}</p>                                                                                      
+                      <p className="text-sm text-muted-foreground">{patent.assignee}</p>                                                                 
+                    </div>                                                                                                                               
+                    <Badge variant={                                                                                                                     
+                      patent.status === 'completed' ? 'default' :                                                                                        
+                      patent.status === 'failed' ? 'destructive' : 'secondary'                                                                           
+                    }>                                                                                                                                   
+                      {patent.status}                                                                                                                    
+                    </Badge>                                                                                                                             
+                  </div>                                                                                                                                 
+                  <p className="text-xs text-muted-foreground mt-1">                                                                                     
+                    {new Date(patent.created_at).toLocaleDateString()}                                                                                   
+                  </p>                                                                                                                                   
+                </div>                                                                                                                                   
+              ))}                                                                                                                                        
+            </div>                                                                                                                                       
+          </div>                                                                                                                                         
+                                                                                                                                                         
+          {/* Credit Transactions */}                                                                                                                    
+          <div>                                                                                                                                          
+            <Label className="text-lg font-semibold">Recent Transactions</Label>                                                                         
+            <div className="mt-2 space-y-2">                                                                                                             
+              {userDetails.transactions?.slice(0, 10).map((txn: any) => (                                                                                
+                <div key={txn.id} className="flex justify-between items-center border-b pb-2">                                                           
+                  <div>                                                                                                                                  
+                    <p className="text-sm font-medium">{txn.description}</p>                                                                             
+                    <p className="text-xs text-muted-foreground">                                                                                        
+                      {new Date(txn.created_at).toLocaleDateString()}                                                                                    
+                    </p>                                                                                                                                 
+                  </div>                                                                                                                                 
+                  <div className="text-right">                                                                                                           
+                    <p className={`font-semibold ${txn.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>                                                
+                      {txn.amount > 0 ? '+' : ''}{txn.amount}                                                                                            
+                    </p>                                                                                                                                 
+                    <p className="text-xs text-muted-foreground">                                                                                        
+                      Balance: {txn.balance_after}                                                                                                       
+                    </p>                                                                                                                                 
+                  </div>                                                                                                                                 
+                </div>                                                                                                                                   
+              ))}                                                                                                                                        
+            </div>                                                                                                                                       
+          </div>                                                                                                                                         
+                                                                                                                                                         
+          {/* Actions */}                                                                                                                                
+          <div className="flex gap-2 pt-4 border-t">                                                                                                     
+            <Button onClick={() => {                                                                                                                     
+              setSelectedUser(userDetails);                                                                                                              
+              setSelectedUserId(null);                                                                                                                   
+            }}>                                                                                                                                          
+              Adjust Credits                                                                                                                             
+            </Button>                                                                                                                                    
+            <Button variant="outline" onClick={() => {                                                                                                   
+              toggleAdminMutation.mutate({                                                                                                               
+                userId: userDetails.id,                                                                                                                  
+                isAdmin: !userDetails.is_admin                                                                                                           
+              });                                                                                                                                        
+            }}>                                                                                                                                          
+              {userDetails.is_admin ? 'Remove Admin' : 'Make Admin'}                                                                                     
+            </Button>                                                                                                                                    
+          </div>                                                                                                                                         
+        </div>                                                                                                                                           
+      ) : null}                                                                                                                                          
+    </DialogContent>                                                                                                                                     
+  </Dialog>                                                                                                                                              
+                                                                                                                                                         
+  2. server/supabaseRoutes.ts                                                                                                                            
+                                                                                                                                                         
+  Add new endpoint for detailed user info:                                                                                                               
+                                                                                                                                                         
+  // Add after existing admin endpoints, around line 580                                                                                                 
+  app.get('/api/admin/users/:id/details', requireAdmin, async (req, res) => {                                                                            
+    try {                                                                                                                                                
+      const userId = req.params.id;                                                                                                                      
+                                                                                                                                                         
+      // Get user profile                                                                                                                                
+      const profile = await supabaseStorage.getProfile(userId);                                                                                          
+      if (!profile) {                                                                                                                                    
+        return res.status(404).json({ error: 'User not found' });                                                                                        
+      }                                                                                                                                                  
+                                                                                                                                                         
+      // Get user's patents                                                                                                                              
+      const patents = await supabaseStorage.getPatentsByUser(userId);                                                                                    
+                                                                                                                                                         
+      // Get user's transactions                                                                                                                         
+      const { data: transactions, error: txnError } = await supabaseAdmin                                                                                
+        .from('credit_transactions')                                                                                                                     
+        .select('*')                                                                                                                                     
+        .eq('user_id', userId)                                                                                                                           
+        .order('created_at', { ascending: false })                                                                                                       
+        .limit(20);                                                                                                                                      
+                                                                                                                                                         
+      if (txnError) throw txnError;                                                                                                                      
+                                                                                                                                                         
+      res.json({                                                                                                                                         
+        id: profile.id,                                                                                                                                  
+        email: profile.email,                                                                                                                            
+        credits: profile.credits,                                                                                                                        
+        is_admin: profile.is_admin,                                                                                                                      
+        created_at: profile.created_at,                                                                                                                  
+        patents: patents,                                                                                                                                
+        transactions: transactions                                                                                                                       
+      });                                                                                                                                                
+                                                                                                                                                         
+    } catch (error) {                                                                                                                                    
+      console.error('User details error:', error);                                                                                                       
+      res.status(500).json({ error: 'Failed to fetch user details' });                                                                                   
+    }                                                                                                                                                    
+  });                                                                                                                                                    
+                                                                                                                                                         
+  Testing Criteria                                                                                                                                       
+                                                                                                                                                         
+  - Click on any user in admin panel                                                                                                                     
+  - Modal opens showing user details                                                                                                                     
+  - Patents list displays correctly                                                                                                                      
+  - Transactions show with correct amounts/dates                                                                                                         
+  - "Adjust Credits" button works                                                                                                                        
+  - "Toggle Admin" button works                                                                                                                          
+  - Modal closes properly                                                                                                                                
+                                                                                                                                                         
+  ---                              

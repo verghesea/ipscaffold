@@ -117,18 +117,22 @@ export function PreviewPage() {
         <div className="container mx-auto px-6 mt-12">
           <div className="max-w-3xl mx-auto">
             {/* ELIA15 Content */}
-            <div className="prose prose-lg prose-headings:font-display prose-headings:text-primary-900 prose-p:text-muted-foreground prose-strong:text-primary-900 max-w-none animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150" data-testid="elia15-content">
+            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150" data-testid="elia15-content">
               <div className="flex items-center gap-4 mb-8">
                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">Artifact 01 / 03</span>
                  <div className="h-px bg-border flex-1" />
               </div>
               
-              {elia15.split('\n').map((line, i) => {
-                if (line.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold mt-8 mb-4">{line.replace('# ', '')}</h2>;
-                if (line.startsWith('## ')) return <h3 key={i} className="text-xl font-bold mt-6 mb-3">{line.replace('## ', '')}</h3>;
-                if (line.trim() === '') return <br key={i} />;
-                return <p key={i} className="mb-4 leading-relaxed">{line}</p>;
-              })}
+              <div className="max-h-[500px] overflow-y-auto px-4 py-6 border border-border rounded-lg bg-card scrollbar-thin">
+                <div className="prose prose-sm prose-headings:font-display prose-headings:text-primary-900 prose-p:text-muted-foreground prose-strong:text-primary-900 max-w-none">
+                  {elia15.split('\n').map((line, i) => {
+                    if (line.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold mt-8 mb-4">{line.replace('# ', '')}</h2>;
+                    if (line.startsWith('## ')) return <h3 key={i} className="text-xl font-bold mt-6 mb-3">{line.replace('## ', '')}</h3>;
+                    if (line.trim() === '') return <br key={i} />;
+                    return <p key={i} className="mb-4 leading-relaxed">{line}</p>;
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Email Gate */}
