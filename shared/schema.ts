@@ -1,168 +1,190 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, serial, timestamp, boolean, numeric } from "drizzle-orm/pg-core";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Users table - stores user accounts
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  credits: integer("credits").notNull().default(100),
-  isAdmin: boolean("is_admin").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  lastLogin: timestamp("last_login"),
+// Type definitions for Supabase tables
+
+// Users/Profiles
+export interface User {
+  id: string;
+  email: string;
+  credits: number;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const insertUserSchema = z.object({
+  email: z.string().email(),
+  credits: z.number().default(100),
+  is_admin: z.boolean().default(false),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-});
-export const selectUserSchema = createSelectSchema(users);
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
 
-// Patents table - stores uploaded patent documents
-export const patents = pgTable("patents", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-  title: text("title"),
-  inventors: text("inventors"),
-  assignee: text("assignee"),
-  filingDate: text("filing_date"),
-  issueDate: text("issue_date"),
-  patentNumber: text("patent_number"),
-  publicationNumber: text("publication_number"),
-  fullText: text("full_text").notNull(),
-  pdfFilename: text("pdf_filename"),
-  status: text("status").notNull().default("processing"), // processing, elia15_complete, completed, failed
-  errorMessage: text("error_message"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+// Patents
+export interface Patent {
+  id: string;
+  user_id: string | null;
+  title: string | null;
+  inventors: string | null;
+  assignee: string | null;
+  filing_date: string | null;
+  issue_date: string | null;
+  patent_number: string | null;
+  publication_number: string | null;
+  full_text: string;
+  pdf_filename: string | null;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const insertPatentSchema = z.object({
+  user_id: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  inventors: z.string().nullable().optional(),
+  assignee: z.string().nullable().optional(),
+  filing_date: z.string().nullable().optional(),
+  issue_date: z.string().nullable().optional(),
+  patent_number: z.string().nullable().optional(),
+  publication_number: z.string().nullable().optional(),
+  full_text: z.string(),
+  pdf_filename: z.string().nullable().optional(),
+  status: z.string().default("processing"),
+  error_message: z.string().nullable().optional(),
 });
 
-export const insertPatentSchema = createInsertSchema(patents).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export const selectPatentSchema = createSelectSchema(patents);
 export type InsertPatent = z.infer<typeof insertPatentSchema>;
-export type Patent = typeof patents.$inferSelect;
 
-// Artifacts table - stores AI-generated content
-export const artifacts = pgTable("artifacts", {
-  id: serial("id").primaryKey(),
-  patentId: integer("patent_id").notNull().references(() => patents.id, { onDelete: "cascade" }),
-  artifactType: text("artifact_type").notNull(), // elia15, business_narrative, golden_circle
-  content: text("content").notNull(),
-  tokensUsed: integer("tokens_used"),
-  generationTimeSeconds: integer("generation_time_seconds"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+// Artifacts (AI-generated content)
+export interface Artifact {
+  id: string;
+  patent_id: string;
+  artifact_type: string; // elia15, business_narrative, golden_circle
+  content: string;
+  tokens_used: number | null;
+  generation_time_seconds: number | null;
+  created_at: string;
+}
+
+export const insertArtifactSchema = z.object({
+  patent_id: z.string(),
+  artifact_type: z.string(),
+  content: z.string(),
+  tokens_used: z.number().nullable().optional(),
+  generation_time_seconds: z.number().nullable().optional(),
 });
 
-export const insertArtifactSchema = createInsertSchema(artifacts).omit({
-  id: true,
-  createdAt: true,
-});
-export const selectArtifactSchema = createSelectSchema(artifacts);
 export type InsertArtifact = z.infer<typeof insertArtifactSchema>;
-export type Artifact = typeof artifacts.$inferSelect;
 
-// Magic tokens for passwordless authentication
-export const magicTokens = pgTable("magic_tokens", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token: text("token").notNull().unique(),
-  patentId: integer("patent_id").references(() => patents.id, { onDelete: "set null" }),
-  expiresAt: timestamp("expires_at").notNull(),
-  usedAt: timestamp("used_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+// Section Images (DALL-E generated images for artifact sections)
+export interface SectionImage {
+  id: string;
+  artifact_id: string;
+  section_heading: string;
+  section_order: number;
+  image_url: string;
+  dalle_prompt: string;
+  image_size: string | null;
+  generation_cost: string | null;
+  created_at: string;
+}
+
+export const insertSectionImageSchema = z.object({
+  artifact_id: z.string(),
+  section_heading: z.string(),
+  section_order: z.number(),
+  image_url: z.string(),
+  dalle_prompt: z.string(),
+  image_size: z.string().nullable().optional(),
+  generation_cost: z.string().nullable().optional(),
 });
 
-export const insertMagicTokenSchema = createInsertSchema(magicTokens).omit({
-  id: true,
-  createdAt: true,
-});
-export const selectMagicTokenSchema = createSelectSchema(magicTokens);
-export type InsertMagicToken = z.infer<typeof insertMagicTokenSchema>;
-export type MagicToken = typeof magicTokens.$inferSelect;
+export type InsertSectionImage = z.infer<typeof insertSectionImageSchema>;
 
-// Credit transactions for audit trail
-export const creditTransactions = pgTable("credit_transactions", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  amount: integer("amount").notNull(), // Negative for deduction, positive for addition
-  balanceAfter: integer("balance_after").notNull(),
-  transactionType: text("transaction_type").notNull(), // signup_bonus, ip_processing, purchase, refund, admin_adjustment
-  description: text("description"),
-  patentId: integer("patent_id").references(() => patents.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+// Credit transactions
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: string; // signup_bonus, ip_processing, purchase, refund, admin_adjustment, promo_code
+  description: string | null;
+  patent_id: string | null;
+  created_at: string;
+}
+
+export const insertCreditTransactionSchema = z.object({
+  user_id: z.string(),
+  amount: z.number(),
+  balance_after: z.number(),
+  transaction_type: z.string(),
+  description: z.string().nullable().optional(),
+  patent_id: z.string().nullable().optional(),
 });
 
-export const insertCreditTransactionSchema = createInsertSchema(creditTransactions).omit({
-  id: true,
-  createdAt: true,
-});
-export const selectCreditTransactionSchema = createSelectSchema(creditTransactions);
 export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
-export type CreditTransaction = typeof creditTransactions.$inferSelect;
 
-// Promo codes for free credits
-export const promoCodes = pgTable("promo_codes", {
-  id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(),
-  creditAmount: integer("credit_amount").notNull(),
-  maxRedemptions: integer("max_redemptions"),
-  currentRedemptions: integer("current_redemptions").notNull().default(0),
-  expiresAt: timestamp("expires_at"),
-  isActive: boolean("is_active").notNull().default(true),
-  createdBy: integer("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+// Promo codes
+export interface PromoCode {
+  id: string;
+  code: string;
+  credit_amount: number;
+  max_redemptions: number | null;
+  current_redemptions: number;
+  expires_at: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export const insertPromoCodeSchema = z.object({
+  code: z.string(),
+  credit_amount: z.number(),
+  max_redemptions: z.number().nullable().optional(),
+  expires_at: z.string().nullable().optional(),
+  is_active: z.boolean().default(true),
+  created_by: z.string().nullable().optional(),
 });
 
-export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
-  id: true,
-  currentRedemptions: true,
-  createdAt: true,
-});
-export const selectPromoCodeSchema = createSelectSchema(promoCodes);
 export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
-export type PromoCode = typeof promoCodes.$inferSelect;
 
 // Promo code redemptions
-export const promoCodeRedemptions = pgTable("promo_code_redemptions", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  promoCodeId: integer("promo_code_id").notNull().references(() => promoCodes.id, { onDelete: "cascade" }),
-  creditsAwarded: integer("credits_awarded").notNull(),
-  redeemedAt: timestamp("redeemed_at").notNull().defaultNow(),
+export interface PromoCodeRedemption {
+  id: string;
+  user_id: string;
+  promo_code_id: string;
+  credits_awarded: number;
+  redeemed_at: string;
+}
+
+export const insertPromoCodeRedemptionSchema = z.object({
+  user_id: z.string(),
+  promo_code_id: z.string(),
+  credits_awarded: z.number(),
 });
 
-export const insertPromoCodeRedemptionSchema = createInsertSchema(promoCodeRedemptions).omit({
-  id: true,
-  redeemedAt: true,
-});
-export const selectPromoCodeRedemptionSchema = createSelectSchema(promoCodeRedemptions);
 export type InsertPromoCodeRedemption = z.infer<typeof insertPromoCodeRedemptionSchema>;
-export type PromoCodeRedemption = typeof promoCodeRedemptions.$inferSelect;
 
-// Section images table - stores DALL-E generated images for artifact section headers
-export const sectionImages = pgTable("section_images", {
-  id: serial("id").primaryKey(),
-  artifactId: integer("artifact_id").notNull().references(() => artifacts.id, { onDelete: "cascade" }),
-  sectionHeading: text("section_heading").notNull(),
-  sectionOrder: integer("section_order").notNull(),
-  imageUrl: text("image_url").notNull(),
-  dallePrompt: text("dalle_prompt").notNull(),
-  imageSize: text("image_size").default("1024x1024"),
-  generationCost: numeric("generation_cost", { precision: 10, scale: 4 }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+// Notifications
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: Record<string, any> | null;
+  read: boolean;
+  created_at: string;
+}
+
+export const insertNotificationSchema = z.object({
+  user_id: z.string(),
+  type: z.string(),
+  title: z.string(),
+  message: z.string(),
+  data: z.record(z.any()).nullable().optional(),
+  read: z.boolean().default(false),
 });
 
-export const insertSectionImageSchema = createInsertSchema(sectionImages).omit({
-  id: true,
-  createdAt: true,
-});
-export const selectSectionImageSchema = createSelectSchema(sectionImages);
-export type InsertSectionImage = z.infer<typeof insertSectionImageSchema>;
-export type SectionImage = typeof sectionImages.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;

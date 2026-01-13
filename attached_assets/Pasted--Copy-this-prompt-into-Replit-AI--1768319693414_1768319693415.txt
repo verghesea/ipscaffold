@@ -1,0 +1,20 @@
+ Copy this prompt into Replit AI:                                                                                                                       
+                                                                                                                                                         
+  I have a feature branch 'feature/dalle-images-and-exports' with 5 new features:                                                                        
+  1. Patent number extraction and display                                                                                                                
+  2. DALL-E image generation for artifact sections                                                                                                       
+  3. Export functionality (PDF, DOCX, TXT)                                                                                                               
+  4. Enhanced markdown rendering                                                                                                                         
+  5. Section parser service                                                                                                                              
+                                                                                                                                                         
+  The branch was built with Drizzle ORM patterns, but our main branch uses                                                                               
+  Supabase directly with Zod schemas and TypeScript interfaces.                                                                                          
+                                                                                                                                                         
+  Please read INTEGRATION_GUIDE.md and help me:                                                                                                          
+  1. Show the schema differences in shared/schema.ts                                                                                                     
+  2. Adapt the Drizzle definitions to our Supabase/Zod pattern                                                                                           
+  3. Merge the new services (they're architecture-agnostic)                                                                                              
+  4. Integrate the API endpoint changes                                                                                                                  
+  5. Keep our existing patterns                                                                                                                          
+                                                                                                                                                         
+  Start by showing me what needs to change in shared/schema.ts 
