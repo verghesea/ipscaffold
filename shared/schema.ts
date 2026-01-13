@@ -6,8 +6,9 @@ import { z } from "zod";
 export interface User {
   id: string;
   email: string;
-  credits: number;
+  credits: number;  // DEPRECATED: Will be moved to organization level
   is_admin: boolean;
+  current_organization_id: string | null;  // Currently selected organization
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +25,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export interface Patent {
   id: string;
   user_id: string | null;
+  organization_id: string | null;  // Organization that owns this patent
   title: string | null;
   inventors: string | null;
   assignee: string | null;
@@ -77,6 +79,7 @@ export type InsertArtifact = z.infer<typeof insertArtifactSchema>;
 export interface CreditTransaction {
   id: string;
   user_id: string;
+  organization_id: string | null;  // Organization for org-based credits
   amount: number;
   balance_after: number;
   transaction_type: string; // signup_bonus, ip_processing, purchase, refund, admin_adjustment, promo_code
@@ -159,3 +162,36 @@ export const insertNotificationSchema = z.object({
 });
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Organizations
+export interface Organization {
+  id: string;
+  name: string;
+  credits: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const insertOrganizationSchema = z.object({
+  name: z.string().min(1).max(100),
+  credits: z.number().default(100),
+});
+
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+// Organization Members
+export interface OrganizationMember {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: 'admin' | 'member' | 'viewer';
+  joined_at: string;
+}
+
+export const insertOrganizationMemberSchema = z.object({
+  organization_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  role: z.enum(['admin', 'member', 'viewer']).default('member'),
+});
+
+export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
