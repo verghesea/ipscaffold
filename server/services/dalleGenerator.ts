@@ -46,7 +46,11 @@ export async function generateSectionImage(
   const conceptSummary = sectionContent.substring(0, 300); // First 300 chars for context
   const dallePrompt = `${STYLE_PROMPT}, representing: ${sectionHeading} from patent "${patentTitle}". Concept: ${conceptSummary}. Single symbolic illustration only.`;
 
-  console.log(`Generating image for section: ${sectionHeading}`);
+  console.log(`\n=== DALL-E Image Generation ===`);
+  console.log(`Section: ${sectionHeading}`);
+  console.log(`Patent: ${patentTitle}`);
+  console.log(`Full Prompt:\n${dallePrompt}`);
+  console.log(`================================\n`);
 
   try {
     // Generate image with DALL-E 3
@@ -59,10 +63,11 @@ export async function generateSectionImage(
       n: 1,
     });
 
-    const tempImageUrl = response.data[0].url;
+    const tempImageUrl = response.data?.[0]?.url;
     if (!tempImageUrl) {
       throw new Error('DALL-E did not return an image URL');
     }
+    console.log(`DALL-E returned temporary URL for: ${sectionHeading}`);
 
     // Download image from OpenAI's temporary URL
     const imageResponse = await fetch(tempImageUrl);
