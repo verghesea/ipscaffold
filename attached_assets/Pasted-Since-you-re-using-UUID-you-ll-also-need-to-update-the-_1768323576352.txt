@@ -1,0 +1,18 @@
+Since you're using UUID, you'll also need to update the TypeScript interface in your code:                                                             
+                                                                                                                                                         
+  In server/supabaseStorage.ts (or wherever you define it):                                                                                              
+  export interface SectionImage {                                                                                                                        
+    id: string;  // UUID as string                                                                                                                       
+    artifact_id: string;  // UUID as string (not number!)                                                                                                
+    section_heading: string;                                                                                                                             
+    section_order: number;                                                                                                                               
+    image_url: string;                                                                                                                                   
+    dalle_prompt: string;                                                                                                                                
+    image_size: string | null;                                                                                                                           
+    generation_cost: string | null;                                                                                                                      
+    created_at: string;                                                                                                                                  
+  }                                                                                                                                                      
+                                                                                                                                                         
+  The TypeScript interface already has string types, which is correct for UUIDs. Just make sure when you integrate the code, it stays as string and not  
+  number.                                                                                                                                                
+            
