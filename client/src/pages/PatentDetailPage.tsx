@@ -209,6 +209,12 @@ export function PatentDetailPage() {
                         <p className="text-muted-foreground">{patent.filingDate}</p>
                       </div>
                     )}
+                    {patent.patentNumber && (
+                      <div>
+                        <span className="font-medium text-primary-900">Patent Number</span>
+                        <p className="text-muted-foreground font-mono">{patent.patentNumber}</p>
+                      </div>
+                    )}
                     <div>
                       <span className="font-medium text-primary-900">Artifacts Generated</span>
                       <p className="text-muted-foreground">{artifacts.length} / 3</p>

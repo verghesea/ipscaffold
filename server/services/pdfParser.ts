@@ -6,6 +6,8 @@ export interface ParsedPatent {
   assignee: string | null;
   filingDate: string | null;
   issueDate: string | null;
+  patentNumber: string | null;
+  publicationNumber: string | null;
   fullText: string;
 }
 
@@ -53,13 +55,37 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   // Extract issue date (or publication date)
   const issueDateMatch = text.match(/(?:Date of Patent|Patent No\.|Pub\. No\.).*?(\w+\.?\s+\d{1,2},?\s+\d{4})/i);
   const issueDate = issueDateMatch ? issueDateMatch[1].trim() : null;
-  
+
+  // Extract patent number (multiple common patterns)
+  const patentPatterns = [
+    /Patent\s+No\.?\s*:?\s*([0-9,]+\s*[A-Z]\d*)/i,
+    /US\s*([0-9,]+\s*[A-Z]\d*)/i,
+    /United States Patent\s+([0-9,]+)/i,
+    /Patent Number:\s*([0-9,]+\s*[A-Z]\d*)/i,
+    /\(US\s+([0-9,]+\s*[A-Z]\d*)\)/i,
+  ];
+
+  let patentNumber = null;
+  for (const pattern of patentPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      patentNumber = match[1].replace(/,/g, '').trim();
+      break;
+    }
+  }
+
+  // Extract publication number
+  const publicationMatch = text.match(/Pub(?:lication)?\.?\s+No\.?\s*:?\s*(US\s*\d{4}\/\d+\s*[A-Z]\d*)/i);
+  const publicationNumber = publicationMatch ? publicationMatch[1].trim() : null;
+
   return {
     title,
     inventors,
     assignee,
     filingDate,
     issueDate,
+    patentNumber,
+    publicationNumber,
     fullText: text
   };
 }

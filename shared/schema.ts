@@ -30,6 +30,8 @@ export const patents = pgTable("patents", {
   assignee: text("assignee"),
   filingDate: text("filing_date"),
   issueDate: text("issue_date"),
+  patentNumber: text("patent_number"),
+  publicationNumber: text("publication_number"),
   fullText: text("full_text").notNull(),
   pdfFilename: text("pdf_filename"),
   status: text("status").notNull().default("processing"), // processing, elia15_complete, completed, failed

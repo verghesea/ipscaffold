@@ -246,7 +246,8 @@ export function DashboardPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40%]">Title</TableHead>
+                        <TableHead className="w-[35%]">Title</TableHead>
+                        <TableHead>Patent No.</TableHead>
                         <TableHead>Assignee</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Artifacts</TableHead>
@@ -265,6 +266,9 @@ export function DashboardPage() {
                             <span className="line-clamp-1" data-testid={`text-title-${patent.id}`}>
                               {patent.title || 'Untitled Patent'}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-sm">
+                            {patent.patentNumber || '-'}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             <span className="line-clamp-1">{patent.assignee || '-'}</span>

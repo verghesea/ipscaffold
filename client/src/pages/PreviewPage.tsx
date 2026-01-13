@@ -107,7 +107,8 @@ export function PreviewPage() {
                 {patent.title}
               </h1>
               <p className="text-muted-foreground text-sm">
-                {patent.filingDate && `Filed: ${patent.filingDate}`}
+                {patent.patentNumber && `Patent No.: ${patent.patentNumber}`}
+                {patent.filingDate && ` • Filed: ${patent.filingDate}`}
                 {patent.assignee && ` • Assignee: ${patent.assignee}`}
               </p>
             </div>
