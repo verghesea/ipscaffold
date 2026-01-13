@@ -3,6 +3,7 @@ import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact, getAuthHeaders } from '@/lib/api';
 import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Download } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -142,78 +143,6 @@ export function PatentDetailPage() {
     };
     const config = configs[status] || configs.processing;
     return <Badge variant={config.variant}>{config.text}</Badge>;
-  };
-
-  const formatContent = (content: string, artifactId: string) => {
-    const artifactImages = images.filter(img => img.artifactId === artifactId);
-
-    return content.split('\n').map((line, i) => {
-      if (line.startsWith('# ')) {
-        return (
-          <h2 key={i} className="text-2xl font-display font-bold text-primary-900 mt-8 mb-4 first:mt-0">
-            {line.replace('# ', '')}
-          </h2>
-        );
-      }
-      if (line.startsWith('## ')) {
-        const heading = line.replace('## ', '');
-        const image = artifactImages.find(img => img.sectionHeading === heading);
-
-        return (
-          <div key={i}>
-            <h3 className="text-xl font-display font-bold text-primary-900 mt-6 mb-3">
-              {heading}
-            </h3>
-            {image && (
-              <div className="flex justify-center my-6">
-                <img
-                  src={image.imageUrl}
-                  alt={heading}
-                  className="max-w-md rounded-lg shadow-md border border-gray-200"
-                  loading="lazy"
-                />
-              </div>
-            )}
-          </div>
-        );
-      }
-      if (line.startsWith('### ')) {
-        return (
-          <h4 key={i} className="text-lg font-display font-semibold text-primary-900 mt-4 mb-2">
-            {line.replace('### ', '')}
-          </h4>
-        );
-      }
-      if (line.trim().startsWith('- ')) {
-        return (
-          <li key={i} className="ml-6 mb-2 text-muted-foreground leading-relaxed">
-            {line.replace(/^[\s]*- /, '')}
-          </li>
-        );
-      }
-      if (line.trim().match(/^\d+\./)) {
-        return (
-          <li key={i} className="ml-6 mb-2 text-muted-foreground leading-relaxed list-decimal">
-            {line.replace(/^\d+\.\s*/, '')}
-          </li>
-        );
-      }
-      if (line.trim() === '') {
-        return <div key={i} className="h-2" />;
-      }
-      if (line.startsWith('**') && line.endsWith('**')) {
-        return (
-          <p key={i} className="mb-3 font-semibold text-primary-900 leading-relaxed">
-            {line.replace(/\*\*/g, '')}
-          </p>
-        );
-      }
-      return (
-        <p key={i} className="mb-3 text-muted-foreground leading-relaxed">
-          {line}
-        </p>
-      );
-    });
   };
 
   const defaultTab = artifacts.length > 0 ? artifacts[0].type : 'elia15';
@@ -380,7 +309,15 @@ export function PatentDetailPage() {
                           <CardContent className="p-6 md:p-8">
                             <ScrollArea className="max-h-[600px] pr-4">
                               <div className="prose prose-lg max-w-none">
-                                {formatContent(artifact.content, artifact.id)}
+                                <MarkdownRenderer
+                                  content={artifact.content}
+                                  images={images
+                                    .filter(img => img.artifactId === artifact.id)
+                                    .map(img => ({
+                                      sectionHeading: img.sectionHeading,
+                                      imageUrl: img.imageUrl,
+                                    }))}
+                                />
                               </div>
                             </ScrollArea>
                           </CardContent>
