@@ -92,8 +92,41 @@ export async function registerRoutes(
       const filename = req.file.filename;
       const parsedPatent = await parsePatentPDF(filePath);
 
+      let organizationId: string | null = null;
+
+      // If user is logged in, get their current organization
+      if (user?.id) {
+        const profile = await supabaseStorage.getProfile(user.id);
+        organizationId = profile?.current_organization_id || null;
+
+        // Check if user has a current organization
+        if (!organizationId) {
+          return res.status(400).json({ error: 'No organization selected. Please create or select an organization first.' });
+        }
+
+        // Check organization credits
+        const organization = await supabaseStorage.getOrganization(organizationId);
+        if (!organization || organization.credits < 10) {
+          return res.status(402).json({ error: 'Insufficient organization credits' });
+        }
+
+        // Deduct credits from organization
+        const newBalance = organization.credits - 10;
+        await supabaseStorage.updateOrganizationCredits(organizationId, newBalance);
+        await supabaseStorage.createCreditTransaction({
+          user_id: user.id,
+          organization_id: organizationId,
+          amount: -10,
+          balance_after: newBalance,
+          transaction_type: 'ip_processing',
+          description: `Patent analysis: ${parsedPatent.title || 'Untitled'}`,
+          patent_id: null, // Will be updated after patent creation
+        });
+      }
+
       const patent = await supabaseStorage.createPatent({
         user_id: user?.id || null,
+        organization_id: organizationId,
         title: parsedPatent.title,
         inventors: parsedPatent.inventors,
         assignee: parsedPatent.assignee,
@@ -121,18 +154,18 @@ export async function registerRoutes(
 
         await supabaseStorage.updatePatentStatus(patent.id, 'elia15_complete');
 
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           patentId: patent.id,
           message: 'Patent uploaded and ELIA15 generated successfully'
         });
 
         if (user?.id) {
           generateRemainingArtifactsWithNotifications(
-            patent.id, 
-            parsedPatent.fullText, 
-            elia15Result.content, 
-            user.id, 
+            patent.id,
+            parsedPatent.fullText,
+            elia15Result.content,
+            user.id,
             parsedPatent.title
           ).catch((err) => console.error('Error in generation with notifications:', err));
         } else {
@@ -264,20 +297,46 @@ export async function registerRoutes(
 
       if (patentId && profile) {
         const patent = await supabaseStorage.getPatent(patentId);
-        if (patent && !patent.user_id && profile.credits >= 10) {
+        if (patent && !patent.user_id && !patent.organization_id) {
           console.log('Claiming patent:', patentId);
-          await supabaseStorage.updatePatentUserId(patent.id, user.id);
-          const newBalance = profile.credits - 10;
-          await supabaseStorage.updateProfileCredits(user.id, newBalance);
-          await supabaseStorage.createCreditTransaction({
-            user_id: user.id,
-            amount: -10,
-            balance_after: newBalance,
-            transaction_type: 'ip_processing',
-            description: `Patent analysis: ${patent.title}`,
-            patent_id: patent.id,
-          });
-          profile.credits = newBalance;
+
+          // Get or create organization for user
+          let currentOrgId = profile.current_organization_id;
+          if (!currentOrgId) {
+            // Create a personal organization for the user
+            const personalOrg = await supabaseStorage.createOrganization(
+              `${profile.email.split('@')[0]}'s Organization`,
+              user.id
+            );
+            currentOrgId = personalOrg.id;
+            console.log('Created personal organization for user:', user.id);
+          }
+
+          // Check organization credits
+          const organization = await supabaseStorage.getOrganization(currentOrgId);
+          if (organization && organization.credits >= 10) {
+            await supabaseStorage.updatePatentUserId(patent.id, user.id);
+
+            // Update patent with organization_id
+            await supabaseAdmin
+              .from('patents')
+              .update({ organization_id: currentOrgId })
+              .eq('id', patent.id);
+
+            const newBalance = organization.credits - 10;
+            await supabaseStorage.updateOrganizationCredits(currentOrgId, newBalance);
+            await supabaseStorage.createCreditTransaction({
+              user_id: user.id,
+              organization_id: currentOrgId,
+              amount: -10,
+              balance_after: newBalance,
+              transaction_type: 'ip_processing',
+              description: `Patent analysis: ${patent.title}`,
+              patent_id: patent.id,
+            });
+          } else {
+            console.log('Insufficient organization credits to claim patent');
+          }
         }
       }
 
@@ -304,11 +363,21 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'User not found' });
     }
 
+    let currentOrganization = null;
+    if (profile.current_organization_id) {
+      currentOrganization = await supabaseStorage.getOrganization(profile.current_organization_id);
+    }
+
     res.json({
       id: profile.id,
       email: profile.email,
-      credits: profile.credits,
+      credits: profile.credits, // Deprecated - for backwards compatibility
       isAdmin: profile.is_admin,
+      currentOrganization: currentOrganization ? {
+        id: currentOrganization.id,
+        name: currentOrganization.name,
+        credits: currentOrganization.credits,
+      } : null,
     });
   });
 
@@ -318,8 +387,18 @@ export async function registerRoutes(
 
   app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
-      const patents = await supabaseStorage.getPatentsByUser(req.user!.id);
-      
+      const profile = await supabaseStorage.getProfile(req.user!.id);
+
+      let patents: any[] = [];
+
+      // If user has a current organization, show org patents
+      if (profile?.current_organization_id) {
+        patents = await supabaseStorage.getPatentsByOrganization(profile.current_organization_id);
+      } else {
+        // Fallback to user's personal patents (backwards compatibility)
+        patents = await supabaseStorage.getPatentsByUser(req.user!.id);
+      }
+
       const patentsWithArtifactCount = await Promise.all(
         patents.map(async (patent) => {
           const artifacts = await supabaseStorage.getArtifactsByPatent(patent.id);
@@ -331,6 +410,7 @@ export async function registerRoutes(
             status: patent.status,
             createdAt: patent.created_at,
             artifactCount: artifacts.length,
+            uploadedBy: patent.user_id, // Track who uploaded it
           };
         })
       );
@@ -348,7 +428,19 @@ export async function registerRoutes(
       const patentId = req.params.id;
       const patent = await supabaseStorage.getPatent(patentId);
 
-      if (!patent || patent.user_id !== req.user!.id) {
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
+      }
+
+      // Check access: user uploaded it OR user is in the patent's organization
+      let hasAccess = patent.user_id === req.user!.id;
+
+      if (!hasAccess && patent.organization_id) {
+        const role = await supabaseStorage.getOrganizationMemberRole(req.user!.id, patent.organization_id);
+        hasAccess = !!role;
+      }
+
+      if (!hasAccess) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -364,6 +456,8 @@ export async function registerRoutes(
           issueDate: patent.issue_date,
           status: patent.status,
           createdAt: patent.created_at,
+          uploadedBy: patent.user_id,
+          organizationId: patent.organization_id,
         },
         artifacts: artifacts.map(a => ({
           id: a.id,
@@ -534,28 +628,36 @@ export async function registerRoutes(
   app.post('/api/patent/:id/retry', requireAuth, async (req, res) => {
     try {
       const patent = await supabaseStorage.getPatent(req.params.id);
-      
+
       if (!patent) {
         return res.status(404).json({ error: 'Patent not found' });
       }
-      
-      if (patent.user_id !== req.user!.id) {
+
+      // Check access: user uploaded it OR user is in the patent's organization
+      let hasAccess = patent.user_id === req.user!.id;
+
+      if (!hasAccess && patent.organization_id) {
+        const role = await supabaseStorage.getOrganizationMemberRole(req.user!.id, patent.organization_id);
+        hasAccess = !!role;
+      }
+
+      if (!hasAccess) {
         return res.status(403).json({ error: 'Access denied' });
       }
-      
+
       if (patent.status === 'completed') {
         return res.status(400).json({ error: 'Patent is already completed' });
       }
-      
+
       if (patent.status !== 'failed' && patent.status !== 'partial') {
         return res.status(400).json({ error: 'Patent is not in a failed state' });
       }
-      
+
       await supabaseStorage.updatePatentStatus(req.params.id, 'processing');
-      
+
       const existingArtifacts = await supabaseStorage.getArtifactsByPatent(req.params.id);
       const hasElia15 = existingArtifacts.some(a => a.artifact_type === 'elia15');
-      
+
       if (!hasElia15) {
         const elia15Result = await generateELIA15(patent.full_text, patent.title || 'Patent Document');
         await supabaseStorage.createArtifact({
@@ -567,22 +669,22 @@ export async function registerRoutes(
         });
         await supabaseStorage.updatePatentStatus(req.params.id, 'elia15_complete');
       }
-      
+
       const artifacts = await supabaseStorage.getArtifactsByPatent(req.params.id);
       const elia15 = artifacts.find(a => a.artifact_type === 'elia15');
-      
+
       if (elia15) {
         generateRemainingArtifactsWithNotifications(
-          req.params.id, 
-          patent.full_text, 
-          elia15.content, 
-          req.user!.id, 
+          req.params.id,
+          patent.full_text,
+          elia15.content,
+          req.user!.id,
           patent.title
         ).catch((err) => console.error('Error in retry generation:', err));
       }
-      
+
       res.json({ success: true, message: 'Retry initiated' });
-      
+
     } catch (error) {
       console.error('Retry error:', error);
       res.status(500).json({ error: 'Failed to retry patent processing' });
@@ -654,6 +756,248 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Promo update error:', error);
       res.status(500).json({ error: 'Failed to update promo code' });
+    }
+  });
+
+  // Organization Endpoints
+
+  // Get user's organizations
+  app.get('/api/organizations', requireAuth, async (req, res) => {
+    try {
+      const organizations = await supabaseStorage.getUserOrganizations(req.user!.id);
+      const profile = await supabaseStorage.getProfile(req.user!.id);
+
+      const orgsWithRole = await Promise.all(
+        organizations.map(async (org) => {
+          const role = await supabaseStorage.getOrganizationMemberRole(req.user!.id, org.id);
+          return {
+            ...org,
+            role,
+            isCurrent: profile?.current_organization_id === org.id,
+          };
+        })
+      );
+
+      res.json({ organizations: orgsWithRole });
+    } catch (error) {
+      console.error('Organizations error:', error);
+      res.status(500).json({ error: 'Failed to load organizations' });
+    }
+  });
+
+  // Create organization
+  app.post('/api/organizations', requireAuth, async (req, res) => {
+    try {
+      const { name } = req.body;
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Organization name is required' });
+      }
+
+      if (name.length > 100) {
+        return res.status(400).json({ error: 'Organization name must be 100 characters or less' });
+      }
+
+      const organization = await supabaseStorage.createOrganization(name.trim(), req.user!.id);
+      res.json({ organization });
+
+    } catch (error) {
+      console.error('Create organization error:', error);
+      res.status(500).json({ error: 'Failed to create organization' });
+    }
+  });
+
+  // Switch current organization
+  app.post('/api/organizations/switch', requireAuth, async (req, res) => {
+    try {
+      const { organizationId } = req.body;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: 'Organization ID is required' });
+      }
+
+      // Verify user is a member
+      const role = await supabaseStorage.getOrganizationMemberRole(req.user!.id, organizationId);
+      if (!role) {
+        return res.status(403).json({ error: 'You are not a member of this organization' });
+      }
+
+      await supabaseStorage.setCurrentOrganization(req.user!.id, organizationId);
+      const organization = await supabaseStorage.getOrganization(organizationId);
+
+      res.json({ success: true, organization });
+
+    } catch (error) {
+      console.error('Switch organization error:', error);
+      res.status(500).json({ error: 'Failed to switch organization' });
+    }
+  });
+
+  // Get organization members
+  app.get('/api/organizations/:id/members', requireAuth, async (req, res) => {
+    try {
+      const orgId = req.params.id;
+
+      // Verify user is a member
+      const userRole = await supabaseStorage.getOrganizationMemberRole(req.user!.id, orgId);
+      if (!userRole) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const members = await supabaseStorage.getOrganizationMembers(orgId);
+
+      res.json({
+        members: members.map(m => ({
+          id: m.id,
+          userId: m.user_id,
+          email: m.profile?.email,
+          role: m.role,
+          joinedAt: m.joined_at,
+        }))
+      });
+
+    } catch (error) {
+      console.error('Get members error:', error);
+      res.status(500).json({ error: 'Failed to load members' });
+    }
+  });
+
+  // Invite member to organization
+  app.post('/api/organizations/:id/members', requireAuth, async (req, res) => {
+    try {
+      const orgId = req.params.id;
+      const { email, role } = req.body;
+
+      // Verify requester is an admin
+      const userRole = await supabaseStorage.getOrganizationMemberRole(req.user!.id, orgId);
+      if (userRole !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can invite members' });
+      }
+
+      if (!email || !role) {
+        return res.status(400).json({ error: 'Email and role are required' });
+      }
+
+      if (!['admin', 'member', 'viewer'].includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+
+      // Find user by email
+      const invitedUser = await supabaseStorage.getProfileByEmail(email);
+      if (!invitedUser) {
+        return res.status(404).json({ error: 'User not found. They must sign up first.' });
+      }
+
+      // Check if already a member
+      const existingRole = await supabaseStorage.getOrganizationMemberRole(invitedUser.id, orgId);
+      if (existingRole) {
+        return res.status(400).json({ error: 'User is already a member of this organization' });
+      }
+
+      await supabaseStorage.addOrganizationMember(orgId, invitedUser.id, role);
+
+      res.json({ success: true, message: `${email} has been added to the organization` });
+
+    } catch (error) {
+      console.error('Invite member error:', error);
+      res.status(500).json({ error: 'Failed to invite member' });
+    }
+  });
+
+  // Remove member from organization
+  app.delete('/api/organizations/:id/members/:userId', requireAuth, async (req, res) => {
+    try {
+      const orgId = req.params.id;
+      const targetUserId = req.params.userId;
+
+      // Verify requester is an admin
+      const userRole = await supabaseStorage.getOrganizationMemberRole(req.user!.id, orgId);
+      if (userRole !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can remove members' });
+      }
+
+      // Prevent removing yourself if you're the only admin
+      const members = await supabaseStorage.getOrganizationMembers(orgId);
+      const adminCount = members.filter(m => m.role === 'admin').length;
+
+      if (targetUserId === req.user!.id && adminCount <= 1) {
+        return res.status(400).json({ error: 'Cannot remove the only admin. Promote another member first.' });
+      }
+
+      await supabaseStorage.removeOrganizationMember(orgId, targetUserId);
+
+      res.json({ success: true, message: 'Member removed successfully' });
+
+    } catch (error) {
+      console.error('Remove member error:', error);
+      res.status(500).json({ error: 'Failed to remove member' });
+    }
+  });
+
+  // Update member role
+  app.patch('/api/organizations/:id/members/:userId', requireAuth, async (req, res) => {
+    try {
+      const orgId = req.params.id;
+      const targetUserId = req.params.userId;
+      const { role } = req.body;
+
+      // Verify requester is an admin
+      const userRole = await supabaseStorage.getOrganizationMemberRole(req.user!.id, orgId);
+      if (userRole !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can update member roles' });
+      }
+
+      if (!role || !['admin', 'member', 'viewer'].includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+
+      // Prevent demoting yourself if you're the only admin
+      if (targetUserId === req.user!.id && role !== 'admin') {
+        const members = await supabaseStorage.getOrganizationMembers(orgId);
+        const adminCount = members.filter(m => m.role === 'admin').length;
+
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: 'Cannot demote the only admin. Promote another member first.' });
+        }
+      }
+
+      await supabaseStorage.updateOrganizationMemberRole(orgId, targetUserId, role);
+
+      res.json({ success: true, message: 'Member role updated successfully' });
+
+    } catch (error) {
+      console.error('Update member role error:', error);
+      res.status(500).json({ error: 'Failed to update member role' });
+    }
+  });
+
+  // Update organization name
+  app.patch('/api/organizations/:id', requireAuth, async (req, res) => {
+    try {
+      const orgId = req.params.id;
+      const { name } = req.body;
+
+      // Verify requester is an admin
+      const userRole = await supabaseStorage.getOrganizationMemberRole(req.user!.id, orgId);
+      if (userRole !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can update organization settings' });
+      }
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Organization name is required' });
+      }
+
+      if (name.length > 100) {
+        return res.status(400).json({ error: 'Organization name must be 100 characters or less' });
+      }
+
+      await supabaseStorage.updateOrganizationName(orgId, name.trim());
+
+      res.json({ success: true, message: 'Organization name updated successfully' });
+
+    } catch (error) {
+      console.error('Update organization error:', error);
+      res.status(500).json({ error: 'Failed to update organization' });
     }
   });
 

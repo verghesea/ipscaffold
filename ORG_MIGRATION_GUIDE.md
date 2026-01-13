@@ -1,12 +1,12 @@
 # Multi-Organization Support - Implementation Guide
 
-✅ **Status**: Phase 1 Complete (Database Schema)
+✅ **Status**: Phase 2 Complete (Database Schema + Backend API)
 🌿 **Branch**: `feature/multi-org-support`
 📦 **GitHub**: https://github.com/verghesea/ipscaffold/tree/feature/multi-org-support
 
 ---
 
-## What Was Done (Phase 1: Database Schema)
+## What Was Done (Phases 1 & 2: Database Schema + Backend API)
 
 I've reviewed your **latest GitHub code** and created organization support that matches your actual architecture:
 
@@ -27,6 +27,25 @@ I've reviewed your **latest GitHub code** and created organization support that 
 - Updated `Patent` to include `organization_id`
 - Updated `User` to include `current_organization_id`
 - Updated `CreditTransaction` to include `organization_id`
+
+### ✅ Implemented Backend API (`server/supabaseStorage.ts` & `server/supabaseRoutes.ts`):
+- Organization CRUD methods: `getOrganization`, `getUserOrganizations`, `createOrganization`
+- Member management: `addOrganizationMember`, `removeOrganizationMember`, `updateOrganizationMemberRole`, `getOrganizationMembers`
+- Credit operations: `updateOrganizationCredits`, `getPatentsByOrganization`
+- Current org management: `setCurrentOrganization`, `getOrganizationMemberRole`
+- API endpoints:
+  - `GET /api/organizations` - Get user's organizations
+  - `POST /api/organizations` - Create organization
+  - `POST /api/organizations/switch` - Switch current org
+  - `GET /api/organizations/:id/members` - Get org members
+  - `POST /api/organizations/:id/members` - Invite member (admin only)
+  - `DELETE /api/organizations/:id/members/:userId` - Remove member
+  - `PATCH /api/organizations/:id/members/:userId` - Update member role
+  - `PATCH /api/organizations/:id` - Update organization name
+- Updated upload handler to use organization credits
+- Updated session verification to auto-create personal org
+- Updated dashboard to show organization patents
+- Updated patent access checks for organization-based access
 
 ---
 
@@ -108,56 +127,24 @@ This script will:
 
 **If you're starting fresh with no users**, skip this step!
 
-### STEP 4: Next Phases (Need Implementation)
+### STEP 4: Next Phase (Need Implementation)
 
-The database is ready! Now we need to implement:
-
-#### Phase 2: Backend API (Not Yet Done)
-Need to add to `server/supabaseStorage.ts`:
-- Organization CRUD methods
-- Organization member management
-- Update upload handler to use org credits
+The database and backend API are ready! Now we need to implement:
 
 #### Phase 3: Frontend UI (Not Yet Done)
 Need to create:
-- Organization switcher component
-- Signup flow with org creation
+- Organization switcher component (header)
+- Signup flow with org creation/selection
 - Organization settings page
-- Member management UI
+- Member management UI (invite, remove, change roles)
+- Update credit display to show org credits
+- Update upload flow to check org credits
 
 ---
 
 ## What Needs to Be Built Next
 
-### Backend Changes Needed:
-
-1. **`server/supabaseStorage.ts`** - Add these methods:
-   ```typescript
-   async getOrganization(orgId: string)
-   async getUserOrganizations(userId: string)
-   async createOrganization(name: string, creatorUserId: string)
-   async addOrganizationMember(orgId: string, userId: string, role: string)
-   async getOrganizationMembers(orgId: string)
-   async updateOrganizationCredits(orgId: string, credits: number)
-   async setCurrentOrganization(userId: string, orgId: string)
-   async getOrganizationMemberRole(userId: string, orgId: string)
-   ```
-
-2. **`server/supabaseRoutes.ts`** - Add API endpoints:
-   ```typescript
-   GET /api/organizations - Get user's organizations
-   POST /api/organizations - Create organization
-   POST /api/organizations/switch - Switch current org
-   GET /api/organizations/:id/members - Get org members
-   POST /api/organizations/:id/members - Invite member (admin only)
-   ```
-
-3. **Update upload handler** to:
-   - Check `current_organization_id` from user profile
-   - Deduct credits from organization (not user)
-   - Set `organization_id` on new patents
-
-### Frontend Changes Needed:
+### Frontend Changes Needed (Phase 3):
 
 1. **`client/src/components/OrganizationSwitcher.tsx`** (new file)
    - Dropdown to switch between user's organizations
@@ -257,7 +244,7 @@ CREATE POLICY "Users can view own patents"
 ✅ **Database Migrations**: Created and ready to run
 ✅ **Schema Updates**: Complete
 ✅ **Data Migration Script**: Ready
-⏳ **Backend API**: Not yet implemented
+✅ **Backend API**: Fully implemented
 ⏳ **Frontend UI**: Not yet implemented
 
 ---

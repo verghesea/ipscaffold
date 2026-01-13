@@ -5,13 +5,31 @@ export interface Profile {
   email: string;
   credits: number;
   is_admin: boolean;
+  current_organization_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  credits: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationMember {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: 'admin' | 'member' | 'viewer';
+  joined_at: string;
 }
 
 export interface Patent {
   id: string;
   user_id: string | null;
+  organization_id: string | null;
   title: string | null;
   inventors: string | null;
   assignee: string | null;
@@ -298,7 +316,7 @@ export class SupabaseStorage {
       .eq('code', code)
       .eq('is_active', true)
       .single();
-    
+
     if (codeError || !promoCode) {
       throw new Error('Invalid or expired promo code');
     }
@@ -353,6 +371,147 @@ export class SupabaseStorage {
     });
 
     return { creditsAwarded: promoCode.credit_amount };
+  }
+
+  // Organization Methods
+
+  async getOrganization(orgId: string): Promise<Organization | null> {
+    const { data, error } = await supabaseAdmin
+      .from('organizations')
+      .select('*')
+      .eq('id', orgId)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  async getUserOrganizations(userId: string): Promise<Organization[]> {
+    const { data, error } = await supabaseAdmin
+      .from('organization_members')
+      .select('organization_id, organizations(*)')
+      .eq('user_id', userId);
+
+    if (error || !data) return [];
+    return data.map(row => row.organizations as Organization).filter(Boolean);
+  }
+
+  async createOrganization(name: string, creatorUserId: string): Promise<Organization> {
+    const { data: org, error: orgError } = await supabaseAdmin
+      .from('organizations')
+      .insert({ name, credits: 100 })
+      .select()
+      .single();
+
+    if (orgError) throw new Error(`Failed to create organization: ${orgError.message}`);
+
+    // Add creator as admin
+    const { error: memberError } = await supabaseAdmin
+      .from('organization_members')
+      .insert({
+        organization_id: org.id,
+        user_id: creatorUserId,
+        role: 'admin',
+      });
+
+    if (memberError) {
+      console.error('Failed to add creator as admin:', memberError);
+    }
+
+    // Set as current organization
+    await this.setCurrentOrganization(creatorUserId, org.id);
+
+    return org;
+  }
+
+  async addOrganizationMember(orgId: string, userId: string, role: 'admin' | 'member' | 'viewer'): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('organization_members')
+      .insert({
+        organization_id: orgId,
+        user_id: userId,
+        role: role,
+      });
+
+    if (error) throw new Error(`Failed to add member: ${error.message}`);
+  }
+
+  async removeOrganizationMember(orgId: string, userId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('organization_members')
+      .delete()
+      .eq('organization_id', orgId)
+      .eq('user_id', userId);
+
+    if (error) throw new Error(`Failed to remove member: ${error.message}`);
+  }
+
+  async updateOrganizationMemberRole(orgId: string, userId: string, role: 'admin' | 'member' | 'viewer'): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('organization_members')
+      .update({ role })
+      .eq('organization_id', orgId)
+      .eq('user_id', userId);
+
+    if (error) throw new Error(`Failed to update member role: ${error.message}`);
+  }
+
+  async getOrganizationMembers(orgId: string): Promise<Array<OrganizationMember & { profile: Profile }>> {
+    const { data, error } = await supabaseAdmin
+      .from('organization_members')
+      .select('*, profiles(*)')
+      .eq('organization_id', orgId)
+      .order('joined_at', { ascending: true });
+
+    if (error || !data) return [];
+    return data.map(row => ({
+      ...row,
+      profile: row.profiles as Profile,
+    }));
+  }
+
+  async updateOrganizationCredits(orgId: string, credits: number): Promise<void> {
+    await supabaseAdmin
+      .from('organizations')
+      .update({ credits })
+      .eq('id', orgId);
+  }
+
+  async setCurrentOrganization(userId: string, orgId: string): Promise<void> {
+    await supabaseAdmin
+      .from('profiles')
+      .update({ current_organization_id: orgId })
+      .eq('id', userId);
+  }
+
+  async getOrganizationMemberRole(userId: string, orgId: string): Promise<'admin' | 'member' | 'viewer' | null> {
+    const { data, error } = await supabaseAdmin
+      .from('organization_members')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('organization_id', orgId)
+      .single();
+
+    if (error || !data) return null;
+    return data.role;
+  }
+
+  async getPatentsByOrganization(orgId: string): Promise<Patent[]> {
+    const { data, error } = await supabaseAdmin
+      .from('patents')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return data || [];
+  }
+
+  async updateOrganizationName(orgId: string, name: string): Promise<void> {
+    await supabaseAdmin
+      .from('organizations')
+      .update({ name })
+      .eq('id', orgId);
   }
 }
 
