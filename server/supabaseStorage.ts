@@ -48,6 +48,18 @@ export interface CreditTransaction {
   created_at: string;
 }
 
+export interface SectionImage {
+  id: string;
+  artifact_id: string;
+  section_heading: string;
+  section_order: number;
+  image_url: string;
+  dalle_prompt: string;
+  image_size: string | null;
+  generation_cost: string | null;
+  created_at: string;
+}
+
 export class SupabaseStorage {
   async getProfile(userId: string): Promise<Profile | null> {
     const { data, error } = await supabaseAdmin
@@ -158,9 +170,57 @@ export class SupabaseStorage {
       .insert(artifact)
       .select()
       .single();
-    
+
     if (error) throw new Error(`Failed to create artifact: ${error.message}`);
     return data;
+  }
+
+  async getArtifactByPatentAndType(patentId: string, artifactType: string): Promise<Artifact | null> {
+    const { data, error } = await supabaseAdmin
+      .from('artifacts')
+      .select('*')
+      .eq('patent_id', patentId)
+      .eq('artifact_type', artifactType)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  async createSectionImage(image: Omit<SectionImage, 'id' | 'created_at'>): Promise<SectionImage> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .insert(image)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to create section image: ${error.message}`);
+    return data;
+  }
+
+  async getSectionImagesByArtifact(artifactId: string): Promise<SectionImage[]> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .select('*')
+      .eq('artifact_id', artifactId)
+      .order('section_order', { ascending: true });
+
+    if (error) return [];
+    return data || [];
+  }
+
+  async getSectionImagesByPatent(patentId: string): Promise<SectionImage[]> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .select(`
+        *,
+        artifacts!inner(patent_id)
+      `)
+      .eq('artifacts.patent_id', patentId)
+      .order('section_order', { ascending: true });
+
+    if (error) return [];
+    return data || [];
   }
 
   async createCreditTransaction(transaction: Omit<CreditTransaction, 'id' | 'created_at'>): Promise<CreditTransaction> {

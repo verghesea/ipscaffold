@@ -7,6 +7,8 @@ import { nanoid } from "nanoid";
 import fs from "fs/promises";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
+import { parseArtifactSections } from "./services/sectionParser";
+import { generateAllSectionImages } from "./services/dalleGenerator";
 
 declare global {
   namespace Express {
@@ -381,6 +383,38 @@ export async function registerRoutes(
     }
   });
 
+  // Get section images for a patent
+  app.get('/api/patent/:id/images', requireAuth, async (req, res) => {
+    try {
+      const patentId = req.params.id;
+      const patent = await supabaseStorage.getPatent(patentId);
+
+      if (!patent || patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const images = await supabaseStorage.getSectionImagesByPatent(patentId);
+
+      res.json({
+        images: images.map(img => ({
+          id: img.id,
+          artifactId: img.artifact_id,
+          sectionHeading: img.section_heading,
+          sectionOrder: img.section_order,
+          imageUrl: img.image_url,
+          dallePrompt: img.dalle_prompt,
+          imageSize: img.image_size,
+          generationCost: img.generation_cost,
+          createdAt: img.created_at,
+        })),
+      });
+
+    } catch (error) {
+      console.error('Images error:', error);
+      res.status(500).json({ error: 'Failed to load images' });
+    }
+  });
+
   app.get('/api/credits', requireAuth, async (req, res) => {
     try {
       const profile = await supabaseStorage.getProfile(req.user!.id);
@@ -639,30 +673,66 @@ export async function registerRoutes(
 
 async function generateRemainingArtifacts(patentId: string, fullText: string, elia15Content: string) {
   try {
+    const patent = await supabaseStorage.getPatent(patentId);
+    if (!patent) throw new Error('Patent not found');
+
+    // Generate AI artifacts in parallel
     const [narrativeResult, goldenCircleResult] = await Promise.all([
       generateBusinessNarrative(fullText, elia15Content),
       generateGoldenCircle(fullText, elia15Content),
     ]);
 
-    await Promise.all([
-      supabaseStorage.createArtifact({
-        patent_id: patentId,
-        artifact_type: 'business_narrative',
-        content: narrativeResult.content,
-        tokens_used: narrativeResult.tokensUsed,
-        generation_time_seconds: narrativeResult.generationTimeSeconds,
-      }),
-      supabaseStorage.createArtifact({
-        patent_id: patentId,
-        artifact_type: 'golden_circle',
-        content: goldenCircleResult.content,
-        tokens_used: goldenCircleResult.tokensUsed,
-        generation_time_seconds: goldenCircleResult.generationTimeSeconds,
-      }),
-    ]);
+    // Create Business Narrative artifact and generate images
+    const narrativeArtifact = await supabaseStorage.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'business_narrative',
+      content: narrativeResult.content,
+      tokens_used: narrativeResult.tokensUsed,
+      generation_time_seconds: narrativeResult.generationTimeSeconds,
+    });
+
+    console.log('Generating images for Business Narrative...');
+    const narrativeSections = parseArtifactSections(narrativeResult.content);
+    await generateAllSectionImages(
+      parseInt(narrativeArtifact.id),
+      narrativeSections,
+      patent.title || 'Patent',
+      supabaseStorage
+    );
+
+    // Create Golden Circle artifact and generate images
+    const goldenCircleArtifact = await supabaseStorage.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'golden_circle',
+      content: goldenCircleResult.content,
+      tokens_used: goldenCircleResult.tokensUsed,
+      generation_time_seconds: goldenCircleResult.generationTimeSeconds,
+    });
+
+    console.log('Generating images for Golden Circle...');
+    const goldenCircleSections = parseArtifactSections(goldenCircleResult.content);
+    await generateAllSectionImages(
+      parseInt(goldenCircleArtifact.id),
+      goldenCircleSections,
+      patent.title || 'Patent',
+      supabaseStorage
+    );
+
+    // Generate images for ELIA15 (retroactively)
+    const elia15Artifact = await supabaseStorage.getArtifactByPatentAndType(patentId, 'elia15');
+    if (elia15Artifact) {
+      console.log('Generating images for ELIA15...');
+      const elia15Sections = parseArtifactSections(elia15Content);
+      await generateAllSectionImages(
+        parseInt(elia15Artifact.id),
+        elia15Sections,
+        patent.title || 'Patent',
+        supabaseStorage
+      );
+    }
 
     await supabaseStorage.updatePatentStatus(patentId, 'completed');
-    console.log('All artifacts generated for patent:', patentId);
+    console.log('All artifacts and images generated for patent:', patentId);
 
   } catch (error) {
     console.error('Error generating remaining artifacts:', error);
@@ -671,40 +741,76 @@ async function generateRemainingArtifacts(patentId: string, fullText: string, el
 }
 
 async function generateRemainingArtifactsWithNotifications(
-  patentId: string, 
-  fullText: string, 
-  elia15Content: string, 
-  userId: string, 
+  patentId: string,
+  fullText: string,
+  elia15Content: string,
+  userId: string,
   patentTitle: string | null
 ) {
   const { NotificationService } = await import('./services/notificationService');
-  
+
   try {
+    const patent = await supabaseStorage.getPatent(patentId);
+    if (!patent) throw new Error('Patent not found');
+
+    // Generate AI artifacts in parallel
     const [narrativeResult, goldenCircleResult] = await Promise.all([
       generateBusinessNarrative(fullText, elia15Content),
       generateGoldenCircle(fullText, elia15Content),
     ]);
 
-    await Promise.all([
-      supabaseStorage.createArtifact({
-        patent_id: patentId,
-        artifact_type: 'business_narrative',
-        content: narrativeResult.content,
-        tokens_used: narrativeResult.tokensUsed,
-        generation_time_seconds: narrativeResult.generationTimeSeconds,
-      }),
-      supabaseStorage.createArtifact({
-        patent_id: patentId,
-        artifact_type: 'golden_circle',
-        content: goldenCircleResult.content,
-        tokens_used: goldenCircleResult.tokensUsed,
-        generation_time_seconds: goldenCircleResult.generationTimeSeconds,
-      }),
-    ]);
+    // Create Business Narrative artifact and generate images
+    const narrativeArtifact = await supabaseStorage.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'business_narrative',
+      content: narrativeResult.content,
+      tokens_used: narrativeResult.tokensUsed,
+      generation_time_seconds: narrativeResult.generationTimeSeconds,
+    });
+
+    console.log('Generating images for Business Narrative...');
+    const narrativeSections = parseArtifactSections(narrativeResult.content);
+    await generateAllSectionImages(
+      parseInt(narrativeArtifact.id),
+      narrativeSections,
+      patent.title || patentTitle || 'Patent',
+      supabaseStorage
+    );
+
+    // Create Golden Circle artifact and generate images
+    const goldenCircleArtifact = await supabaseStorage.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'golden_circle',
+      content: goldenCircleResult.content,
+      tokens_used: goldenCircleResult.tokensUsed,
+      generation_time_seconds: goldenCircleResult.generationTimeSeconds,
+    });
+
+    console.log('Generating images for Golden Circle...');
+    const goldenCircleSections = parseArtifactSections(goldenCircleResult.content);
+    await generateAllSectionImages(
+      parseInt(goldenCircleArtifact.id),
+      goldenCircleSections,
+      patent.title || patentTitle || 'Patent',
+      supabaseStorage
+    );
+
+    // Generate images for ELIA15 (retroactively)
+    const elia15Artifact = await supabaseStorage.getArtifactByPatentAndType(patentId, 'elia15');
+    if (elia15Artifact) {
+      console.log('Generating images for ELIA15...');
+      const elia15Sections = parseArtifactSections(elia15Content);
+      await generateAllSectionImages(
+        parseInt(elia15Artifact.id),
+        elia15Sections,
+        patent.title || patentTitle || 'Patent',
+        supabaseStorage
+      );
+    }
 
     await supabaseStorage.updatePatentStatus(patentId, 'completed');
-    console.log('All artifacts generated for patent:', patentId);
-    
+    console.log('All artifacts and images generated for patent:', patentId);
+
     await NotificationService.sendPatentReady(userId, patentId, patentTitle);
 
   } catch (error) {

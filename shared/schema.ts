@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, serial, timestamp, boolean, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -145,3 +145,24 @@ export const insertPromoCodeRedemptionSchema = createInsertSchema(promoCodeRedem
 export const selectPromoCodeRedemptionSchema = createSelectSchema(promoCodeRedemptions);
 export type InsertPromoCodeRedemption = z.infer<typeof insertPromoCodeRedemptionSchema>;
 export type PromoCodeRedemption = typeof promoCodeRedemptions.$inferSelect;
+
+// Section images table - stores DALL-E generated images for artifact section headers
+export const sectionImages = pgTable("section_images", {
+  id: serial("id").primaryKey(),
+  artifactId: integer("artifact_id").notNull().references(() => artifacts.id, { onDelete: "cascade" }),
+  sectionHeading: text("section_heading").notNull(),
+  sectionOrder: integer("section_order").notNull(),
+  imageUrl: text("image_url").notNull(),
+  dallePrompt: text("dalle_prompt").notNull(),
+  imageSize: text("image_size").default("1024x1024"),
+  generationCost: numeric("generation_cost", { precision: 10, scale: 4 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSectionImageSchema = createInsertSchema(sectionImages).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectSectionImageSchema = createSelectSchema(sectionImages);
+export type InsertSectionImage = z.infer<typeof insertSectionImageSchema>;
+export type SectionImage = typeof sectionImages.$inferSelect;
