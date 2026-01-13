@@ -9,6 +9,7 @@ import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
 import { parseArtifactSections } from "./services/sectionParser";
 import { generateAllSectionImages } from "./services/dalleGenerator";
+import { exportPatentAsPDF, exportPatentAsDOCX, exportPatentAsTXT } from "./services/exportService";
 
 declare global {
   namespace Express {
@@ -412,6 +413,58 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Images error:', error);
       res.status(500).json({ error: 'Failed to load images' });
+    }
+  });
+
+  // Export patent in various formats
+  app.get('/api/patent/:id/export/:format', requireAuth, async (req, res) => {
+    try {
+      const patentId = req.params.id;
+      const format = req.params.format as 'pdf' | 'docx' | 'txt';
+
+      const patent = await supabaseStorage.getPatent(patentId);
+
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
+      }
+
+      if (patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      let buffer: Buffer;
+      let mimeType: string;
+      let extension: string;
+
+      switch (format) {
+        case 'pdf':
+          buffer = await exportPatentAsPDF(patentId);
+          mimeType = 'application/pdf';
+          extension = 'pdf';
+          break;
+        case 'docx':
+          buffer = await exportPatentAsDOCX(patentId);
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          extension = 'docx';
+          break;
+        case 'txt':
+          buffer = await exportPatentAsTXT(patentId);
+          mimeType = 'text/plain';
+          extension = 'txt';
+          break;
+        default:
+          return res.status(400).json({ error: 'Invalid format. Use pdf, docx, or txt.' });
+      }
+
+      const filename = `${patent.title?.replace(/[^a-z0-9]/gi, '_') || 'patent'}.${extension}`;
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+
+    } catch (error) {
+      console.error('Export error:', error);
+      res.status(500).json({ error: 'Failed to export patent' });
     }
   });
 

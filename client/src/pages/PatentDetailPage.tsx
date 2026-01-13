@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact, getAuthHeaders } from '@/lib/api';
-import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Download } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface SectionImage {
   id: string;
@@ -67,20 +73,30 @@ export function PatentDetailPage() {
     setRetrying(true);
     try {
       await api.retryPatent(params.id);
-      toast({ 
-        title: 'Retry Started', 
-        description: 'Processing has been restarted. Check back shortly.' 
+      toast({
+        title: 'Retry Started',
+        description: 'Processing has been restarted. Check back shortly.'
       });
       loadPatent(params.id);
     } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to retry processing', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Failed to retry processing',
+        variant: 'destructive'
       });
     } finally {
       setRetrying(false);
     }
+  };
+
+  const handleExport = (format: 'pdf' | 'docx' | 'txt') => {
+    if (!params?.id) return;
+    const url = `/api/patent/${params.id}/export/${format}`;
+    window.open(url, '_blank');
+    toast({
+      title: 'Export Started',
+      description: `Your ${format.toUpperCase()} download will begin shortly.`,
+    });
   };
 
   if (loading) {
@@ -257,6 +273,30 @@ export function PatentDetailPage() {
                       <p className="text-muted-foreground">{artifacts.length} / 3</p>
                     </div>
                   </div>
+
+                  {patent.status === 'completed' && artifacts.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full gap-2" data-testid="button-export">
+                            <Download className="w-4 h-4" />
+                            Export
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center">
+                          <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                            Export as PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExport('docx')}>
+                            Export as DOCX
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExport('txt')}>
+                            Export as TXT
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
 
                   {(patent.status === 'failed' || patent.status === 'partial') && (
                     <div className="pt-4 border-t">
