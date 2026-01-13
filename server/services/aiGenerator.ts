@@ -28,27 +28,83 @@ const ELIA15_PROMPT = `ELIA15: You are a professional skilled in simplifying com
    - Highlight why the invention is important and how it improves existing solutions.
    - Discuss the practical benefits and applications of the invention.
 
-5. **Why It Matters:**
+5. **Claims:**
+   - Summarize the key patent claims in simple terms.
+   - Explain what makes these claims unique or innovative.
+
+6. **Visuals and Diagrams:**
+   - Describe any key diagrams or visual elements mentioned in the patent.
+   - Explain how these visuals help understand the invention.
+
+7. **Relatable Example:**
+   - Provide a real-world analogy or example that illustrates how the invention works.
+   - Make it concrete and easy to visualize.
+
+8. **Why It Matters:**
    - Discuss why understanding this invention is important.
-   - Mention other areas where the invention can be useful.`;
+   - Mention other areas where the invention can be useful.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Use EXACTLY these markdown headers (## prefix):
+  ## Introduction
+  ## The Invention
+  ## Detailed Functioning
+  ## Importance
+  ## Claims
+  ## Visuals and Diagrams
+  ## Relatable Example
+  ## Why It Matters
+
+- Each section MUST start with the exact header name above
+- Use ## (two hashes) for section headers, nothing else
+- This enables automatic image generation for each section
+- Do not add numbers or prefixes to the headers`;
 
 const BUSINESS_NARRATIVE_PROMPT = `Generate a business narrative that effectively communicates the value of this intellectual property (IP) for commercialization. Follow this structure:
 
 Essential Sections:
 1. Problem Definition – Clearly articulate the pain point or unmet need.
-2. Solution (Your IP) – Introduce how your innovation uniquely solves the problem.
+2. Solution – Introduce how your innovation uniquely solves the problem.
 3. Why It Matters – Highlight key advantages over existing solutions.
 4. Market Opportunity – Define potential customers, industry demand, and scalability.
-5. Go-to-Market Strategy – Explain the path from development to commercialization.`;
+5. Go-to-Market Strategy – Explain the path from development to commercialization (partnerships, licensing, direct sales).
+6. Funding Requirements – Outline what resources are needed to bring this to market.
+7. Technical Justification – Explain the technical superiority and competitive advantages.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Use EXACTLY these markdown headers (## prefix):
+  ## Problem Definition
+  ## Solution
+  ## Why It Matters
+  ## Market Opportunity
+  ## Go-to-Market Strategy
+  ## Funding Requirements
+  ## Technical Justification
+
+- Each section MUST start with the exact header name above
+- Use ## for section headers consistently
+- This enables automatic image generation for each section
+- Do not add numbers or prefixes to the headers`;
 
 const GOLDEN_CIRCLE_PROMPT = `This is the Golden Circle framework based on Simon Sinek's work. Create a Golden Circle analysis for this patent that defines the WHY, HOW, and WHAT.
 
 Framework:
-- WHY: Why does this innovation exist beyond making money? What is the overarching purpose? Why should customers care?
-- HOW: How does this innovation achieve its objective? What is the secret sauce or methodology that makes it unique?
-- WHAT: What does this technology do? What tangible product or good does it create? What intangible service does it provide?
+- WHY: Why does this innovation exist beyond making money? What is the overarching purpose? Why should customers care? What belief or mission drives this innovation?
+- HOW: How does this innovation achieve its objective? What is the secret sauce or methodology that makes it unique? What processes or approaches differentiate it?
+- WHAT: What does this technology do? What tangible product or good does it create? What intangible service does it provide? What are the concrete outputs?
 
-Format your response with clear sections for WHY, HOW, and WHAT. Each section should be 2-4 paragraphs.`;
+Each section should be 2-4 paragraphs that deeply explore the concept.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Use EXACTLY these markdown headers (## prefix):
+  ## WHY
+  ## HOW
+  ## WHAT
+
+- Each section MUST start with exactly these header names (all caps)
+- Use ## for section headers consistently
+- This enables automatic image generation for each section
+- Do not add prefixes, numbers, or lowercase variations`;
 
 export async function generateELIA15(fullText: string, title: string): Promise<AIGenerationResult> {
   const startTime = Date.now();
