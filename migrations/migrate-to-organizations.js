@@ -8,10 +8,19 @@
  * 4. Sets the organization as their current organization
  *
  * Run with: node migrations/migrate-to-organizations.js
+ *
+ * Make sure to set environment variables:
+ * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
  */
 
 import { createClient } from '@supabase/supabase-js';
-import 'dotenv/config';
+
+// Check for required environment variables
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ Error: Missing required environment variables');
+  console.error('Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
