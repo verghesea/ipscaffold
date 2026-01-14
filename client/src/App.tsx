@@ -11,6 +11,7 @@ import { PatentDetailPage } from "@/pages/PatentDetailPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import LoginPage from "@/pages/LoginPage";
 import AdminPage from "@/pages/AdminPage";
+import { OrganizationSettingsPage } from "@/pages/OrganizationSettingsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/patent/:id" component={PatentDetailPage} />
       <Route path="/auth/callback" component={AuthCallbackPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/organization/settings" component={OrganizationSettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

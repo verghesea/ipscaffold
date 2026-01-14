@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getStoredToken, clearStoredTokens } from '@/lib/api';
+import { api, getStoredToken, clearStoredTokens, type User, type Organization } from '@/lib/api';
 import { useLocation } from 'wouter';
 
 interface Profile {
@@ -8,13 +8,7 @@ interface Profile {
   email: string;
   credits: number;
   is_admin: boolean;
-}
-
-interface User {
-  id: string;
-  email: string;
-  credits: number;
-  isAdmin: boolean;
+  currentOrganization?: Organization | null;
 }
 
 interface AuthContextType {
@@ -24,6 +18,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   logout: () => void;
   refetch: () => void;
+  currentOrganization: Organization | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -46,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: user.email,
     credits: user.credits,
     is_admin: user.isAdmin,
+    currentOrganization: user.currentOrganization,
   } : null;
 
   const logout = () => {
@@ -62,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user,
       logout,
       refetch,
+      currentOrganization: user?.currentOrganization || null,
     }}>
       {children}
     </AuthContext.Provider>
@@ -78,6 +75,7 @@ export function useAuth(): AuthContextType {
       isAuthenticated: false,
       logout: () => {},
       refetch: () => {},
+      currentOrganization: null,
     };
   }
   return context;

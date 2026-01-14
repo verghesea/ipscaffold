@@ -13,11 +13,28 @@ export interface Artifact {
   content: string;
 }
 
+export interface Organization {
+  id: string;
+  name: string;
+  credits: number;
+  role?: 'admin' | 'member' | 'viewer';
+  isCurrent?: boolean;
+}
+
+export interface OrganizationMember {
+  id: string;
+  userId: string;
+  email: string;
+  role: 'admin' | 'member' | 'viewer';
+  joinedAt: string;
+}
+
 export interface User {
   id: string;
   email: string;
   credits: number;
   isAdmin: boolean;
+  currentOrganization?: Organization | null;
 }
 
 const AUTH_TOKEN_KEY = 'ip_scaffold_access_token';
@@ -160,12 +177,142 @@ export const api = {
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to retry');
     }
-    
+
+    return response.json();
+  },
+
+  // Organization methods
+
+  async getOrganizations(): Promise<{ organizations: Organization[] }> {
+    const response = await fetch('/api/organizations', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load organizations');
+    }
+
+    return response.json();
+  },
+
+  async createOrganization(name: string): Promise<{ organization: Organization }> {
+    const response = await fetch('/api/organizations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create organization');
+    }
+
+    return response.json();
+  },
+
+  async switchOrganization(organizationId: string): Promise<{ success: boolean; organization: Organization }> {
+    const response = await fetch('/api/organizations/switch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ organizationId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to switch organization');
+    }
+
+    return response.json();
+  },
+
+  async getOrganizationMembers(organizationId: string): Promise<{ members: OrganizationMember[] }> {
+    const response = await fetch(`/api/organizations/${organizationId}/members`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load members');
+    }
+
+    return response.json();
+  },
+
+  async inviteOrganizationMember(organizationId: string, email: string, role: 'admin' | 'member' | 'viewer'): Promise<{ success: boolean }> {
+    const response = await fetch(`/api/organizations/${organizationId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ email, role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to invite member');
+    }
+
+    return response.json();
+  },
+
+  async removeOrganizationMember(organizationId: string, userId: string): Promise<{ success: boolean }> {
+    const response = await fetch(`/api/organizations/${organizationId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove member');
+    }
+
+    return response.json();
+  },
+
+  async updateOrganizationMemberRole(organizationId: string, userId: string, role: 'admin' | 'member' | 'viewer'): Promise<{ success: boolean }> {
+    const response = await fetch(`/api/organizations/${organizationId}/members/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update member role');
+    }
+
+    return response.json();
+  },
+
+  async updateOrganization(organizationId: string, name: string): Promise<{ success: boolean }> {
+    const response = await fetch(`/api/organizations/${organizationId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update organization');
+    }
+
     return response.json();
   },
 };

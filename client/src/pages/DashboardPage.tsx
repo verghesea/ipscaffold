@@ -4,6 +4,8 @@ import { api, type Patent } from '@/lib/api';
 import { FileText, Clock, CheckCircle, AlertCircle, Upload, Loader2, Plus, Gift, Grid, List } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { FirstTimeOrgSetup } from '@/components/FirstTimeOrgSetup';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,11 +27,20 @@ export function DashboardPage() {
   const [isRedeemingCode, setIsRedeemingCode] = useState(false);
   const [promoDialogOpen, setPromoDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [showOrgSetup, setShowOrgSetup] = useState(false);
   const { toast } = useToast();
+  const { user, currentOrganization, refetch } = useAuth();
 
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  useEffect(() => {
+    // Show org setup if user is authenticated but has no organization
+    if (user && !loading && !currentOrganization) {
+      setShowOrgSetup(true);
+    }
+  }, [user, loading, currentOrganization]);
 
   const loadDashboard = async () => {
     try {
@@ -45,6 +56,12 @@ export function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOrgSetupComplete = async () => {
+    setShowOrgSetup(false);
+    await refetch();
+    await loadDashboard();
   };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -441,6 +458,15 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* First Time Organization Setup */}
+      {user && showOrgSetup && (
+        <FirstTimeOrgSetup
+          open={showOrgSetup}
+          onComplete={handleOrgSetupComplete}
+          userEmail={user.email}
+        />
+      )}
     </Layout>
   );
 }

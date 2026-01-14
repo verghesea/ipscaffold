@@ -1,29 +1,15 @@
 import { Link, useLocation } from "wouter";
-import { useEffect, useState } from "react";
-import { api, type User } from "@/lib/api";
 import { LogOut, LayoutDashboard, Shield } from "lucide-react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
+import { OrganizationSwitcher } from "@/components/OrganizationSwitcher";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
-    try {
-      const userData = await api.getUser();
-      setUser(userData);
-    } catch (error) {
-      // Not authenticated, ignore
-    }
-  };
+  const { user, currentOrganization, logout } = useAuth();
 
   const handleLogout = async () => {
-    await api.logout();
-    setUser(null);
+    await logout();
     setLocation('/');
   };
 
@@ -34,15 +20,19 @@ export function Navbar() {
           IP Scaffold
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {user ? (
             <>
+              <OrganizationSwitcher />
+
               <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-secondary rounded-full" data-testid="text-credits">
-                <span className="text-sm font-medium text-primary-900">{user.credits} Credits</span>
+                <span className="text-sm font-medium text-primary-900">
+                  {currentOrganization?.credits ?? user.credits} Credits
+                </span>
               </div>
 
               <NotificationDropdown />
-              
+
               <Link href="/dashboard" className={`text-sm font-medium transition-colors hover:text-accent-600 flex items-center gap-2 ${location === '/dashboard' ? 'text-accent-600' : 'text-muted-foreground'}`} data-testid="link-dashboard">
                 <LayoutDashboard className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -54,8 +44,8 @@ export function Navbar() {
                   <span className="hidden sm:inline">Admin</span>
                 </Link>
               )}
-              
-              <button 
+
+              <button
                 onClick={handleLogout}
                 className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-2"
                 data-testid="button-logout"
@@ -65,8 +55,8 @@ export function Navbar() {
               </button>
             </>
           ) : (
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="text-sm font-medium px-4 py-2 bg-primary-900 text-white rounded-lg hover:bg-primary-800 transition-colors"
               data-testid="link-login"
             >
