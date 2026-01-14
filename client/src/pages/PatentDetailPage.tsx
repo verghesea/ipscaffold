@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { api, type Artifact, getAuthHeaders } from '@/lib/api';
+import { api, type Artifact } from '@/lib/api';
 import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loader2 } from 'lucide-react';
 import { analytics } from '@/lib/analytics';
 import { Layout } from '@/components/layout/Layout';
@@ -11,14 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
-interface SectionImage {
-  id: string;
-  artifactId: string;
-  sectionHeading: string;
-  sectionOrder: number;
-  imageUrl: string;
-  dallePrompt: string;
-}
 
 const ARTIFACT_TYPES = {
   elia15: {
@@ -58,7 +50,6 @@ export function PatentDetailPage() {
   const [, setLocation] = useLocation();
   const [patent, setPatent] = useState<any>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [images, setImages] = useState<SectionImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const { toast } = useToast();
@@ -71,16 +62,9 @@ export function PatentDetailPage() {
 
   const loadPatent = async (id: string) => {
     try {
-      const [patentData, imagesData] = await Promise.all([
-        api.getPatentDetail(id),
-        fetch(`/api/patent/${id}/images`, {
-          headers: getAuthHeaders(),
-        }).then(res => res.ok ? res.json() : { images: [] }),
-      ]);
-      
+      const patentData = await api.getPatentDetail(id);
       setPatent(patentData.patent);
       setArtifacts(patentData.artifacts);
-      setImages(imagesData.images || []);
     } catch (error) {
       toast({
         title: 'Error',
@@ -331,7 +315,7 @@ export function PatentDetailPage() {
                               <div className="max-h-[600px] overflow-y-auto px-6 py-6 md:px-8 md:py-8 scrollbar-thin">
                                 <MarkdownRenderer 
                                   content={artifact.content} 
-                                  images={images.filter(img => img.artifactId === artifact.id)}
+                                  images={artifact.images}
                                 />
                               </div>
                             </CardContent>

@@ -8,10 +8,18 @@ export interface Patent {
   createdAt?: string;
 }
 
+export interface SectionImage {
+  id: string;
+  sectionHeading: string;
+  sectionOrder: number;
+  imageUrl: string;
+}
+
 export interface Artifact {
   id: string;
   type: string;
   content: string;
+  images?: SectionImage[];
 }
 
 export interface Organization {
