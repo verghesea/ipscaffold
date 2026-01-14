@@ -9,6 +9,7 @@ export interface Patent {
 }
 
 export interface Artifact {
+  id: string;
   type: string;
   content: string;
 }
