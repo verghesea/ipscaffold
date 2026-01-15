@@ -9,8 +9,37 @@ export interface Patent {
 }
 
 export interface Artifact {
+  id?: string;
   type: string;
   content: string;
+}
+
+export interface SectionImage {
+  id: string;
+  artifact_id: string;
+  section_number: number;
+  section_title: string;
+  image_url: string;
+  prompt_used: string;
+  generation_metadata: {
+    model: string;
+    size: string;
+    quality: string;
+    revised_prompt?: string;
+  } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GenerateImagesResult {
+  success: boolean;
+  imagesGenerated: number;
+  sectionImages: SectionImage[];
+  errors?: string[];
+  costEstimate?: {
+    costUSD: number;
+    breakdown: string;
+  };
 }
 
 export interface User {
@@ -160,12 +189,75 @@ export const api = {
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to retry');
     }
-    
+
     return response.json();
+  },
+
+  // Image generation methods
+  async getSectionImages(artifactId: string): Promise<SectionImage[]> {
+    const response = await fetch(`/api/images/${artifactId}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load section images');
+    }
+
+    return response.json();
+  },
+
+  async generateSectionImages(artifactId: string): Promise<GenerateImagesResult> {
+    const response = await fetch(`/api/images/generate/${artifactId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate images');
+    }
+
+    return response.json();
+  },
+
+  async regenerateSectionImage(
+    artifactId: string,
+    sectionNumber: number
+  ): Promise<SectionImage> {
+    const response = await fetch(
+      `/api/images/regenerate/${artifactId}/${sectionNumber}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to regenerate image');
+    }
+
+    return response.json();
+  },
+
+  async deleteSectionImage(imageId: string): Promise<void> {
+    const response = await fetch(`/api/images/${imageId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete image');
+    }
   },
 };

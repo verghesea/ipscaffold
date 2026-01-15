@@ -49,12 +49,18 @@
   /* Refined Editorial Palette */
   --primary-900: 215 72% 14%; /* #0A1F3D */
   --primary-700: 210 56% 27%; /* #1E446B */
-  
+
   --accent-600: 43 89% 38%;   /* #B8860B */
   --accent-400: 47 77% 59%;   /* #E8C547 */
 
   --background: 51 100% 99%;  /* #FFFEF9 - Warm off-white */
   --foreground: 24 10% 10%;   /* #1C1917 - Warm black */
+
+  /* 4-Color Pen Palette for Image System */
+  --pen-black: #1f2937;
+  --pen-blue: #2563eb;
+  --pen-red: #dc2626;
+  --pen-green: #059669;
 
   --card: 51 33% 96%;         /* #F8F7F2 - Light warm gray */
   --card-foreground: 24 10% 10%;
@@ -131,4 +137,16 @@
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Animation for section fade-in */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
