@@ -159,3 +159,37 @@ export const insertNotificationSchema = z.object({
 });
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Section Images (AI-generated images for artifact sections)
+export interface SectionImage {
+  id: string;
+  artifact_id: string;
+  section_number: number;
+  section_title: string;
+  image_url: string;
+  prompt_used: string;
+  generation_metadata: {
+    model: string;
+    size: string;
+    quality: string;
+    revised_prompt?: string;
+  } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const insertSectionImageSchema = z.object({
+  artifact_id: z.string(),
+  section_number: z.number(),
+  section_title: z.string(),
+  image_url: z.string(),
+  prompt_used: z.string(),
+  generation_metadata: z.object({
+    model: z.string(),
+    size: z.string(),
+    quality: z.string(),
+    revised_prompt: z.string().optional(),
+  }).nullable().optional(),
+});
+
+export type InsertSectionImage = z.infer<typeof insertSectionImageSchema>;

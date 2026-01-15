@@ -1,0 +1,68 @@
+[
+  {
+    "promptName": "elia15_introduction",
+    "prompt": "Abstract visualization of a wireless power transmission system problem, showing tangled wires and complexity being solved, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "elia15_invention",
+    "prompt": "Technical concept visualization of electromagnetic resonance coils and power transfer, clean geometric representation of wireless energy flow between devices, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "elia15_functioning",
+    "prompt": "Exploded view technical illustration showing wireless charging coil assembly with magnetic field lines, precise component layout, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "elia15_importance",
+    "prompt": "Abstract visualization representing efficiency improvement and innovation, showing transformation from complex to elegant solution, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "elia15_why_matters",
+    "prompt": "Panoramic visualization of wireless power applications across multiple domains - medical devices, consumer electronics, industrial equipment shown as interconnected nodes, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "business_problem",
+    "prompt": "Abstract visualization of a pain point in power delivery infrastructure, represented through visual tension with fragmented shapes and barriers against clean white background, clinical blue-gray and amber warning colors, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "business_solution",
+    "prompt": "Elegant visualization of wireless charging innovation, showing refined crystalline or engineered magnetic field structure emerging from complexity, clean white environment with teal and silver accents, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "business_market",
+    "prompt": "Abstract visualization of market expansion for wireless power technology, showing scaling through expanding geometric patterns or network graphs, clean white background, teal and amber accent colors, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "golden_why",
+    "prompt": "Abstract visualization of purpose and innovation, represented through glowing energy core with concentric circles radiating outward, clean white environment with warm amber and teal colors, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "golden_how",
+    "prompt": "Process and methodology visualization of electromagnetic coupling, showing interconnected circuits and flowing energy processes, clean white background with teal technical elements, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  },
+  {
+    "promptName": "golden_what",
+    "prompt": "Product visualization of wireless charging pad as elegant geometric object, clean white studio environment, slate gray and teal colors, soft product photography lighting, modern laboratory aesthetic, contemporary scientific research facility environment, clean white and clinical blue-gray color palette, soft diffused lighting, precise geometric composition, professional scientific illustration style, minimalist design, no text or labels, ultra-clean background, 16:9 aspect ratio",
+    "success": false,
+    "error": "Could not resolve authentication method. Expected either apiKey or authToken to be set. Or for one of the \"X-Api-Key\" or \"Authorization\" headers to be explicitly omitted"
+  }
+]

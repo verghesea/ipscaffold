@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modern Lab Aesthetic - Patent Artifact Mockup</title>
+  <style>
+    /* Modern Lab Design System */
+    :root {
+      /* Colors */
+      --lab-slate-950: #0f172a;
+      --lab-slate-900: #1e293b;
+      --lab-slate-800: #334155;
+      --lab-slate-700: #475569;
+      --lab-slate-600: #64748b;
+      --lab-slate-500: #94a3b8;
+      --lab-slate-400: #cbd5e1;
+      --lab-slate-300: #e2e8f0;
+      --lab-slate-200: #f1f5f9;
+      --lab-slate-100: #f8fafc;
+      --lab-slate-50: #fafbfc;
+
+      --lab-teal-600: #0d9488;
+      --lab-teal-500: #14b8a6;
+      --lab-teal-400: #2dd4bf;
+      --lab-teal-100: #ccfbf1;
+
+      --lab-amber-500: #f59e0b;
+      --lab-amber-100: #fef3c7;
+
+      /* Typography */
+      --font-body: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--lab-slate-50);
+      color: var(--lab-slate-900);
+      line-height: 1.75;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* Page Header */
+    .page-header {
+      background: white;
+      border-bottom: 1px solid var(--lab-slate-200);
+      padding: 2rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    .page-header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    .page-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--lab-slate-900);
+      letter-spacing: -0.025em;
+    }
+
+    .page-subtitle {
+      font-size: 0.875rem;
+      color: var(--lab-slate-600);
+      margin-top: 0.25rem;
+    }
+
+    /* Container */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+    }
+
+    /* Artifact Header Banner */
+    .artifact-header {
+      background: var(--lab-teal-50);
+      border-left: 4px solid var(--lab-teal-500);
+      padding: 1.5rem;
+      margin-bottom: 3rem;
+      display: flex;
+      align-items: start;
+      gap: 1rem;
+    }
+
+    .artifact-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      flex-shrink: 0;
+      color: var(--lab-teal-600);
+    }
+
+    .artifact-info {
+      flex: 1;
+    }
+
+    .artifact-tagline {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--lab-slate-500);
+      margin-bottom: 0.25rem;
+    }
+
+    .artifact-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--lab-teal-600);
+      margin-bottom: 0.25rem;
+    }
+
+    .artifact-description {
+      font-size: 0.875rem;
+      color: var(--lab-slate-600);
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 4rem;
+    }
+
+    /* Section Image */
+    .section-image {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: var(--lab-slate-100);
+      border: 1px solid var(--lab-slate-200);
+      overflow: hidden;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .section-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .section-image-placeholder {
+      color: var(--lab-slate-400);
+      font-size: 0.875rem;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    /* Dot grid pattern for placeholder */
+    .section-image::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, var(--lab-slate-300) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    /* Accent Line */
+    .accent-line {
+      width: 48px;
+      height: 3px;
+      background: var(--lab-teal-500);
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Section Label */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--lab-slate-500);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Section Title */
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--lab-slate-900);
+      letter-spacing: -0.025em;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Content Block with Dot Grid */
+    .content-block {
+      padding: 1.5rem;
+      background-color: var(--lab-slate-50);
+      background-image: radial-gradient(circle, var(--lab-slate-300) 1px, transparent 1px);
+      background-size: 24px 24px;
+      border: 1px solid var(--lab-slate-200);
+    }
+
+    .content-block p {
+      color: var(--lab-slate-700);
+      margin-bottom: 1rem;
+    }
+
+    .content-block p:last-child {
+      margin-bottom: 0;
+    }
+
+    .content-block strong {
+      font-weight: 600;
+      color: var(--lab-slate-900);
+    }
+
+    .content-block ul {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .content-block li {
+      color: var(--lab-slate-700);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Section Divider */
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--lab-slate-300), transparent);
+      margin: 3rem 0;
+    }
+
+    /* Variation: Clean White Content Block */
+    .content-block-clean {
+      padding: 1.5rem;
+      background: white;
+      border: 1px solid var(--lab-slate-200);
+    }
+
+    /* Sticky Note for Designer */
+    .design-note {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--lab-amber-100);
+      border: 1px solid var(--lab-amber-500);
+      padding: 1rem;
+      max-width: 300px;
+      font-size: 0.875rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
+
+    .design-note h4 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--lab-slate-900);
+    }
+
+    .design-note p {
+      color: var(--lab-slate-700);
+      line-height: 1.5;
+      font-size: 0.75rem;
+    }
+
+    .design-note-close {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: none;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+      color: var(--lab-slate-600);
+    }
+
+    /* Loading Animation */
+    @keyframes shimmer {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+
+    .section-image.loading {
+      background: linear-gradient(
+        90deg,
+        var(--lab-slate-100) 0%,
+        var(--lab-slate-200) 50%,
+        var(--lab-slate-100) 100%
+      );
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite linear;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 2rem 1rem;
+      }
+
+      .page-header-content {
+        padding: 0 1rem;
+      }
+
+      .section-title {
+        font-size: 1.25rem;
+      }
+
+      .design-note {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-content">
+      <div class="page-title">Wireless Power Transfer System for Consumer Electronics</div>
+      <div class="page-subtitle">Filed: March 15, 2023 • Assignee: Tech Innovations Inc.</div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Artifact Header Banner -->
+    <div class="artifact-header">
+      <svg class="artifact-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+      <div class="artifact-info">
+        <div class="artifact-tagline">Explain Like I'm 15</div>
+        <div class="artifact-title">ELIA15</div>
+        <div class="artifact-description">Simplified explanation of your patent</div>
+      </div>
+    </div>
+
+    <!-- Section 1: Introduction -->
+    <div class="section">
+      <!-- Image (with placeholder) -->
+      <div class="section-image">
+        <div class="section-image-placeholder">
+          [DALL-E Generated Image]<br>
+          Modern lab aesthetic: Abstract visualization of wireless power problem
+        </div>
+      </div>
+
+      <!-- Section Header -->
+      <div class="accent-line"></div>
+      <div class="section-label">Section 01</div>
+      <h3 class="section-title">Introduction</h3>
+
+      <!-- Content with dot grid background -->
+      <div class="content-block">
+        <p><strong>The Problem: Too Many Cables</strong></p>
+        <p>Imagine having a desk cluttered with charging cables for your phone, laptop, smartwatch, and wireless earbuds. Each device needs its own cable, and you're constantly hunting for the right charger. This isn't just annoying—it's a limitation of current technology.</p>
+        <p>Traditional charging methods require physical connections between a power source and your device. This creates several problems:</p>
+        <ul>
+          <li>Cable wear and tear leading to frequent replacements</li>
+          <li>Incompatible charging standards across devices</li>
+          <li>Limited mobility while charging</li>
+          <li>Safety hazards from damaged cables</li>
+        </ul>
+        <p>What if you could walk into a room and have all your devices charge automatically, without any cables or plugging anything in?</p>
+      </div>
+    </div>
+
+    <!-- Section Divider -->
+    <div class="section-divider"></div>
+
+    <!-- Section 2: The Invention -->
+    <div class="section">
+      <div class="section-image loading">
+        <div class="section-image-placeholder">
+          [DALL-E Generated Image]<br>
+          Modern lab aesthetic: Technical concept of electromagnetic resonance
+        </div>
+      </div>
+
+      <div class="accent-line"></div>
+      <div class="section-label">Section 02</div>
+      <h3 class="section-title">The Invention</h3>
+
+      <div class="content-block">
+        <p><strong>Wireless Power Through Resonance</strong></p>
+        <p>This invention introduces a wireless power transfer system that uses electromagnetic resonance to charge multiple devices simultaneously without any physical connection.</p>
+        <p>Think of it like a Wi-Fi router for power instead of internet. Just as your phone connects to Wi-Fi automatically when you're in range, this system allows devices to charge automatically when they're within a certain distance of the power transmitter.</p>
+        <p>The system consists of two main components:</p>
+        <ul>
+          <li><strong>Transmitter Unit:</strong> A base station that creates an oscillating magnetic field</li>
+          <li><strong>Receiver Coils:</strong> Small components embedded in your devices that capture energy from this field</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Section 3: Detailed Functioning -->
+    <div class="section">
+      <div class="section-image">
+        <div class="section-image-placeholder">
+          [DALL-E Generated Image]<br>
+          Modern lab aesthetic: Exploded view of coil assembly with magnetic fields
+        </div>
+      </div>
+
+      <div class="accent-line"></div>
+      <div class="section-label">Section 03</div>
+      <h3 class="section-title">Detailed Functioning</h3>
+
+      <!-- Alternative: Clean white content block -->
+      <div class="content-block-clean">
+        <p><strong>How It Actually Works</strong></p>
+        <p>The technology operates on the principle of magnetic resonance coupling. Here's the step-by-step process:</p>
+        <p><strong>1. Power Transmission</strong><br>
+        The base station generates an alternating current through its coil, creating an oscillating magnetic field at a specific frequency (typically 6.78 MHz, an industry standard).</p>
+        <p><strong>2. Resonance Coupling</strong><br>
+        When a device with a receiver coil tuned to the same frequency enters this magnetic field, resonance occurs—like how a tuning fork vibrates when another matching tuning fork is struck nearby.</p>
+        <p><strong>3. Power Conversion</strong><br>
+        The receiver coil converts the magnetic field back into electrical current, which is then regulated to the appropriate voltage for charging the device's battery.</p>
+        <p><strong>4. Efficiency Optimization</strong><br>
+        Smart sensors continuously monitor the coupling efficiency and adjust the transmission power to minimize energy waste and prevent overheating.</p>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Section 4: Importance -->
+    <div class="section">
+      <div class="section-image">
+        <div class="section-image-placeholder">
+          [DALL-E Generated Image]<br>
+          Modern lab aesthetic: Transformation showing efficiency improvement
+        </div>
+      </div>
+
+      <div class="accent-line"></div>
+      <div class="section-label">Section 04</div>
+      <h3 class="section-title">Importance</h3>
+
+      <div class="content-block">
+        <p><strong>Why This Matters</strong></p>
+        <p>This wireless charging system represents a significant advancement over existing solutions for several reasons:</p>
+        <p><strong>Greater Range:</strong> Unlike current wireless chargers that require devices to be placed on a charging pad, this system works across distances of up to 30 centimeters, allowing more flexibility in device placement.</p>
+        <p><strong>Multiple Device Support:</strong> The system can charge up to 5 devices simultaneously, automatically distributing power based on each device's needs.</p>
+        <p><strong>Universal Compatibility:</strong> By adhering to the Qi wireless charging standard while extending its capabilities, this technology works with existing compatible devices.</p>
+        <p><strong>Safety Features:</strong> Built-in sensors detect foreign objects and living tissue in the charging field, automatically reducing power to prevent interference with medical devices or safety concerns.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Designer Note (Sticky) -->
+  <div class="design-note">
+    <button class="design-note-close" onclick="this.parentElement.style.display='none'">×</button>
+    <h4>🔬 Modern Lab Aesthetic</h4>
+    <p><strong>Key Design Elements:</strong></p>
+    <p>✓ Dot grid patterns on content blocks<br>
+    ✓ Teal accent lines and colors<br>
+    ✓ Clean sans-serif typography<br>
+    ✓ 16:9 image aspect ratios<br>
+    ✓ Sharp corners (no rounded edges)<br>
+    ✓ High contrast, clinical feel</p>
+    <p style="margin-top: 0.5rem;"><strong>Try:</strong> Scroll to see section variations. Notice the dot grid vs. clean white content blocks.</p>
+  </div>
+
+  <script>
+    // Simple image loading simulation
+    document.addEventListener('DOMContentLoaded', () => {
+      const loadingImages = document.querySelectorAll('.section-image.loading');
+
+      loadingImages.forEach((img, index) => {
+        setTimeout(() => {
+          img.classList.remove('loading');
+        }, 2000 + (index * 500));
+      });
+    });
+  </script>
+
+</body>
+</html>

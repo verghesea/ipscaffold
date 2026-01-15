@@ -657,6 +657,134 @@ export async function registerRoutes(
     }
   });
 
+  // Image Generation Routes
+
+  // Generate images for all sections in an artifact
+  app.post('/api/images/generate/:artifactId', async (req, res) => {
+    try {
+      const { artifactId } = req.params;
+
+      // Get artifact details
+      const { data: artifact, error } = await supabaseAdmin
+        .from('artifacts')
+        .select('artifact_type, content')
+        .eq('id', artifactId)
+        .single();
+
+      if (error || !artifact) {
+        return res.status(404).json({ error: 'Artifact not found' });
+      }
+
+      // Validate artifact type
+      if (!['elia15', 'business_narrative', 'golden_circle'].includes(artifact.artifact_type)) {
+        return res.status(400).json({ error: 'Invalid artifact type' });
+      }
+
+      // Generate images
+      const { generateArtifactImages } = await import('./services/artifactImageService');
+      const result = await generateArtifactImages({
+        artifactId,
+        artifactType: artifact.artifact_type as 'elia15' | 'business_narrative' | 'golden_circle',
+        markdownContent: artifact.content,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating images:', error);
+      res.status(500).json({
+        error: 'Failed to generate images',
+        details: (error as Error).message
+      });
+    }
+  });
+
+  // Get all images for an artifact
+  app.get('/api/images/:artifactId', async (req, res) => {
+    try {
+      const { artifactId } = req.params;
+
+      const { data, error } = await supabaseAdmin
+        .from('section_images')
+        .select('*')
+        .eq('artifact_id', artifactId)
+        .order('section_number', { ascending: true });
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(data || []);
+    } catch (error) {
+      console.error('Error fetching images:', error);
+      res.status(500).json({ error: 'Failed to fetch images' });
+    }
+  });
+
+  // Regenerate a single section image
+  app.post('/api/images/regenerate/:artifactId/:sectionNumber', async (req, res) => {
+    try {
+      const { artifactId, sectionNumber } = req.params;
+
+      // Get artifact details
+      const { data: artifact, error } = await supabaseAdmin
+        .from('artifacts')
+        .select('artifact_type, content')
+        .eq('id', artifactId)
+        .single();
+
+      if (error || !artifact) {
+        return res.status(404).json({ error: 'Artifact not found' });
+      }
+
+      // Parse sections to get the title
+      const { parseMarkdownSections } = await import('./services/sectionParser');
+      const sections = parseMarkdownSections(artifact.content);
+      const section = sections.find(s => s.number === parseInt(sectionNumber));
+
+      if (!section) {
+        return res.status(404).json({ error: 'Section not found' });
+      }
+
+      // Generate single image
+      const { generateSingleSectionImage } = await import('./services/artifactImageService');
+      const sectionImage = await generateSingleSectionImage({
+        artifactId,
+        artifactType: artifact.artifact_type as 'elia15' | 'business_narrative' | 'golden_circle',
+        sectionNumber: parseInt(sectionNumber),
+        sectionTitle: section.title,
+      });
+
+      res.json(sectionImage);
+    } catch (error) {
+      console.error('Error regenerating image:', error);
+      res.status(500).json({
+        error: 'Failed to regenerate image',
+        details: (error as Error).message
+      });
+    }
+  });
+
+  // Delete a specific section image
+  app.delete('/api/images/:imageId', async (req, res) => {
+    try {
+      const { imageId } = req.params;
+
+      const { error } = await supabaseAdmin
+        .from('section_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      res.status(500).json({ error: 'Failed to delete image' });
+    }
+  });
+
   return httpServer;
 }
 

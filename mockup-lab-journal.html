@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scientific Lab Journal Aesthetic - Patent Artifact</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Architects+Daughter&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Scientific Lab Journal Design System */
+    :root {
+      /* Graph Paper Colors */
+      --graph-line: #d1d5db;
+      --graph-major-line: #9ca3af;
+      --graph-accent-line: #3b82f6;
+      --paper-bg: #fefefe;
+
+      /* Lab Notebook Colors (like colored pens) */
+      --pen-blue: #2563eb;
+      --pen-black: #1f2937;
+      --pen-red: #dc2626;
+      --pen-green: #059669;
+      --highlighter-yellow: rgba(250, 204, 21, 0.3);
+      --highlighter-green: rgba(52, 211, 153, 0.2);
+
+      /* Typography */
+      --font-technical: 'Work Sans', sans-serif;
+      --font-handwriting: 'Architects Daughter', cursive;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      /* Grid Size */
+      --grid-size: 20px;
+      --major-grid: 100px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-technical);
+      background: #e5e7eb;
+      color: var(--pen-black);
+      padding: 2rem 0;
+      line-height: 1.6;
+    }
+
+    /* Lab Notebook Page Container */
+    .lab-page {
+      max-width: 900px;
+      margin: 0 auto 2rem;
+      background: var(--paper-bg);
+      box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.1),
+        0 10px 20px rgba(0, 0, 0, 0.05);
+      position: relative;
+      border-right: 1px solid #d1d5db;
+    }
+
+    /* Spiral Binding Effect */
+    .lab-page::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: linear-gradient(to right,
+        rgba(0,0,0,0.03) 0%,
+        rgba(0,0,0,0.01) 50%,
+        transparent 100%
+      );
+      border-right: 2px solid #e5e7eb;
+    }
+
+    /* Hole Punch Marks */
+    .lab-page::after {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 80px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: white;
+      box-shadow:
+        0 0 0 1px #cbd5e1,
+        0 180px 0 0 white,
+        0 180px 0 1px #cbd5e1,
+        0 360px 0 0 white,
+        0 360px 0 1px #cbd5e1,
+        0 540px 0 0 white,
+        0 540px 0 1px #cbd5e1;
+    }
+
+    /* Graph Paper Background */
+    .page-content {
+      padding: 3rem 3rem 3rem 5rem;
+      background-image:
+        /* Small grid */
+        linear-gradient(to right, var(--graph-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--graph-line) 1px, transparent 1px),
+        /* Major grid */
+        linear-gradient(to right, var(--graph-major-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--graph-major-line) 1px, transparent 1px);
+      background-size:
+        var(--grid-size) var(--grid-size),
+        var(--grid-size) var(--grid-size),
+        var(--major-grid) var(--major-grid),
+        var(--major-grid) var(--major-grid);
+      background-position: -1px -1px;
+      min-height: 800px;
+      position: relative;
+    }
+
+    /* Page Metadata (Top Corner) */
+    .page-meta {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: #6b7280;
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    .page-meta .date {
+      color: var(--pen-blue);
+      font-weight: 600;
+    }
+
+    /* Margin Ruler */
+    .margin-ruler {
+      position: absolute;
+      left: 50px;
+      top: 3rem;
+      bottom: 3rem;
+      width: 20px;
+      border-right: 2px solid var(--pen-red);
+      opacity: 0.3;
+    }
+
+    .margin-ruler::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: -1px;
+      width: 10px;
+      height: 100%;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 9px,
+        var(--pen-red) 9px,
+        var(--pen-red) 10px
+      );
+      opacity: 0.5;
+    }
+
+    /* Patent Title (Handwritten style header) */
+    .patent-title-header {
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--pen-blue);
+      position: relative;
+    }
+
+    .patent-title-header::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--pen-blue);
+      opacity: 0.3;
+    }
+
+    .patent-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--pen-blue);
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    .patent-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Artifact Badge (Lab Stamp Style) */
+    .artifact-badge {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      background: var(--highlighter-yellow);
+      border: 2px dashed var(--pen-blue);
+      border-radius: 4px;
+      margin-bottom: 2rem;
+      transform: rotate(-1deg);
+    }
+
+    .artifact-badge .badge-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: #92400e;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+
+    .artifact-badge .badge-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--pen-blue);
+      margin-top: 0.25rem;
+    }
+
+    /* Section Container */
+    .lab-section {
+      margin-bottom: 3rem;
+      position: relative;
+    }
+
+    /* Section Image with Graph Paper Frame */
+    .section-image-container {
+      width: 100%;
+      margin-bottom: 1.5rem;
+      position: relative;
+      border: 2px solid var(--pen-black);
+      background: white;
+      padding: 0.5rem;
+    }
+
+    .section-image-container::before {
+      content: 'Figure ' attr(data-figure);
+      position: absolute;
+      bottom: -1.5rem;
+      left: 0;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--pen-black);
+      font-weight: 600;
+    }
+
+    .section-image {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Grid pattern in image placeholder */
+    .section-image::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+        linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+      background-size: 10px 10px;
+    }
+
+    .section-image-placeholder {
+      position: relative;
+      z-index: 1;
+      font-family: var(--font-handwriting);
+      font-size: 1rem;
+      color: #9ca3af;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    /* Section Header with Handwritten Accent */
+    .section-header {
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    /* Section Number (Margin Note Style) */
+    .section-number {
+      position: absolute;
+      left: -3rem;
+      top: 0;
+      font-family: var(--font-handwriting);
+      font-size: 1.2rem;
+      color: var(--pen-red);
+      font-weight: 600;
+    }
+
+    /* Hand-drawn underline */
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--pen-black);
+      position: relative;
+      display: inline-block;
+      padding-bottom: 0.25rem;
+    }
+
+    .section-title::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--pen-blue);
+      opacity: 0.7;
+      transform: skewY(-0.5deg);
+    }
+
+    /* Hand-drawn arrow/pointer */
+    .section-title::before {
+      content: '→';
+      position: absolute;
+      left: -1.5rem;
+      top: 0.1rem;
+      color: var(--pen-red);
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    /* Content Box (Highlighted Notes Style) */
+    .content-box {
+      background: white;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+      border-left: 4px solid var(--pen-green);
+    }
+
+    /* Highlight effect on first paragraph */
+    .content-box p:first-of-type {
+      background: var(--highlighter-yellow);
+      padding: 0.25rem 0.5rem;
+      margin: -0.25rem -0.5rem 1rem;
+      display: inline-block;
+    }
+
+    .content-box p {
+      color: var(--pen-black);
+      margin-bottom: 1rem;
+      line-height: 1.7;
+    }
+
+    .content-box strong {
+      color: var(--pen-blue);
+      font-weight: 700;
+    }
+
+    .content-box ul {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .content-box li {
+      margin-bottom: 0.5rem;
+      position: relative;
+    }
+
+    .content-box li::marker {
+      color: var(--pen-blue);
+      font-weight: 700;
+    }
+
+    /* Margin Annotations */
+    .margin-note {
+      position: absolute;
+      left: -14rem;
+      width: 12rem;
+      font-family: var(--font-handwriting);
+      font-size: 0.85rem;
+      color: var(--pen-red);
+      line-height: 1.4;
+      padding: 0.5rem;
+      background: rgba(254, 243, 199, 0.5);
+      border-left: 2px solid var(--pen-red);
+    }
+
+    /* Hand-drawn box around important text */
+    .highlight-box {
+      border: 2px solid var(--pen-red);
+      padding: 1rem;
+      margin: 1rem 0;
+      position: relative;
+      background: rgba(254, 243, 199, 0.2);
+    }
+
+    .highlight-box::before {
+      content: '!';
+      position: absolute;
+      left: -1.5rem;
+      top: 0.5rem;
+      width: 1.5rem;
+      height: 1.5rem;
+      background: var(--pen-red);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    /* Section Divider (Hand-drawn line) */
+    .section-divider {
+      margin: 3rem 0;
+      height: 2px;
+      background: var(--pen-blue);
+      opacity: 0.3;
+      position: relative;
+    }
+
+    .section-divider::after {
+      content: '◆';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--paper-bg);
+      color: var(--pen-blue);
+      padding: 0 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    /* Color-coded tags */
+    .tag {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      border-radius: 3px;
+      margin-right: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tag-theory {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--pen-blue);
+      border: 1px solid var(--pen-blue);
+    }
+
+    .tag-practical {
+      background: rgba(5, 150, 105, 0.1);
+      color: var(--pen-green);
+      border: 1px solid var(--pen-green);
+    }
+
+    .tag-important {
+      background: rgba(220, 38, 38, 0.1);
+      color: var(--pen-red);
+      border: 1px solid var(--pen-red);
+    }
+
+    /* Bottom page note */
+    .page-footer {
+      margin-top: 4rem;
+      padding-top: 1rem;
+      border-top: 1px dashed var(--graph-major-line);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: #9ca3af;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .lab-page {
+        margin: 0 1rem 2rem;
+      }
+
+      .page-content {
+        padding: 2rem 1.5rem 2rem 3rem;
+      }
+
+      .margin-note {
+        position: relative;
+        left: 0;
+        width: 100%;
+        margin-bottom: 1rem;
+      }
+
+      .section-number {
+        position: relative;
+        left: 0;
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+    }
+
+    /* Optional: Checkboxes (like lab notebook todo items) */
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 1.2rem;
+      height: 1.2rem;
+      border: 2px solid var(--pen-blue);
+      cursor: pointer;
+    }
+
+    .checkbox-item label {
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Lab Notebook Page -->
+  <div class="lab-page">
+
+    <!-- Page Metadata -->
+    <div class="page-meta">
+      <div class="date">2025-01-15</div>
+      <div>Patent Analysis</div>
+      <div>Doc ID: US-2023-0156</div>
+      <div>Page 1/3</div>
+    </div>
+
+    <!-- Margin Ruler -->
+    <div class="margin-ruler"></div>
+
+    <!-- Page Content with Graph Paper -->
+    <div class="page-content">
+
+      <!-- Patent Title Header -->
+      <div class="patent-title-header">
+        <div class="patent-title">Wireless Power Transfer System for Consumer Electronics</div>
+        <div class="patent-subtitle">Filed: March 15, 2023 • Assignee: Tech Innovations Inc.</div>
+      </div>
+
+      <!-- Artifact Badge (Stamp Style) -->
+      <div class="artifact-badge">
+        <div class="badge-label">Artifact 01/03</div>
+        <div class="badge-title">ELIA15 – Explain Like I'm 15</div>
+      </div>
+
+      <!-- Section 1: Introduction -->
+      <div class="lab-section">
+
+        <!-- Section Image -->
+        <div class="section-image-container" data-figure="1.1">
+          <div class="section-image">
+            <div class="section-image-placeholder">
+              [DALL-E Generated Image]<br>
+              Conceptual visualization of wireless power problem
+            </div>
+          </div>
+        </div>
+
+        <!-- Section Header -->
+        <div class="section-header">
+          <div class="section-number">01</div>
+          <h3 class="section-title">Introduction</h3>
+          <div style="margin-top: 0.5rem;">
+            <span class="tag tag-theory">Background</span>
+            <span class="tag tag-important">Problem</span>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content-box">
+          <p><strong>The Problem: Too Many Cables</strong></p>
+
+          <p>Imagine having a desk cluttered with charging cables for your phone, laptop, smartwatch, and wireless earbuds. Each device needs its own cable, and you're constantly hunting for the right charger. This isn't just annoying—it's a limitation of current technology.</p>
+
+          <div class="highlight-box">
+            <p><strong>Key Challenge:</strong> Traditional charging methods require physical connections between a power source and your device.</p>
+          </div>
+
+          <p>This creates several problems:</p>
+          <ul>
+            <li>Cable wear and tear leading to frequent replacements</li>
+            <li>Incompatible charging standards across devices</li>
+            <li>Limited mobility while charging</li>
+            <li>Safety hazards from damaged cables</li>
+          </ul>
+
+          <p>What if you could walk into a room and have all your devices charge automatically, without any cables or plugging anything in?</p>
+        </div>
+
+        <!-- Margin Annotation -->
+        <div class="margin-note" style="top: 5rem;">
+          ✓ User pain point clearly defined<br>
+          ✓ Relatable example<br>
+          → Sets up solution
+        </div>
+
+      </div>
+
+      <!-- Section Divider -->
+      <div class="section-divider"></div>
+
+      <!-- Section 2: The Invention -->
+      <div class="lab-section">
+
+        <div class="section-image-container" data-figure="1.2">
+          <div class="section-image">
+            <div class="section-image-placeholder">
+              [DALL-E Generated Image]<br>
+              Technical diagram of electromagnetic resonance
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-number">02</div>
+          <h3 class="section-title">The Invention</h3>
+          <div style="margin-top: 0.5rem;">
+            <span class="tag tag-theory">Core Tech</span>
+            <span class="tag tag-practical">Solution</span>
+          </div>
+        </div>
+
+        <div class="content-box">
+          <p><strong>Wireless Power Through Resonance</strong></p>
+
+          <p>This invention introduces a wireless power transfer system that uses electromagnetic resonance to charge multiple devices simultaneously without any physical connection.</p>
+
+          <p>Think of it like a Wi-Fi router for power instead of internet. Just as your phone connects to Wi-Fi automatically when you're in range, this system allows devices to charge automatically when they're within a certain distance of the power transmitter.</p>
+
+          <div class="highlight-box">
+            <p><strong>Two Main Components:</strong></p>
+            <ul style="margin-bottom: 0;">
+              <li><strong>Transmitter Unit:</strong> A base station that creates an oscillating magnetic field</li>
+              <li><strong>Receiver Coils:</strong> Small components embedded in your devices that capture energy from this field</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="margin-note" style="top: 8rem;">
+          Great analogy: Wi-Fi router for power<br>
+          → Makes tech accessible
+        </div>
+
+      </div>
+
+      <!-- Page Footer -->
+      <div class="page-footer">
+        <div>IP Scaffold Analysis Engine • v2.1.4</div>
+        <div>Continued on next page →</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Second Page (showing different styling options) -->
+  <div class="lab-page">
+
+    <div class="page-meta">
+      <div class="date">2025-01-15</div>
+      <div>Patent Analysis</div>
+      <div>Doc ID: US-2023-0156</div>
+      <div>Page 2/3</div>
+    </div>
+
+    <div class="margin-ruler"></div>
+
+    <div class="page-content">
+
+      <!-- Section 3: Detailed Functioning -->
+      <div class="lab-section">
+
+        <div class="section-image-container" data-figure="1.3">
+          <div class="section-image">
+            <div class="section-image-placeholder">
+              [DALL-E Generated Image]<br>
+              Exploded view of coil assembly
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-number">03</div>
+          <h3 class="section-title">Detailed Functioning</h3>
+          <div style="margin-top: 0.5rem;">
+            <span class="tag tag-theory">Technical</span>
+            <span class="tag tag-practical">How It Works</span>
+          </div>
+        </div>
+
+        <div class="content-box">
+          <p><strong>How It Actually Works</strong></p>
+
+          <p>The technology operates on the principle of magnetic resonance coupling. Here's the step-by-step process:</p>
+
+          <p><strong>1. Power Transmission</strong><br>
+          The base station generates an alternating current through its coil, creating an oscillating magnetic field at a specific frequency (typically 6.78 MHz, an industry standard).</p>
+
+          <p><strong>2. Resonance Coupling</strong><br>
+          When a device with a receiver coil tuned to the same frequency enters this magnetic field, resonance occurs—like how a tuning fork vibrates when another matching tuning fork is struck nearby.</p>
+
+          <div class="highlight-box">
+            <p><strong>3. Power Conversion</strong><br>
+            The receiver coil converts the magnetic field back into electrical current, which is then regulated to the appropriate voltage for charging the device's battery.</p>
+          </div>
+
+          <p><strong>4. Efficiency Optimization</strong><br>
+          Smart sensors continuously monitor the coupling efficiency and adjust the transmission power to minimize energy waste and prevent overheating.</p>
+        </div>
+
+        <div class="margin-note" style="top: 12rem;">
+          ⚡ Key insight:<br>
+          Resonance = efficient energy transfer<br>
+          → Similar to tuning fork analogy
+        </div>
+
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Check boxes for follow-up items -->
+      <div style="margin-top: 2rem; padding: 1rem; background: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--pen-blue);">
+        <p style="font-weight: 700; margin-bottom: 1rem; color: var(--pen-blue);">Follow-up Research:</p>
+        <div class="checkbox-item">
+          <input type="checkbox" id="item1">
+          <label for="item1">Review competitive patents in wireless charging space</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="item2">
+          <label for="item2">Calculate market sizing for consumer electronics segment</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="item3" checked>
+          <label for="item3">Identify key technical differentiators vs. Qi standard</label>
+        </div>
+      </div>
+
+      <div class="page-footer">
+        <div>IP Scaffold Analysis Engine • v2.1.4</div>
+        <div>Continued on next page →</div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Add slight random rotation to stamps for authentic look
+    document.querySelectorAll('.artifact-badge').forEach(badge => {
+      const rotation = (Math.random() - 0.5) * 3; // -1.5 to 1.5 degrees
+      badge.style.transform = `rotate(${rotation}deg)`;
+    });
+  </script>
+
+</body>
+</html>

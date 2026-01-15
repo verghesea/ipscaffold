@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medieval Illuminated Manuscript - Patent Codex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    /* Medieval Illuminated Manuscript Design System */
+    :root {
+      /* Parchment Colors */
+      --parchment-light: #f4f1e8;
+      --parchment: #f0e6d2;
+      --parchment-dark: #e8dcc4;
+      --parchment-darker: #d4c4a8;
+
+      /* Medieval Ink Colors */
+      --ink-black: #2c1810;
+      --ink-brown: #4a3728;
+      --medieval-red: #8b2e2e;
+      --medieval-blue: #1e4d7b;
+      --medieval-gold: #c9a961;
+      --gold-bright: #d4af37;
+      --gold-dark: #a8872e;
+
+      /* Illumination Colors */
+      --illumination-red: #b91c1c;
+      --illumination-blue: #1e40af;
+      --illumination-green: #166534;
+      --illumination-purple: #6b21a8;
+
+      /* Typography */
+      --font-gothic: 'UnifrakturMaguntia', cursive;
+      --font-serif: 'Cinzel', serif;
+      --font-old-english: 'IM Fell English', serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-old-english);
+      background: linear-gradient(135deg, #8b7355 0%, #5c4a3a 100%);
+      color: var(--ink-black);
+      padding: 2rem;
+      line-height: 1.8;
+    }
+
+    /* Parchment Page */
+    .manuscript-page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--parchment);
+      background-image:
+        /* Parchment texture */
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(139, 115, 85, 0.03) 2px,
+          rgba(139, 115, 85, 0.03) 4px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 2px,
+          rgba(139, 115, 85, 0.03) 2px,
+          rgba(139, 115, 85, 0.03) 4px
+        );
+      box-shadow:
+        0 0 0 1px rgba(92, 74, 58, 0.3),
+        0 20px 40px rgba(0, 0, 0, 0.3),
+        inset 0 0 100px rgba(255, 255, 255, 0.1);
+      position: relative;
+      padding: 0;
+      border: 20px solid var(--parchment-darker);
+      border-image: linear-gradient(
+        135deg,
+        var(--parchment-darker),
+        var(--parchment-dark),
+        var(--parchment-darker)
+      ) 1;
+    }
+
+    /* Aged paper effect */
+    .manuscript-page::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 30%, rgba(139, 69, 19, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(101, 67, 33, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(160, 120, 80, 0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* Ornate Border Frame */
+    .ornate-border {
+      position: absolute;
+      inset: 0;
+      border: 3px double var(--medieval-gold);
+      margin: 1rem;
+      pointer-events: none;
+    }
+
+    .ornate-border::before,
+    .ornate-border::after {
+      content: '✤';
+      position: absolute;
+      font-size: 2rem;
+      color: var(--medieval-gold);
+      text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    }
+
+    .ornate-border::before {
+      top: -1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .ornate-border::after {
+      bottom: -1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* Corner Ornaments */
+    .corner-ornament {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: 2px solid var(--medieval-gold);
+      pointer-events: none;
+    }
+
+    .corner-ornament.top-left {
+      top: 1rem;
+      left: 1rem;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .corner-ornament.top-right {
+      top: 1rem;
+      right: 1rem;
+      border-left: none;
+      border-bottom: none;
+    }
+
+    .corner-ornament.bottom-left {
+      bottom: 1rem;
+      left: 1rem;
+      border-right: none;
+      border-top: none;
+    }
+
+    .corner-ornament.bottom-right {
+      bottom: 1rem;
+      right: 1rem;
+      border-left: none;
+      border-top: none;
+    }
+
+    /* Content Area */
+    .manuscript-content {
+      padding: 4rem 5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Decorated Initial Letter */
+    .illuminated-initial {
+      float: left;
+      font-family: var(--font-gothic);
+      font-size: 5rem;
+      line-height: 0.8;
+      color: var(--illumination-red);
+      margin: 0.5rem 1rem 0 0;
+      padding: 1rem;
+      background: linear-gradient(135deg, var(--gold-dark), var(--gold-bright));
+      border: 3px solid var(--medieval-gold);
+      box-shadow:
+        inset 0 0 20px rgba(212, 175, 55, 0.5),
+        0 4px 8px rgba(0, 0, 0, 0.3);
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    .illuminated-initial::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border: 1px solid var(--medieval-gold);
+      opacity: 0.5;
+    }
+
+    /* Manuscript Title */
+    .manuscript-title {
+      text-align: center;
+      margin-bottom: 3rem;
+      position: relative;
+      padding-bottom: 1.5rem;
+    }
+
+    .manuscript-title::after {
+      content: '※ ※ ※';
+      display: block;
+      margin-top: 1rem;
+      color: var(--medieval-gold);
+      letter-spacing: 1rem;
+    }
+
+    .title-main {
+      font-family: var(--font-gothic);
+      font-size: 2.5rem;
+      color: var(--medieval-blue);
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      margin-bottom: 1rem;
+      line-height: 1.3;
+    }
+
+    .title-subtitle {
+      font-family: var(--font-serif);
+      font-size: 1rem;
+      color: var(--ink-brown);
+      text-transform: uppercase;
+      letter-spacing: 0.3em;
+      font-weight: 600;
+    }
+
+    .title-date {
+      font-family: var(--font-old-english);
+      font-size: 0.9rem;
+      color: var(--medieval-red);
+      font-style: italic;
+      margin-top: 0.5rem;
+    }
+
+    /* Wax Seal (Artifact Badge) */
+    .wax-seal {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 3rem;
+      background: radial-gradient(circle, var(--medieval-red), #6b1e1e);
+      border-radius: 50%;
+      position: relative;
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.2),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    .wax-seal::before {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border: 2px solid rgba(212, 175, 55, 0.6);
+      border-radius: 50%;
+    }
+
+    .seal-text {
+      font-family: var(--font-serif);
+      color: var(--gold-bright);
+      text-align: center;
+      z-index: 1;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .seal-number {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .seal-label {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Section with Illuminated Border */
+    .manuscript-section {
+      margin-bottom: 3rem;
+      position: relative;
+    }
+
+    /* Rubric (Red Header Text) */
+    .rubric {
+      font-family: var(--font-serif);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--medieval-red);
+      margin-bottom: 1.5rem;
+      text-align: center;
+      position: relative;
+      padding: 1rem 0;
+    }
+
+    .rubric::before,
+    .rubric::after {
+      content: '✦';
+      color: var(--medieval-gold);
+      margin: 0 1rem;
+      font-size: 1.2rem;
+    }
+
+    /* Section Number (Marginal Note) */
+    .section-number {
+      position: absolute;
+      left: -4rem;
+      top: 0;
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--medieval-blue);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+
+    /* Image Frame (Miniature Illumination) */
+    .miniature-frame {
+      border: 8px solid var(--medieval-gold);
+      background: var(--parchment-dark);
+      padding: 1rem;
+      margin: 2rem 0;
+      position: relative;
+      box-shadow:
+        inset 0 0 20px rgba(139, 69, 19, 0.1),
+        0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .miniature-frame::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 2px solid var(--gold-dark);
+    }
+
+    .miniature-image {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: var(--parchment-light);
+      border: 2px solid var(--ink-brown);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .miniature-placeholder {
+      font-family: var(--font-old-english);
+      font-style: italic;
+      color: var(--ink-brown);
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.9rem;
+    }
+
+    /* Caption (Legend) */
+    .legend {
+      text-align: center;
+      font-family: var(--font-old-english);
+      font-size: 0.85rem;
+      color: var(--medieval-blue);
+      margin-top: 0.75rem;
+      font-style: italic;
+    }
+
+    .legend::before {
+      content: '~ ';
+      color: var(--medieval-gold);
+    }
+
+    .legend::after {
+      content: ' ~';
+      color: var(--medieval-gold);
+    }
+
+    /* Body Text (Two-Column like medieval manuscripts) */
+    .text-block {
+      columns: 1;
+      column-gap: 2rem;
+      text-align: justify;
+      hyphens: auto;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: var(--ink-black);
+      margin-bottom: 2rem;
+    }
+
+    .text-block p {
+      margin-bottom: 1rem;
+      text-indent: 2rem;
+    }
+
+    .text-block p:first-of-type {
+      text-indent: 0;
+    }
+
+    .text-block strong {
+      color: var(--medieval-red);
+      font-weight: 700;
+    }
+
+    /* Decorated List */
+    .text-block ul {
+      list-style: none;
+      margin: 1rem 0 1rem 2rem;
+    }
+
+    .text-block li {
+      position: relative;
+      margin-bottom: 0.5rem;
+      padding-left: 1.5rem;
+    }
+
+    .text-block li::before {
+      content: '❧';
+      position: absolute;
+      left: 0;
+      color: var(--medieval-gold);
+      font-size: 1.2rem;
+    }
+
+    /* Highlighted Text (Gold Leaf) */
+    .gold-leaf {
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold-dark));
+      color: var(--ink-black);
+      padding: 0.15rem 0.5rem;
+      border-radius: 2px;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Decorated Box (Cartouche) */
+    .cartouche {
+      border: 4px double var(--medieval-blue);
+      background: rgba(30, 77, 123, 0.05);
+      padding: 1.5rem;
+      margin: 2rem 0;
+      position: relative;
+    }
+
+    .cartouche::before,
+    .cartouche::after {
+      content: '✤';
+      position: absolute;
+      color: var(--medieval-blue);
+      font-size: 1.5rem;
+    }
+
+    .cartouche::before {
+      top: -0.75rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--parchment);
+      padding: 0 0.5rem;
+    }
+
+    .cartouche::after {
+      bottom: -0.75rem;
+      left: 50%;
+      transform: translateX(-50%) rotate(180deg);
+      background: var(--parchment);
+      padding: 0 0.5rem;
+    }
+
+    /* Marginal Notes (Glosses) */
+    .gloss {
+      position: absolute;
+      right: -5rem;
+      width: 4rem;
+      font-family: var(--font-old-english);
+      font-size: 0.7rem;
+      color: var(--medieval-blue);
+      line-height: 1.4;
+      font-style: italic;
+      text-align: right;
+    }
+
+    /* Decorated Divider */
+    .manuscript-divider {
+      text-align: center;
+      margin: 3rem 0;
+      color: var(--medieval-gold);
+      font-size: 1.5rem;
+      position: relative;
+    }
+
+    .manuscript-divider::before,
+    .manuscript-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 2px;
+      background: linear-gradient(to right, transparent, var(--medieval-gold), transparent);
+    }
+
+    .manuscript-divider::before {
+      left: 0;
+    }
+
+    .manuscript-divider::after {
+      right: 0;
+    }
+
+    /* Footer (Colophon) */
+    .colophon {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 3px double var(--medieval-gold);
+      text-align: center;
+      font-family: var(--font-old-english);
+      font-size: 0.85rem;
+      color: var(--ink-brown);
+      font-style: italic;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .manuscript-content {
+        padding: 2rem 2rem;
+      }
+
+      .section-number,
+      .gloss {
+        position: relative;
+        left: 0;
+        right: 0;
+        width: 100%;
+        writing-mode: horizontal-tb;
+        margin-bottom: 0.5rem;
+        text-align: center;
+      }
+
+      .illuminated-initial {
+        font-size: 3.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="manuscript-page">
+    <!-- Ornate Border -->
+    <div class="ornate-border"></div>
+
+    <!-- Corner Ornaments -->
+    <div class="corner-ornament top-left"></div>
+    <div class="corner-ornament top-right"></div>
+    <div class="corner-ornament bottom-left"></div>
+    <div class="corner-ornament bottom-right"></div>
+
+    <!-- Content -->
+    <div class="manuscript-content">
+
+      <!-- Title -->
+      <div class="manuscript-title">
+        <div class="title-main">Codex of Inventions</div>
+        <div class="title-subtitle">Concerning Wireless Power Transfer</div>
+        <div class="title-date">In the Year of Our Lord MMXXIII</div>
+      </div>
+
+      <!-- Wax Seal (Artifact Badge) -->
+      <div class="wax-seal">
+        <div class="seal-text">
+          <div class="seal-number">I</div>
+          <div class="seal-label">ELIA XV</div>
+        </div>
+      </div>
+
+      <!-- Section I: Introduction -->
+      <div class="manuscript-section">
+        <div class="section-number">I</div>
+
+        <div class="rubric">
+          <span>Introduction</span>
+        </div>
+
+        <!-- Miniature Illumination -->
+        <div class="miniature-frame">
+          <div class="miniature-image">
+            <div class="miniature-placeholder">
+              [Here shall be depicted:<br>
+              A Vision of Tangled Cables &amp; Wires<br>
+              Being Transformed by Divine Magnetism]
+            </div>
+          </div>
+          <div class="legend">Figura I: The Problem of Many Cables</div>
+        </div>
+
+        <!-- Text with Illuminated Initial -->
+        <div class="text-block">
+          <p>
+            <span class="illuminated-initial">I</span>magine, good Reader, having a desk cluttered with charging cables for thy telephone, portable computing device, time-keeping apparatus, and ear instruments for the reception of music. Each device requireth its own cable, and thou art constantly searching for the proper charger. This is not merely vexing—'tis a limitation of our current arts and sciences.
+          </p>
+
+          <p>Traditional methods of charging require <span class="gold-leaf">physical connexions</span> betwixt a source of power and thy device. This createth several afflictions:</p>
+
+          <ul>
+            <li>Cable wear and deterioration leading to frequent replacements</li>
+            <li>Incompatible standards of charging across diverse devices</li>
+            <li>Limited mobility whilst the device receiveth power</li>
+            <li>Hazards to safety from damaged cables</li>
+          </ul>
+
+          <p>What if, dear Scholar, thou couldst walk into a chamber and have all thy devices charge automatically, <strong>without any cables or manual connexion</strong>? This is the promise of the invention herein described.</p>
+        </div>
+
+        <!-- Cartouche (Highlighted Box) -->
+        <div class="cartouche">
+          <p style="text-align: center; margin: 0;">
+            <strong>The Central Question:</strong><br>
+            How might one transmit the essence of power through the very aether itself,<br>
+            without need of copper wire or physical touch?
+          </p>
+        </div>
+
+        <div class="gloss" style="top: 5rem;">
+          Note well:<br>
+          This problem<br>
+          hath vexed<br>
+          scholars for<br>
+          many years
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="manuscript-divider">❧ ❦ ❧</div>
+
+      <!-- Section II: The Invention -->
+      <div class="manuscript-section">
+        <div class="section-number">II</div>
+
+        <div class="rubric">
+          <span>The Invention Itself</span>
+        </div>
+
+        <div class="miniature-frame">
+          <div class="miniature-image">
+            <div class="miniature-placeholder">
+              [Here shall be depicted:<br>
+              The Sacred Geometry of Electromagnetic Resonance<br>
+              With Coils &amp; Magnetic Field Lines Most Elegant]
+            </div>
+          </div>
+          <div class="legend">Figura II: The Architecture of Wireless Power</div>
+        </div>
+
+        <div class="text-block">
+          <p>
+            <span class="illuminated-initial">T</span>his invention introduceth a system of <span class="gold-leaf">wireless power transfer</span> that employeth the mystical force of electromagnetic resonance to charge multiple devices simultaneously, without any physical connexion whatsoever.
+          </p>
+
+          <p>Think of it as a manner of <strong>invisible fountain</strong> from which all devices may drink of power, rather than requiring individual vessels and pipes. Just as thy telephonic instrument connecteth to the wireless aether when within range, so too doth this system permit devices to receive their vital energy automatically when positioned within a certain radius of the transmitting apparatus.</p>
+        </div>
+
+        <div class="cartouche">
+          <p style="margin-bottom: 1rem;"><strong>The System Consisteth of Two Principal Components:</strong></p>
+          <p style="margin-bottom: 0.5rem;">
+            <span class="gold-leaf">Transmitter Unit</span>: A base station that generateth an oscillating field of magnetic force
+          </p>
+          <p style="margin-bottom: 0;">
+            <span class="gold-leaf">Receiver Coils</span>: Small devices embedded within thy instruments that capture the energy from said field
+          </p>
+        </div>
+
+        <div class="gloss" style="top: 8rem;">
+          As Wi-Fi<br>
+          is to the<br>
+          Internet,<br>
+          so is this<br>
+          to Power
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="manuscript-divider">❧ ❦ ❧</div>
+
+      <!-- Section III: How It Functions -->
+      <div class="manuscript-section">
+        <div class="section-number">III</div>
+
+        <div class="rubric">
+          <span>Detailed Functioning</span>
+        </div>
+
+        <div class="miniature-frame">
+          <div class="miniature-image">
+            <div class="miniature-placeholder">
+              [Here shall be depicted:<br>
+              An Exploded View Most Ingenious<br>
+              Showing the Assembly of Coils &amp; Components]
+            </div>
+          </div>
+          <div class="legend">Figura III: The Mechanisms in Detail</div>
+        </div>
+
+        <div class="text-block">
+          <p>
+            <span class="illuminated-initial">T</span>he technology operateth upon the principle of <span class="gold-leaf">magnetic resonance coupling</span>. Herein lies the step-by-step process, as revealed through careful study and experimentation:
+          </p>
+
+          <p><strong>Primus — Power Transmission:</strong> The base station generateth an alternating current through its coil, thereby creating an oscillating magnetic field at a frequency most specific (typically 6.78 million cycles per second, an industry standard adopted by learned societies).</p>
+
+          <p><strong>Secundus — Resonance Coupling:</strong> When a device bearing a receiver coil tuned to the selfsame frequency entereth this magnetic field, <strong>resonance doth occur</strong>—much as how a tuning fork vibrateth when another matching fork be struck in its presence.</p>
+
+          <p><strong>Tertius — Power Conversion:</strong> The receiver coil converteth the magnetic field back into electrical current, which is then regulated to the appropriate voltage for charging the device's repository of power (commonly called a "battery").</p>
+
+          <p><strong>Quartus — Optimization of Efficiency:</strong> Intelligent sensors continuously monitor the coupling efficiency and adjust the transmission of power to minimize waste of energy and prevent excessive heating.</p>
+        </div>
+
+        <div class="cartouche">
+          <p style="text-align: center; margin: 0; font-style: italic;">
+            "As the tuning fork resonateth with its brother,<br>
+            so doth the receiver coil harmonize with the transmitter,<br>
+            and thus is power conveyed through the invisible medium."
+          </p>
+        </div>
+      </div>
+
+      <!-- Colophon (Footer) -->
+      <div class="colophon">
+        <p>
+          Here endeth the First Part of this Illuminated Codex<br>
+          concerning the Mysteries of Wireless Power Transfer
+        </p>
+        <p style="margin-top: 1rem;">
+          Transcribed and Illuminated by the Scribes of IP Scaffold<br>
+          In the Scriptorium of Innovation<br>
+          Anno Domini MMXXV
+        </p>
+        <p style="margin-top: 1rem; color: var(--medieval-gold);">
+          ✤ Laus Deo ✤
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

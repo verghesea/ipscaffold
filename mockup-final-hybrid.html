@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Future Lab + 4-Color Pen Hybrid - Patent Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Hybrid Design System: Future Lab Layout + 4-Color Pen Accents */
+    :root {
+      /* Paper & Grid */
+      --paper: #fefefe;
+      --grid-light: rgba(0, 0, 0, 0.04);
+      --grid-medium: rgba(0, 0, 0, 0.08);
+
+      /* 4-Color Pen Palette */
+      --pen-black: #1f2937;
+      --pen-blue: #2563eb;
+      --pen-red: #dc2626;
+      --pen-green: #059669;
+
+      /* Neutrals */
+      --neutral-900: #0f172a;
+      --neutral-800: #1e293b;
+      --neutral-700: #334155;
+      --neutral-600: #475569;
+      --neutral-500: #64748b;
+      --neutral-400: #94a3b8;
+      --neutral-300: #cbd5e1;
+      --neutral-200: #e2e8f0;
+      --neutral-100: #f1f5f9;
+
+      /* Typography */
+      --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+      /* Grid */
+      --grid-size: 10px;
+      --major-grid: 50px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-primary);
+      background: linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%);
+      color: var(--pen-black);
+      padding: 2rem;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    /* Document Card */
+    .document {
+      background: var(--paper);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 10px 15px rgba(0, 0, 0, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle graph paper background */
+    .document::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, var(--grid-light) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-light) 1px, transparent 1px),
+        linear-gradient(to right, var(--grid-medium) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-medium) 1px, transparent 1px);
+      background-size:
+        var(--grid-size) var(--grid-size),
+        var(--grid-size) var(--grid-size),
+        var(--major-grid) var(--major-grid),
+        var(--major-grid) var(--major-grid);
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* Top accent line (pen-style) */
+    .document::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg,
+        var(--pen-blue) 0%,
+        var(--pen-green) 50%,
+        var(--pen-blue) 100%
+      );
+    }
+
+    /* Content Area */
+    .content {
+      padding: 3rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Document Header */
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 3rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid var(--pen-blue);
+      position: relative;
+    }
+
+    .doc-title-group {
+      flex: 1;
+    }
+
+    .doc-meta-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--pen-blue);
+      margin-bottom: 0.5rem;
+    }
+
+    .doc-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--neutral-900);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+    }
+
+    .doc-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      color: var(--neutral-600);
+    }
+
+    /* Metrics Panel */
+    .metrics-panel {
+      background: white;
+      padding: 1rem;
+      border: 2px solid var(--pen-blue);
+      min-width: 200px;
+    }
+
+    /* Corner marks on metrics panel */
+    .metrics-panel::before,
+    .metrics-panel::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--pen-blue);
+    }
+
+    .metrics-panel::before {
+      top: -2px;
+      right: -2px;
+      border-left: none;
+      border-bottom: none;
+    }
+
+    .metrics-panel::after {
+      bottom: -2px;
+      right: -2px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+    }
+
+    .metric-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .metric-label {
+      color: var(--neutral-600);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      color: var(--pen-blue);
+      font-weight: 700;
+    }
+
+    /* Artifact Badge */
+    .artifact-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      border: 2px solid var(--pen-blue);
+      border-left: 4px solid var(--pen-blue);
+      margin-bottom: 3rem;
+      position: relative;
+      background: white;
+    }
+
+    .artifact-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 2px solid var(--pen-blue);
+      color: var(--pen-blue);
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .artifact-info {
+      position: relative;
+      z-index: 1;
+    }
+
+    .artifact-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--pen-red);
+      margin-bottom: 0.25rem;
+    }
+
+    .artifact-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--neutral-900);
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 4rem;
+      position: relative;
+    }
+
+    /* Image Container */
+    .image-container {
+      position: relative;
+      margin-bottom: 2rem;
+      background: white;
+      border: 2px solid var(--pen-black);
+      padding: 0.5rem;
+    }
+
+    /* Simple corner markers */
+    .corner-mark {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--pen-blue);
+    }
+
+    .corner-mark.tl {
+      top: -2px;
+      left: -2px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .corner-mark.tr {
+      top: -2px;
+      right: -2px;
+      border-left: none;
+      border-bottom: none;
+    }
+
+    .corner-mark.bl {
+      bottom: -2px;
+      left: -2px;
+      border-right: none;
+      border-top: none;
+    }
+
+    .corner-mark.br {
+      bottom: -2px;
+      right: -2px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .section-image {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: white;
+      border: 1px solid var(--neutral-300);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle grid in image area */
+    .section-image::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, var(--grid-light) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-light) 1px, transparent 1px);
+      background-size: 8px 8px;
+      opacity: 0.6;
+    }
+
+    .image-placeholder {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      color: var(--neutral-400);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 2rem;
+    }
+
+    /* Figure Caption */
+    .figure-caption {
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--pen-blue);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .figure-caption::before {
+      content: '▸';
+      color: var(--pen-blue);
+    }
+
+    /* Section Header */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    /* Section Number */
+    .section-number {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--pen-blue);
+      background: white;
+      padding: 0.25rem 0.75rem;
+      border: 2px solid var(--pen-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--neutral-900);
+      letter-spacing: -0.02em;
+      position: relative;
+      flex: 1;
+    }
+
+    /* Simple underline */
+    .section-title::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 40%;
+      height: 2px;
+      background: var(--pen-blue);
+    }
+
+    /* Tags (4-color) */
+    .tags {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid;
+    }
+
+    .tag-blue {
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--pen-blue);
+      border-color: var(--pen-blue);
+    }
+
+    .tag-green {
+      background: rgba(5, 150, 105, 0.08);
+      color: var(--pen-green);
+      border-color: var(--pen-green);
+    }
+
+    .tag-red {
+      background: rgba(220, 38, 38, 0.08);
+      color: var(--pen-red);
+      border-color: var(--pen-red);
+    }
+
+    /* Content Block */
+    .content-block {
+      background: white;
+      padding: 2rem;
+      border-left: 3px solid var(--pen-blue);
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .content-block p {
+      color: var(--neutral-700);
+      margin-bottom: 1rem;
+      line-height: 1.7;
+    }
+
+    .content-block p:last-child {
+      margin-bottom: 0;
+    }
+
+    .content-block strong {
+      color: var(--pen-blue);
+      font-weight: 700;
+    }
+
+    .content-block ul {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .content-block li {
+      color: var(--neutral-700);
+      margin-bottom: 0.5rem;
+    }
+
+    .content-block li::marker {
+      color: var(--pen-blue);
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: rgba(5, 150, 105, 0.05);
+      border: 1px solid var(--pen-green);
+      border-left: 4px solid var(--pen-green);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      position: relative;
+    }
+
+    .highlight-box::before {
+      content: '▸';
+      position: absolute;
+      left: -0.7rem;
+      top: 1.25rem;
+      color: var(--pen-green);
+      background: white;
+      font-size: 0.9rem;
+    }
+
+    .highlight-box strong {
+      color: var(--pen-green);
+    }
+
+    /* Annotation */
+    .annotation {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--pen-red);
+      margin-top: 1rem;
+      padding-left: 1rem;
+      border-left: 2px solid var(--pen-red);
+      font-style: italic;
+    }
+
+    /* Section Divider */
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent,
+        var(--pen-blue) 20%,
+        var(--pen-blue) 80%,
+        transparent
+      );
+      margin: 3rem 0;
+      position: relative;
+    }
+
+    .section-divider::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: var(--pen-blue);
+      border: 2px solid white;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .content {
+        padding: 2rem 1.5rem;
+      }
+
+      .doc-header {
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .metrics-panel {
+        width: 100%;
+      }
+
+      .section-title {
+        font-size: 1.25rem;
+      }
+    }
+
+    /* Subtle animation on load */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .section {
+      animation: fadeInUp 0.6s ease-out;
+      animation-fill-mode: both;
+    }
+
+    .section:nth-child(1) { animation-delay: 0.1s; }
+    .section:nth-child(2) { animation-delay: 0.2s; }
+    .section:nth-child(3) { animation-delay: 0.3s; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="document">
+      <div class="content">
+
+        <!-- Document Header -->
+        <div class="doc-header">
+          <div class="doc-title-group">
+            <div class="doc-meta-label">Patent Analysis</div>
+            <h1 class="doc-title">Wireless Power Transfer System for Consumer Electronics</h1>
+            <div class="doc-subtitle">Filed: 2023-03-15 • Assignee: Tech Innovations Inc.</div>
+          </div>
+
+          <div class="metrics-panel">
+            <div class="metric-row">
+              <span class="metric-label">Doc ID</span>
+              <span class="metric-value">US-2023-0156</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Artifacts</span>
+              <span class="metric-value">3/3</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Status</span>
+              <span class="metric-value">Complete</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Generated</span>
+              <span class="metric-value">2025-01-15</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Artifact Badge -->
+        <div class="artifact-badge">
+          <div class="artifact-icon">01</div>
+          <div class="artifact-info">
+            <div class="artifact-label">Artifact 01 of 03</div>
+            <div class="artifact-title">ELIA15 – Explain Like I'm 15</div>
+          </div>
+        </div>
+
+        <!-- Section 1 -->
+        <div class="section">
+          <div class="image-container">
+            <div class="corner-mark tl"></div>
+            <div class="corner-mark tr"></div>
+            <div class="corner-mark bl"></div>
+            <div class="corner-mark br"></div>
+
+            <div class="section-image">
+              <div class="image-placeholder">
+                [Simple 4-color pen sketch]<br>
+                Tangled cables → Clean wireless coils<br>
+                Quick hand-drawn diagram
+              </div>
+            </div>
+          </div>
+          <div class="figure-caption">Figure 1.1 — Problem visualization: Cable complexity</div>
+
+          <div class="section-header">
+            <div class="section-number">Sec 01</div>
+            <h3 class="section-title">Introduction</h3>
+          </div>
+
+          <div class="tags">
+            <span class="tag tag-blue">Background</span>
+            <span class="tag tag-red">Problem</span>
+          </div>
+
+          <div class="content-block">
+            <p><strong>The Problem: Too Many Cables</strong></p>
+
+            <p>Imagine having a desk cluttered with charging cables for your phone, laptop, smartwatch, and wireless earbuds. Each device needs its own cable, and you're constantly hunting for the right charger. This isn't just annoying—it's a limitation of current technology.</p>
+
+            <div class="highlight-box">
+              <p><strong>Key Challenge:</strong> Traditional charging methods require physical connections between a power source and your device, creating multiple friction points in daily use.</p>
+            </div>
+
+            <p>This creates several problems:</p>
+            <ul>
+              <li>Cable wear and tear leading to frequent replacements</li>
+              <li>Incompatible charging standards across devices</li>
+              <li>Limited mobility while charging</li>
+              <li>Safety hazards from damaged cables</li>
+            </ul>
+
+            <p>What if you could walk into a room and have all your devices charge automatically, without any cables or plugging anything in?</p>
+
+            <div class="annotation">
+              → User pain point clearly defined | Sets up solution narrative
+            </div>
+          </div>
+        </div>
+
+        <!-- Section Divider -->
+        <div class="section-divider"></div>
+
+        <!-- Section 2 -->
+        <div class="section">
+          <div class="image-container">
+            <div class="corner-mark tl"></div>
+            <div class="corner-mark tr"></div>
+            <div class="corner-mark bl"></div>
+            <div class="corner-mark br"></div>
+
+            <div class="section-image">
+              <div class="image-placeholder">
+                [Simple 4-color pen sketch]<br>
+                Two coils with field lines (green)<br>
+                Quick technical diagram
+              </div>
+            </div>
+          </div>
+          <div class="figure-caption">Figure 1.2 — Solution architecture: Resonance coupling</div>
+
+          <div class="section-header">
+            <div class="section-number">Sec 02</div>
+            <h3 class="section-title">The Invention</h3>
+          </div>
+
+          <div class="tags">
+            <span class="tag tag-blue">Core Technology</span>
+            <span class="tag tag-green">Solution</span>
+          </div>
+
+          <div class="content-block">
+            <p><strong>Wireless Power Through Resonance</strong></p>
+
+            <p>This invention introduces a wireless power transfer system that uses electromagnetic resonance to charge multiple devices simultaneously without any physical connection.</p>
+
+            <p>Think of it like a Wi-Fi router for power instead of internet. Just as your phone connects to Wi-Fi automatically when you're in range, this system allows devices to charge automatically when they're within a certain distance of the power transmitter.</p>
+
+            <div class="highlight-box">
+              <p><strong>System Components:</strong></p>
+              <ul style="margin-bottom: 0;">
+                <li><strong>Transmitter Unit:</strong> Base station creating oscillating magnetic field</li>
+                <li><strong>Receiver Coils:</strong> Components embedded in devices to capture energy</li>
+              </ul>
+            </div>
+
+            <div class="annotation">
+              → Effective analogy: Wi-Fi router for power | Accessible to non-technical audience
+            </div>
+          </div>
+        </div>
+
+        <!-- Section Divider -->
+        <div class="section-divider"></div>
+
+        <!-- Section 3 -->
+        <div class="section">
+          <div class="image-container">
+            <div class="corner-mark tl"></div>
+            <div class="corner-mark tr"></div>
+            <div class="corner-mark bl"></div>
+            <div class="corner-mark br"></div>
+
+            <div class="section-image">
+              <div class="image-placeholder">
+                [Simple 4-color pen sketch]<br>
+                Exploded view with assembly arrows (red)<br>
+                Quick component diagram
+              </div>
+            </div>
+          </div>
+          <div class="figure-caption">Figure 1.3 — Technical detail: Component assembly</div>
+
+          <div class="section-header">
+            <div class="section-number">Sec 03</div>
+            <h3 class="section-title">Detailed Functioning</h3>
+          </div>
+
+          <div class="tags">
+            <span class="tag tag-blue">Technical</span>
+            <span class="tag tag-green">Mechanism</span>
+          </div>
+
+          <div class="content-block">
+            <p><strong>How It Actually Works</strong></p>
+
+            <p>The technology operates on the principle of magnetic resonance coupling. Here's the step-by-step process:</p>
+
+            <p><strong>1. Power Transmission</strong><br>
+            The base station generates an alternating current through its coil, creating an oscillating magnetic field at a specific frequency (typically 6.78 MHz, an industry standard).</p>
+
+            <p><strong>2. Resonance Coupling</strong><br>
+            When a device with a receiver coil tuned to the same frequency enters this magnetic field, resonance occurs—like how a tuning fork vibrates when another matching tuning fork is struck nearby.</p>
+
+            <div class="highlight-box">
+              <p><strong>3. Power Conversion</strong><br>
+              The receiver coil converts the magnetic field back into electrical current, which is then regulated to the appropriate voltage for charging the device's battery.</p>
+            </div>
+
+            <p><strong>4. Efficiency Optimization</strong><br>
+            Smart sensors continuously monitor the coupling efficiency and adjust the transmission power to minimize energy waste and prevent overheating.</p>
+
+            <div class="annotation">
+              → Strong analogy: tuning fork resonance | Key differentiator: adaptive power management
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

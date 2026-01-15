@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4-Color Pen Sketch - Patent Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Architects+Daughter&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* 4-Color Pen Sketch Design System */
+    :root {
+      /* Paper */
+      --paper: #ffffff;
+      --grid: rgba(0, 0, 0, 0.06);
+
+      /* 4-Color Pens */
+      --pen-black: #1f2937;
+      --pen-blue: #2563eb;
+      --pen-red: #dc2626;
+      --pen-green: #059669;
+
+      /* Typography */
+      --font-main: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-hand: 'Architects Daughter', cursive;
+
+      --grid-size: 10px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background: #f5f5f5;
+      color: var(--pen-black);
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    /* Page (Graph Paper) */
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--paper);
+      padding: 3rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+
+    /* Light graph paper */
+    .page::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, var(--grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+      background-size: var(--grid-size) var(--grid-size);
+      pointer-events: none;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header - Simple */
+    .header {
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--pen-blue);
+    }
+
+    .doc-id {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--pen-blue);
+      margin-bottom: 0.5rem;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--pen-black);
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+
+    /* Artifact Label - Hand-drawn box */
+    .artifact-label {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      margin-bottom: 2rem;
+      border: 2px solid var(--pen-blue);
+      position: relative;
+    }
+
+    .artifact-num {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--pen-red);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .artifact-name {
+      font-weight: 700;
+      color: var(--pen-blue);
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 3rem;
+    }
+
+    /* Image - Simple border */
+    .image-box {
+      border: 2px solid var(--pen-black);
+      padding: 0.5rem;
+      margin-bottom: 0.75rem;
+      background: white;
+    }
+
+    .image {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed var(--grid);
+      position: relative;
+    }
+
+    /* Very light grid in image */
+    .image::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+      background-size: 10px 10px;
+    }
+
+    .image-placeholder {
+      position: relative;
+      z-index: 1;
+      font-family: var(--font-hand);
+      color: #9ca3af;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    /* Caption - Simple */
+    .caption {
+      font-size: 0.75rem;
+      color: var(--pen-blue);
+      font-family: var(--font-mono);
+    }
+
+    /* Section Header - Simple with pen underline */
+    .section-header {
+      margin-bottom: 1rem;
+    }
+
+    .section-num {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--pen-red);
+      margin-bottom: 0.25rem;
+      font-weight: 700;
+    }
+
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--pen-black);
+      position: relative;
+      display: inline-block;
+      padding-bottom: 0.25rem;
+    }
+
+    /* Hand-drawn underline */
+    .section-title::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--pen-blue);
+    }
+
+    /* Tags - Colored circles */
+    .tags {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tag-blue {
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--pen-blue);
+      border: 1px solid var(--pen-blue);
+    }
+
+    .tag-red {
+      background: rgba(220, 38, 38, 0.1);
+      color: var(--pen-red);
+      border: 1px solid var(--pen-red);
+    }
+
+    .tag-green {
+      background: rgba(5, 150, 105, 0.1);
+      color: var(--pen-green);
+      border: 1px solid var(--pen-green);
+    }
+
+    /* Content - Simple */
+    .text-block {
+      padding-left: 1rem;
+      border-left: 3px solid var(--pen-blue);
+      margin-bottom: 1.5rem;
+    }
+
+    .text-block p {
+      margin-bottom: 1rem;
+      color: var(--pen-black);
+    }
+
+    .text-block p:last-child {
+      margin-bottom: 0;
+    }
+
+    .text-block strong {
+      color: var(--pen-blue);
+      font-weight: 700;
+    }
+
+    .text-block ul {
+      margin: 1rem 0 1rem 1.5rem;
+    }
+
+    .text-block li {
+      margin-bottom: 0.5rem;
+      color: var(--pen-black);
+    }
+
+    .text-block li::marker {
+      color: var(--pen-blue);
+    }
+
+    /* Highlight box - Simple colored box */
+    .highlight-box {
+      padding: 1rem;
+      margin: 1rem 0;
+      border-left: 4px solid var(--pen-green);
+      background: rgba(5, 150, 105, 0.05);
+    }
+
+    .highlight-box p {
+      margin-bottom: 0.5rem;
+    }
+
+    .highlight-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Note - Handwritten style */
+    .note {
+      font-family: var(--font-hand);
+      font-size: 0.85rem;
+      color: var(--pen-red);
+      margin-top: 0.75rem;
+      padding-left: 1rem;
+      border-left: 2px solid var(--pen-red);
+    }
+
+    /* Divider - Simple line */
+    .divider {
+      margin: 2.5rem 0;
+      height: 2px;
+      background: var(--pen-blue);
+      opacity: 0.3;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .page {
+        padding: 2rem 1.5rem;
+      }
+
+      .title {
+        font-size: 1.25rem;
+      }
+
+      .section-title {
+        font-size: 1.1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    <div class="content">
+
+      <!-- Simple Header -->
+      <div class="header">
+        <div class="doc-id">US-2023-0156 • 2025-01-15</div>
+        <h1 class="title">Wireless Power Transfer System for Consumer Electronics</h1>
+        <div class="subtitle">Filed: March 15, 2023</div>
+      </div>
+
+      <!-- Artifact Label -->
+      <div class="artifact-label">
+        <div class="artifact-num">01/03</div>
+        <div class="artifact-name">ELIA15</div>
+      </div>
+
+      <!-- Section 1 -->
+      <div class="section">
+        <!-- Image -->
+        <div class="image-box">
+          <div class="image">
+            <div class="image-placeholder">
+              [Quick pen sketch]<br>
+              Tangled cables → Wireless coils<br>
+              4-color pen drawing
+            </div>
+          </div>
+        </div>
+        <div class="caption">Fig 1.1 — Problem: Cable complexity</div>
+
+        <!-- Header -->
+        <div class="section-header">
+          <div class="section-num">SECTION 01</div>
+          <h3 class="section-title">Introduction</h3>
+        </div>
+
+        <!-- Tags -->
+        <div class="tags">
+          <span class="tag tag-blue">Background</span>
+          <span class="tag tag-red">Problem</span>
+        </div>
+
+        <!-- Content -->
+        <div class="text-block">
+          <p><strong>The Problem: Too Many Cables</strong></p>
+
+          <p>Imagine having a desk cluttered with charging cables for your phone, laptop, smartwatch, and wireless earbuds. Each device needs its own cable, and you're constantly hunting for the right charger.</p>
+
+          <div class="highlight-box">
+            <p><strong>Key Challenge:</strong> Traditional charging methods require physical connections, creating friction in daily use.</p>
+          </div>
+
+          <p>This creates several problems:</p>
+          <ul>
+            <li>Cable wear and tear</li>
+            <li>Incompatible standards</li>
+            <li>Limited mobility while charging</li>
+            <li>Safety hazards from damaged cables</li>
+          </ul>
+
+          <p>What if you could walk into a room and have all your devices charge automatically?</p>
+
+          <div class="note">
+            → User pain point clearly defined
+          </div>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="divider"></div>
+
+      <!-- Section 2 -->
+      <div class="section">
+        <div class="image-box">
+          <div class="image">
+            <div class="image-placeholder">
+              [Quick pen diagram]<br>
+              Transmitter coil ⟷ Receiver coil<br>
+              Field lines between them
+            </div>
+          </div>
+        </div>
+        <div class="caption">Fig 1.2 — Resonance coupling diagram</div>
+
+        <div class="section-header">
+          <div class="section-num">SECTION 02</div>
+          <h3 class="section-title">The Invention</h3>
+        </div>
+
+        <div class="tags">
+          <span class="tag tag-green">Core Tech</span>
+          <span class="tag tag-blue">Solution</span>
+        </div>
+
+        <div class="text-block">
+          <p><strong>Wireless Power Through Resonance</strong></p>
+
+          <p>This invention uses electromagnetic resonance to charge multiple devices simultaneously without physical connection.</p>
+
+          <p>Think of it like a Wi-Fi router for power. Just as your phone connects to Wi-Fi automatically when in range, devices charge automatically near the power transmitter.</p>
+
+          <div class="highlight-box">
+            <p><strong>Two Components:</strong></p>
+            <p><strong>Transmitter:</strong> Creates oscillating magnetic field</p>
+            <p><strong>Receiver:</strong> Captures energy from field</p>
+          </div>
+
+          <div class="note">
+            → "Wi-Fi for power" analogy works well
+          </div>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="divider"></div>
+
+      <!-- Section 3 -->
+      <div class="section">
+        <div class="image-box">
+          <div class="image">
+            <div class="image-placeholder">
+              [Simple exploded view]<br>
+              Coil layers stacked<br>
+              Arrows showing assembly
+            </div>
+          </div>
+        </div>
+        <div class="caption">Fig 1.3 — Component assembly</div>
+
+        <div class="section-header">
+          <div class="section-num">SECTION 03</div>
+          <h3 class="section-title">How It Works</h3>
+        </div>
+
+        <div class="tags">
+          <span class="tag tag-blue">Technical</span>
+          <span class="tag tag-green">Mechanism</span>
+        </div>
+
+        <div class="text-block">
+          <p><strong>Step-by-Step Process</strong></p>
+
+          <p><strong>1. Transmission:</strong> Base creates oscillating magnetic field at 6.78 MHz</p>
+
+          <p><strong>2. Resonance:</strong> Device with tuned receiver enters field, resonance occurs (like tuning forks)</p>
+
+          <div class="highlight-box">
+            <p><strong>3. Conversion:</strong> Receiver converts field to electrical current, regulated for battery charging</p>
+          </div>
+
+          <p><strong>4. Optimization:</strong> Sensors monitor efficiency, adjust power to minimize waste</p>
+
+          <div class="note">
+            → Tuning fork analogy = key insight
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

@@ -46,6 +46,18 @@ export interface CreditTransaction {
   created_at: string;
 }
 
+export interface SectionImage {
+  id: string;
+  artifact_id: string;
+  section_number: number;
+  section_title: string;
+  image_url: string;
+  prompt_used: string;
+  generation_metadata: any | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export class SupabaseStorage {
   async getProfile(userId: string): Promise<Profile | null> {
     const { data, error } = await supabaseAdmin
@@ -353,6 +365,72 @@ export class SupabaseStorage {
     });
 
     return { creditsAwarded: promoCode.credit_amount };
+  }
+
+  // Section Images methods
+  async getSectionImagesByArtifact(artifactId: string): Promise<SectionImage[]> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .select('*')
+      .eq('artifact_id', artifactId)
+      .order('section_number', { ascending: true });
+
+    if (error) return [];
+    return data || [];
+  }
+
+  async getSectionImage(artifactId: string, sectionNumber: number): Promise<SectionImage | null> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .select('*')
+      .eq('artifact_id', artifactId)
+      .eq('section_number', sectionNumber)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  async createSectionImage(sectionImage: Omit<SectionImage, 'id' | 'created_at' | 'updated_at'>): Promise<SectionImage> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .insert(sectionImage)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to create section image: ${error.message}`);
+    return data;
+  }
+
+  async upsertSectionImage(sectionImage: Omit<SectionImage, 'id' | 'created_at' | 'updated_at'>): Promise<SectionImage> {
+    const { data, error } = await supabaseAdmin
+      .from('section_images')
+      .upsert(sectionImage, {
+        onConflict: 'artifact_id,section_number'
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to upsert section image: ${error.message}`);
+    return data;
+  }
+
+  async deleteSectionImage(id: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('section_images')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(`Failed to delete section image: ${error.message}`);
+  }
+
+  async deleteSectionImagesByArtifact(artifactId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('section_images')
+      .delete()
+      .eq('artifact_id', artifactId);
+
+    if (error) throw new Error(`Failed to delete section images: ${error.message}`);
   }
 }
 
