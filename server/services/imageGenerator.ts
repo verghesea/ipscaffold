@@ -6,8 +6,7 @@
 import { getPromptForSection, type ArtifactType } from './dallePrompts';
 
 // NOTE: Requires OpenAI SDK - install with: npm install openai
-// Uncomment when openai is installed:
-// import OpenAI from 'openai';
+import OpenAI from 'openai';
 
 export interface ImageGenerationRequest {
   artifactType: ArtifactType;
@@ -32,8 +31,6 @@ export interface ImageGenerationError {
  * Requires OPENAI_API_KEY environment variable
  */
 function getOpenAIClient() {
-  // Uncomment when openai is installed:
-  /*
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY environment variable is required');
   }
@@ -41,9 +38,6 @@ function getOpenAIClient() {
   return new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
-  */
-
-  throw new Error('OpenAI SDK not installed. Run: npm install openai');
 }
 
 /**
@@ -72,8 +66,6 @@ export async function generateSectionImage(
   try {
     const openai = getOpenAIClient();
 
-    // Uncomment when openai is installed:
-    /*
     const response = await openai.images.generate({
       model: 'dall-e-3',
       prompt,
@@ -91,10 +83,6 @@ export async function generateSectionImage(
       promptUsed: prompt,
       revisedPrompt: response.data[0].revised_prompt,
     };
-    */
-
-    // Temporary placeholder until OpenAI SDK is installed
-    throw new Error('OpenAI SDK not installed. Run: npm install openai');
   } catch (error) {
     console.error(`Error generating image for section ${sectionNumber}:`, error);
     throw new Error(
