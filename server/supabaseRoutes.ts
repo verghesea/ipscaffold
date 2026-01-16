@@ -744,7 +744,7 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Artifact not found' });
       }
 
-      // Parse sections to get the title
+      // Parse sections to get the title and content
       const { parseMarkdownSections } = await import('./services/sectionParser');
       const sections = parseMarkdownSections(artifact.content);
       const section = sections.find(s => s.number === parseInt(sectionNumber));
@@ -753,13 +753,14 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Section not found' });
       }
 
-      // Generate single image
+      // Generate single image with section content for Claude analysis
       const { generateSingleSectionImage } = await import('./services/artifactImageService');
       const sectionImage = await generateSingleSectionImage({
         artifactId,
         artifactType: artifact.artifact_type as 'elia15' | 'business_narrative' | 'golden_circle',
         sectionNumber: parseInt(sectionNumber),
         sectionTitle: section.title,
+        sectionContent: section.content, // Pass content for patent-specific prompts
       });
 
       res.json(sectionImage);

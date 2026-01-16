@@ -29,6 +29,7 @@ export interface GenerateSingleImageRequest {
   artifactType: ArtifactType;
   sectionNumber: number;
   sectionTitle: string;
+  sectionContent: string; // ADD: Section content for Claude analysis
 }
 
 /**
@@ -73,11 +74,12 @@ export async function generateArtifactImages(
     try {
       console.log(`Generating image for section ${section.number}: ${section.title}`);
 
-      // Generate image via DALL-E
+      // Generate image via DALL-E with patent-specific content
       const imageResult = await generateSectionImage({
         artifactType,
         sectionNumber: section.number,
         sectionTitle: section.title,
+        sectionContent: section.content, // Pass actual section content for Claude analysis
       });
 
       // Upload to Supabase Storage
@@ -132,15 +134,16 @@ export async function generateArtifactImages(
 export async function generateSingleSectionImage(
   request: GenerateSingleImageRequest
 ): Promise<SectionImage> {
-  const { artifactId, artifactType, sectionNumber, sectionTitle } = request;
+  const { artifactId, artifactType, sectionNumber, sectionTitle, sectionContent } = request;
 
   console.log(`Generating image for section ${sectionNumber}: ${sectionTitle}`);
 
-  // Generate image via DALL-E
+  // Generate image via DALL-E with patent-specific content
   const imageResult = await generateSectionImage({
     artifactType,
     sectionNumber,
     sectionTitle,
+    sectionContent, // Pass actual section content for Claude analysis
   });
 
   // Upload to Supabase Storage

@@ -1,9 +1,11 @@
 /**
  * Image Generator - DALL-E 3 integration for section images
  * Generates simple 4-color pen sketch style images
+ * Uses Claude to create patent-specific prompts
  */
 
 import { getPromptForSection, type ArtifactType } from './dallePrompts';
+import { generateImagePrompt } from './imagePromptGenerator';
 
 // NOTE: Requires OpenAI SDK - install with: npm install openai
 import OpenAI from 'openai';
@@ -12,6 +14,7 @@ export interface ImageGenerationRequest {
   artifactType: ArtifactType;
   sectionNumber: number;
   sectionTitle: string;
+  sectionContent: string; // ADD: Actual section content for Claude to analyze
 }
 
 export interface ImageGenerationResult {
@@ -52,16 +55,24 @@ function getOpenAIClient() {
 export async function generateSectionImage(
   request: ImageGenerationRequest
 ): Promise<ImageGenerationResult> {
-  const { artifactType, sectionNumber, sectionTitle } = request;
+  const { artifactType, sectionNumber, sectionTitle, sectionContent } = request;
 
-  // Get the prompt for this section
-  const prompt = getPromptForSection(artifactType, sectionNumber);
+  // Generate patent-specific prompt using Claude
+  console.log(`[ImageGenerator] Generating custom prompt for ${artifactType} section ${sectionNumber}...`);
+  const prompt = await generateImagePrompt({
+    artifactType,
+    sectionNumber,
+    sectionTitle,
+    sectionContent,
+  });
 
   if (!prompt) {
     throw new Error(
-      `No prompt found for ${artifactType} section ${sectionNumber}`
+      `Failed to generate prompt for ${artifactType} section ${sectionNumber}`
     );
   }
+
+  console.log(`[ImageGenerator] Using prompt: ${prompt.substring(0, 100)}...`);
 
   try {
     const openai = getOpenAIClient();
