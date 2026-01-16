@@ -661,6 +661,10 @@ export async function registerRoutes(
 
   // Generate images for all sections in an artifact
   app.post('/api/images/generate/:artifactId', async (req, res) => {
+    // Extend timeout for image generation (DALL-E can take 30-60+ seconds per image)
+    req.setTimeout(5 * 60 * 1000); // 5 minutes
+    res.setTimeout(5 * 60 * 1000);
+
     try {
       const { artifactId } = req.params;
 
@@ -722,6 +726,10 @@ export async function registerRoutes(
 
   // Regenerate a single section image
   app.post('/api/images/regenerate/:artifactId/:sectionNumber', async (req, res) => {
+    // Extend timeout for image generation (DALL-E can take 30-60+ seconds)
+    req.setTimeout(2 * 60 * 1000); // 2 minutes
+    res.setTimeout(2 * 60 * 1000);
+
     try {
       const { artifactId, sectionNumber } = req.params;
 

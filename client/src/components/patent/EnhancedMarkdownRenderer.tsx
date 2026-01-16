@@ -136,6 +136,11 @@ export function EnhancedMarkdownRenderer({
                 sectionNumber={section.number}
                 sectionTitle={section.title}
                 loading={isGenerating}
+                onGenerate={
+                  onRegenerateImage && !isGenerating
+                    ? () => onRegenerateImage(section.number)
+                    : undefined
+                }
               />
             )}
 
