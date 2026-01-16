@@ -47,7 +47,7 @@ function getOpenAIClient() {
  * @returns Image URL and prompts
  * @throws Error if generation fails
  *
- * Cost: ~$0.08 per HD image (1792x1024)
+ * Cost: ~$0.04 per standard quality image (1792x1024)
  */
 export async function generateSectionImage(
   request: ImageGenerationRequest
@@ -69,8 +69,8 @@ export async function generateSectionImage(
     const response = await openai.images.generate({
       model: 'dall-e-3',
       prompt,
-      size: '1792x1024', // 16:9 HD aspect ratio
-      quality: 'hd',
+      size: '1792x1024', // 16:9 aspect ratio
+      quality: 'standard', // Standard quality - $0.04/image (vs HD $0.08/image)
       n: 1,
     });
 
@@ -123,13 +123,13 @@ export async function generateBatchImages(
 /**
  * Estimates cost for generating images
  *
- * DALL-E 3 HD (1792x1024): $0.08 per image
+ * DALL-E 3 Standard (1792x1024): $0.04 per image
  */
 export function estimateImageGenerationCost(imageCount: number): {
   costUSD: number;
   breakdown: string;
 } {
-  const costPerImage = 0.08;
+  const costPerImage = 0.04;
   const totalCost = imageCount * costPerImage;
 
   return {
