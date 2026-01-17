@@ -9,7 +9,7 @@
  * Prompts are stored in the database (system_prompts table) instead of hardcoded.
  */
 
-import { supabaseAdmin } from '../supabase';
+import { supabaseAdmin } from '../lib/supabase';
 
 export interface SystemPrompt {
   id: string;

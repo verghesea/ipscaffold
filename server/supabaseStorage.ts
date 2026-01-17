@@ -487,29 +487,6 @@ export class SupabaseStorage {
 
     if (error) throw new Error(`Failed to update friendly title: ${error.message}`);
   }
-
-  // Get patent with friendly title
-  async getPatent(patentId: string): Promise<Patent | null> {
-    const { data, error } = await supabaseAdmin
-      .from('patents')
-      .select('*')
-      .eq('id', patentId)
-      .single();
-
-    if (error) return null;
-    return data;
-  }
-
-  // Get all patents (for backfill scripts)
-  async getAllPatents(): Promise<Patent[]> {
-    const { data, error } = await supabaseAdmin
-      .from('patents')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) return [];
-    return data || [];
-  }
 }
 
 export const supabaseStorage = new SupabaseStorage();
