@@ -5,13 +5,16 @@
  */
 
 import { useState } from 'react';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SectionImage as SectionImageType } from '@/lib/api';
+import { PromptDetailsModal } from './PromptDetailsModal';
 
 interface SectionImageProps {
   image: SectionImageType;
   onRegenerate?: () => Promise<void>;
+  onPromptUpdate?: (newPrompt: string) => Promise<void>;
+  isAdmin?: boolean;
   className?: string;
 }
 
@@ -34,9 +37,10 @@ function CornerMark({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
   );
 }
 
-export function SectionImage({ image, onRegenerate, className }: SectionImageProps) {
+export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = false, className }: SectionImageProps) {
   const [regenerating, setRegenerating] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [showPromptModal, setShowPromptModal] = useState(false);
 
   const handleRegenerate = async () => {
     if (!onRegenerate || regenerating) return;
@@ -47,6 +51,21 @@ export function SectionImage({ image, onRegenerate, className }: SectionImagePro
       setImageError(false);
     } catch (error) {
       console.error('Error regenerating image:', error);
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handlePromptUpdate = async (newPrompt: string) => {
+    if (!onPromptUpdate) return;
+
+    setRegenerating(true);
+    try {
+      await onPromptUpdate(newPrompt);
+      setImageError(false);
+    } catch (error) {
+      console.error('Error updating prompt:', error);
+      throw error;
     } finally {
       setRegenerating(false);
     }
@@ -89,28 +108,46 @@ export function SectionImage({ image, onRegenerate, className }: SectionImagePro
             />
           )}
 
-          {/* Regenerate button (hover) */}
-          {onRegenerate && (
-            <button
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className={cn(
-                'absolute top-2 right-2 p-2 bg-white/90 border border-[#2563eb]',
-                'text-[#2563eb] rounded opacity-0 group-hover:opacity-100',
-                'transition-opacity duration-200 hover:bg-[#2563eb] hover:text-white',
-                'disabled:opacity-50 disabled:cursor-not-allowed z-20',
-                'focus:outline-none focus:ring-2 focus:ring-[#2563eb]'
-              )}
-              title="Regenerate image"
-              aria-label="Regenerate image"
-            >
-              {regenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-            </button>
-          )}
+          {/* Action buttons (hover) */}
+          <div className="absolute top-2 right-2 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {/* Info button (admin only) */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowPromptModal(true)}
+                className={cn(
+                  'p-2 bg-white/90 border border-[#2563eb]',
+                  'text-[#2563eb] rounded hover:bg-[#2563eb] hover:text-white',
+                  'transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563eb]'
+                )}
+                title="View prompt details"
+                aria-label="View prompt details"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Regenerate button */}
+            {onRegenerate && (
+              <button
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className={cn(
+                  'p-2 bg-white/90 border border-[#2563eb]',
+                  'text-[#2563eb] rounded hover:bg-[#2563eb] hover:text-white',
+                  'transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+                  'focus:outline-none focus:ring-2 focus:ring-[#2563eb]'
+                )}
+                title="Regenerate image"
+                aria-label="Regenerate image"
+              >
+                {regenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -121,6 +158,17 @@ export function SectionImage({ image, onRegenerate, className }: SectionImagePro
           Fig {image.section_number} — {image.section_title}
         </span>
       </div>
+
+      {/* Prompt Details Modal (admin only) */}
+      {isAdmin && (
+        <PromptDetailsModal
+          image={image}
+          open={showPromptModal}
+          onOpenChange={setShowPromptModal}
+          onPromptUpdate={onPromptUpdate}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }

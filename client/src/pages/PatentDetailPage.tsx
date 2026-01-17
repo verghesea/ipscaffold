@@ -5,10 +5,12 @@ import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loade
 import { analytics } from '@/lib/analytics';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { EnhancedMarkdownRenderer } from '@/components/patent/EnhancedMarkdownRenderer';
 import { ArtifactHeader } from '@/components/patent/ArtifactHeader';
 import { useSectionImages } from '@/hooks/useSectionImages';
@@ -56,6 +58,7 @@ export function PatentDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('elia15');
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   // Get current artifact based on active tab
   const currentArtifact = artifacts.find(a => a.type === activeTab);
@@ -158,6 +161,25 @@ export function PatentDetailPage() {
     }
   };
 
+  const handleUpdateImagePrompt = async (imageId: string, newPrompt: string) => {
+    try {
+      const updatedImage = await api.updateImagePrompt(imageId, newPrompt);
+      toast({ title: 'Image regenerated with new prompt' });
+      // Refresh images to show the updated image
+      if (currentArtifact?.id) {
+        // Force a refresh of images
+        window.location.reload();
+      }
+    } catch (error) {
+      toast({
+        title: 'Update failed',
+        description: 'Failed to regenerate image with new prompt',
+        variant: 'destructive'
+      });
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -205,9 +227,24 @@ export function PatentDetailPage() {
               <Card className="sticky top-24">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
-                    <CardTitle className="font-display text-xl leading-tight" data-testid="text-patent-title">
-                      {patent.title || 'Untitled Patent'}
-                    </CardTitle>
+                    {patent.friendlyTitle ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <CardTitle className="font-display text-xl leading-tight cursor-help" data-testid="text-patent-title">
+                              {patent.friendlyTitle}
+                            </CardTitle>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-md">
+                            <p className="text-xs font-mono">{patent.title}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <CardTitle className="font-display text-xl leading-tight" data-testid="text-patent-title">
+                        {patent.title || 'Untitled Patent'}
+                      </CardTitle>
+                    )}
                     {getStatusBadge(patent.status)}
                   </div>
                 </CardHeader>
@@ -345,6 +382,8 @@ export function PatentDetailPage() {
                                   images={images}
                                   generating={generating}
                                   onRegenerateImage={handleRegenerateImage}
+                                  onUpdateImagePrompt={handleUpdateImagePrompt}
+                                  isAdmin={profile?.is_admin || false}
                                 />
                               </>
                             ) : (

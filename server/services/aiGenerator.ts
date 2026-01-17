@@ -52,13 +52,17 @@ Format your response with clear sections for WHY, HOW, and WHAT. Each section sh
 
 export async function generateELIA15(fullText: string, title: string): Promise<AIGenerationResult> {
   const startTime = Date.now();
-  
+
+  // Get system prompt from database (with fallback to hardcoded)
+  const { getSystemPromptWithFallback } = await import('./SystemPromptService');
+  const systemPrompt = await getSystemPromptWithFallback('elia15');
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4000,
     messages: [{
       role: 'user',
-      content: `${ELIA15_PROMPT}\n\nPatent Title: ${title}\n\nPatent Full Text:\n${fullText.substring(0, 100000)}`
+      content: `${systemPrompt}\n\nPatent Title: ${title}\n\nPatent Full Text:\n${fullText.substring(0, 100000)}`
     }]
   });
   
@@ -74,13 +78,17 @@ export async function generateELIA15(fullText: string, title: string): Promise<A
 
 export async function generateBusinessNarrative(fullText: string, elia15Content: string): Promise<AIGenerationResult> {
   const startTime = Date.now();
-  
+
+  // Get system prompt from database (with fallback to hardcoded)
+  const { getSystemPromptWithFallback } = await import('./SystemPromptService');
+  const systemPrompt = await getSystemPromptWithFallback('business_narrative');
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 5000,
     messages: [{
       role: 'user',
-      content: `${BUSINESS_NARRATIVE_PROMPT}\n\nYou have already created this simplified explanation (ELIA15):\n${elia15Content}\n\nHere is the full patent text:\n${fullText.substring(0, 80000)}\n\nUse the ELIA15 to understand the technology clearly, then create a compelling business narrative that would resonate with investors, partners, and potential licensees.`
+      content: `${systemPrompt}\n\nYou have already created this simplified explanation (ELIA15):\n${elia15Content}\n\nHere is the full patent text:\n${fullText.substring(0, 80000)}\n\nUse the ELIA15 to understand the technology clearly, then create a compelling business narrative that would resonate with investors, partners, and potential licensees.`
     }]
   });
   
@@ -96,13 +104,17 @@ export async function generateBusinessNarrative(fullText: string, elia15Content:
 
 export async function generateGoldenCircle(elia15Content: string, businessNarrativeContent: string): Promise<AIGenerationResult> {
   const startTime = Date.now();
-  
+
+  // Get system prompt from database (with fallback to hardcoded)
+  const { getSystemPromptWithFallback } = await import('./SystemPromptService');
+  const systemPrompt = await getSystemPromptWithFallback('golden_circle');
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 3000,
     messages: [{
       role: 'user',
-      content: `${GOLDEN_CIRCLE_PROMPT}\n\nContext:\n- ELIA15 explanation:\n${elia15Content}\n\n- Business Narrative:\n${businessNarrativeContent}`
+      content: `${systemPrompt}\n\nContext:\n- ELIA15 explanation:\n${elia15Content}\n\n- Business Narrative:\n${businessNarrativeContent}`
     }]
   });
   

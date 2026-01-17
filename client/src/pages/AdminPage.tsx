@@ -9,9 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { getAuthHeaders } from '@/lib/api';
-import { Users, FileText, CreditCard, TrendingUp, Shield, ArrowLeft, Gift, Plus, Loader2 } from 'lucide-react';
+import { Users, FileText, CreditCard, TrendingUp, Shield, ArrowLeft, Gift, Plus, Loader2, Settings } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { SystemPromptManager } from '@/components/patent/SystemPromptManager';
 
 interface SystemMetrics {
   total_users: number;
@@ -313,6 +314,7 @@ export default function AdminPage() {
             <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             <TabsTrigger value="patents" data-testid="tab-patents">Patents</TabsTrigger>
             <TabsTrigger value="promo-codes" data-testid="tab-promo-codes">Promo Codes</TabsTrigger>
+            <TabsTrigger value="system-prompts" data-testid="tab-system-prompts">System Prompts</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -598,6 +600,10 @@ export default function AdminPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="system-prompts" className="mt-6">
+            <SystemPromptManager />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">

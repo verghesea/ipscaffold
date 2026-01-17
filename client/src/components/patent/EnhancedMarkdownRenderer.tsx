@@ -16,6 +16,8 @@ interface EnhancedMarkdownRendererProps {
   images: SectionImageType[];
   generating: boolean;
   onRegenerateImage?: (sectionNumber: number) => Promise<void>;
+  onUpdateImagePrompt?: (imageId: string, newPrompt: string) => Promise<void>;
+  isAdmin?: boolean;
   className?: string;
 }
 
@@ -102,6 +104,8 @@ export function EnhancedMarkdownRenderer({
   images,
   generating,
   onRegenerateImage,
+  onUpdateImagePrompt,
+  isAdmin = false,
   className,
 }: EnhancedMarkdownRendererProps) {
   const sections = useMemo(() => parseMarkdownSections(content), [content]);
@@ -130,6 +134,12 @@ export function EnhancedMarkdownRenderer({
                     ? () => onRegenerateImage(section.number)
                     : undefined
                 }
+                onPromptUpdate={
+                  onUpdateImagePrompt
+                    ? (newPrompt) => onUpdateImagePrompt(image.id, newPrompt)
+                    : undefined
+                }
+                isAdmin={isAdmin}
               />
             ) : (
               <ImagePlaceholder

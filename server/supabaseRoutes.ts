@@ -119,6 +119,21 @@ export async function registerRoutes(
           generation_time_seconds: elia15Result.generationTimeSeconds,
         });
 
+        // Generate friendly title from ELIA15
+        try {
+          const { generateFriendlyTitle, extractELIA15Introduction } = await import('./services/titleGenerator');
+          const introduction = extractELIA15Introduction(elia15Result.content);
+          const friendlyTitle = await generateFriendlyTitle({
+            patentTitle: parsedPatent.title || 'Untitled Patent',
+            elia15Introduction: introduction,
+          });
+          await supabaseStorage.updatePatentFriendlyTitle(patent.id, friendlyTitle);
+          console.log(`✓ Generated friendly title: "${friendlyTitle}"`);
+        } catch (error) {
+          console.error('Failed to generate friendly title:', error);
+          // Don't fail the upload if title generation fails
+        }
+
         await supabaseStorage.updatePatentStatus(patent.id, 'elia15_complete');
 
         res.json({ 
@@ -794,6 +809,196 @@ export async function registerRoutes(
     }
   });
 
+  // Hero Image Routes
+
+  // Get hero image for a patent
+  app.get('/api/patent/:patentId/hero-image', async (req, res) => {
+    try {
+      const { patentId} = req.params;
+      const heroImage = await supabaseStorage.getPatentHeroImage(patentId);
+
+      if (!heroImage) {
+        return res.status(404).json({ error: 'Hero image not found' });
+      }
+
+      res.json(heroImage);
+    } catch (error) {
+      console.error('Error fetching hero image:', error);
+      res.status(500).json({ error: 'Failed to fetch hero image' });
+    }
+  });
+
+  // Generate hero image for a patent
+  app.post('/api/patent/:patentId/hero-image', async (req, res) => {
+    req.setTimeout(2 * 60 * 1000);
+    res.setTimeout(2 * 60 * 1000);
+
+    try {
+      const { patentId } = req.params;
+
+      // Get patent and ELIA15
+      const patent = await supabaseStorage.getPatent(patentId);
+      const artifacts = await supabaseStorage.getArtifactsByPatent(patentId);
+      const elia15 = artifacts.find(a => a.artifact_type === 'elia15');
+
+      if (!patent || !elia15) {
+        return res.status(404).json({ error: 'Patent or ELIA15 not found' });
+      }
+
+      const { generatePatentHeroImage } = await import('./services/patentHeroImageService');
+      const heroImageResult = await generatePatentHeroImage({
+        patentId,
+        elia15Content: elia15.content,
+        patentTitle: patent.title || 'Untitled Patent',
+        friendlyTitle: patent.friendly_title || undefined,
+      });
+
+      // Save to database
+      const heroImage = await supabaseStorage.upsertPatentHeroImage({
+        patent_id: patentId,
+        image_url: heroImageResult.imageUrl,
+        prompt_used: heroImageResult.promptUsed,
+        generation_metadata: {
+          model: 'dall-e-3',
+          size: '1024x1024',
+          quality: 'standard',
+          revisedPrompt: heroImageResult.revisedPrompt,
+          costUSD: heroImageResult.costUSD,
+          generationTimeSeconds: heroImageResult.generationTimeSeconds,
+        },
+      });
+
+      res.json(heroImage);
+    } catch (error) {
+      console.error('Error generating hero image:', error);
+      res.status(500).json({ error: 'Failed to generate hero image' });
+    }
+  });
+
+  // Friendly Title Routes
+
+  // Update patent friendly title
+  app.put('/api/patent/:patentId/friendly-title', requireAuth, async (req, res) => {
+    try {
+      const { patentId } = req.params;
+      const { friendlyTitle } = req.body;
+
+      // Validate
+      if (!friendlyTitle || friendlyTitle.length > 60) {
+        return res.status(400).json({ error: 'Title must be 1-60 characters' });
+      }
+
+      // Check ownership
+      const patent = await supabaseStorage.getPatent(patentId);
+      if (!patent || patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      await supabaseStorage.updatePatentFriendlyTitle(patentId, friendlyTitle);
+      res.json({ success: true, friendlyTitle });
+    } catch (error) {
+      console.error('Error updating friendly title:', error);
+      res.status(500).json({ error: 'Failed to update title' });
+    }
+  });
+
+  // System Prompt Routes (Super Admin Only)
+
+  // Get all active system prompts
+  app.get('/api/admin/system-prompts', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { getAllActivePrompts } = await import('./services/SystemPromptService');
+      const prompts = await getAllActivePrompts();
+      res.json(prompts);
+    } catch (error) {
+      console.error('Error fetching system prompts:', error);
+      res.status(500).json({ error: 'Failed to fetch system prompts' });
+    }
+  });
+
+  // Get all versions of a specific prompt type
+  app.get('/api/admin/system-prompts/:promptType/versions', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { promptType } = req.params;
+      const { getAllPromptVersions } = await import('./services/SystemPromptService');
+      const versions = await getAllPromptVersions(promptType as any);
+      res.json(versions);
+    } catch (error) {
+      console.error('Error fetching prompt versions:', error);
+      res.status(500).json({ error: 'Failed to fetch versions' });
+    }
+  });
+
+  // Update a system prompt (creates new version)
+  app.put('/api/admin/system-prompts/:promptType', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { promptType } = req.params;
+      const { systemPrompt, notes } = req.body;
+
+      if (!systemPrompt) {
+        return res.status(400).json({ error: 'System prompt is required' });
+      }
+
+      const { updateSystemPrompt } = await import('./services/SystemPromptService');
+      const updated = await updateSystemPrompt(
+        promptType as any,
+        systemPrompt,
+        req.user!.id,
+        notes
+      );
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating system prompt:', error);
+      res.status(500).json({ error: 'Failed to update prompt' });
+    }
+  });
+
+  // Rollback to a previous version
+  app.post('/api/admin/system-prompts/rollback', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { promptType, versionId } = req.body;
+
+      if (!promptType || !versionId) {
+        return res.status(400).json({ error: 'promptType and versionId are required' });
+      }
+
+      const { rollbackToVersion } = await import('./services/SystemPromptService');
+      const rolled = await rollbackToVersion(promptType, versionId);
+
+      res.json(rolled);
+    } catch (error) {
+      console.error('Error rolling back prompt:', error);
+      res.status(500).json({ error: 'Failed to rollback' });
+    }
+  });
+
+  // Update section image prompt (for editing individual image prompts)
+  app.put('/api/images/:imageId/prompt', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { imageId } = req.params;
+      const { promptUsed } = req.body;
+
+      if (!promptUsed) {
+        return res.status(400).json({ error: 'Prompt is required' });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('section_images')
+        .update({ prompt_used: promptUsed })
+        .eq('id', imageId);
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating image prompt:', error);
+      res.status(500).json({ error: 'Failed to update prompt' });
+    }
+  });
+
   return httpServer;
 }
 
@@ -864,7 +1069,38 @@ async function generateRemainingArtifactsWithNotifications(
 
     await supabaseStorage.updatePatentStatus(patentId, 'completed');
     console.log('All artifacts generated for patent:', patentId);
-    
+
+    // Generate hero image for dashboard
+    try {
+      const patent = await supabaseStorage.getPatent(patentId);
+      const { generatePatentHeroImage } = await import('./services/patentHeroImageService');
+      const heroImageResult = await generatePatentHeroImage({
+        patentId,
+        elia15Content,
+        patentTitle: patentTitle || 'Untitled Patent',
+        friendlyTitle: patent?.friendly_title || undefined,
+      });
+
+      await supabaseStorage.upsertPatentHeroImage({
+        patent_id: patentId,
+        image_url: heroImageResult.imageUrl,
+        prompt_used: heroImageResult.promptUsed,
+        generation_metadata: {
+          model: 'dall-e-3',
+          size: '1024x1024',
+          quality: 'standard',
+          revisedPrompt: heroImageResult.revisedPrompt,
+          costUSD: heroImageResult.costUSD,
+          generationTimeSeconds: heroImageResult.generationTimeSeconds,
+        },
+      });
+
+      console.log('✓ Generated hero image for patent', patentId);
+    } catch (error) {
+      console.error('Failed to generate hero image:', error);
+      // Don't fail the whole process if hero image fails
+    }
+
     await NotificationService.sendPatentReady(userId, patentId, patentTitle);
 
   } catch (error) {

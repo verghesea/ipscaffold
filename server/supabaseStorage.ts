@@ -13,6 +13,7 @@ export interface Patent {
   id: string;
   user_id: string | null;
   title: string | null;
+  friendly_title?: string | null;
   inventors: string | null;
   assignee: string | null;
   filing_date: string | null;
@@ -44,6 +45,16 @@ export interface CreditTransaction {
   description: string | null;
   patent_id: string | null;
   created_at: string;
+}
+
+export interface PatentHeroImage {
+  id: string;
+  patent_id: string;
+  image_url: string;
+  prompt_used: string;
+  generation_metadata: any | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SectionImage {
@@ -431,6 +442,73 @@ export class SupabaseStorage {
       .eq('artifact_id', artifactId);
 
     if (error) throw new Error(`Failed to delete section images: ${error.message}`);
+  }
+
+  // Patent Hero Image methods
+  async getPatentHeroImage(patentId: string): Promise<PatentHeroImage | null> {
+    const { data, error } = await supabaseAdmin
+      .from('patent_hero_images')
+      .select('*')
+      .eq('patent_id', patentId)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  async upsertPatentHeroImage(
+    heroImage: Omit<PatentHeroImage, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<PatentHeroImage> {
+    const { data, error } = await supabaseAdmin
+      .from('patent_hero_images')
+      .upsert(heroImage, { onConflict: 'patent_id' })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to save hero image: ${error.message}`);
+    return data;
+  }
+
+  async deletePatentHeroImage(patentId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('patent_hero_images')
+      .delete()
+      .eq('patent_id', patentId);
+
+    if (error) throw new Error(`Failed to delete hero image: ${error.message}`);
+  }
+
+  // Patent Title methods
+  async updatePatentFriendlyTitle(patentId: string, friendlyTitle: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('patents')
+      .update({ friendly_title: friendlyTitle })
+      .eq('id', patentId);
+
+    if (error) throw new Error(`Failed to update friendly title: ${error.message}`);
+  }
+
+  // Get patent with friendly title
+  async getPatent(patentId: string): Promise<Patent | null> {
+    const { data, error } = await supabaseAdmin
+      .from('patents')
+      .select('*')
+      .eq('id', patentId)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  // Get all patents (for backfill scripts)
+  async getAllPatents(): Promise<Patent[]> {
+    const { data, error } = await supabaseAdmin
+      .from('patents')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return data || [];
   }
 }
 

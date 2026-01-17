@@ -1,6 +1,7 @@
 export interface Patent {
   id: string;
   title: string;
+  friendlyTitle?: string | null;
   assignee: string | null;
   filingDate: string | null;
   status: string;
@@ -40,6 +41,36 @@ export interface GenerateImagesResult {
     costUSD: number;
     breakdown: string;
   };
+}
+
+export interface PatentHeroImage {
+  id: string;
+  patent_id: string;
+  image_url: string;
+  prompt_used: string;
+  generation_metadata: {
+    model: string;
+    size: string;
+    quality: string;
+    revised_prompt?: string;
+    cost_usd: number;
+    generation_time_seconds: number;
+  } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SystemPrompt {
+  id: string;
+  prompt_type: 'elia15' | 'business_narrative' | 'golden_circle';
+  system_prompt: string;
+  user_prompt_template?: string;
+  version: number;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  notes?: string;
 }
 
 export interface User {
@@ -259,5 +290,155 @@ export const api = {
     if (!response.ok) {
       throw new Error('Failed to delete image');
     }
+  },
+
+  async updateImagePrompt(
+    imageId: string,
+    newPrompt: string
+  ): Promise<SectionImage> {
+    const response = await fetch(`/api/images/${imageId}/prompt`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ newPrompt }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update image prompt');
+    }
+
+    return response.json();
+  },
+
+  // Hero image methods
+  async getPatentHeroImage(patentId: string): Promise<PatentHeroImage | null> {
+    const response = await fetch(`/api/patent/${patentId}/hero-image`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error('Failed to load hero image');
+    }
+
+    return response.json();
+  },
+
+  async generatePatentHeroImage(patentId: string): Promise<PatentHeroImage> {
+    const response = await fetch(`/api/patent/${patentId}/hero-image`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate hero image');
+    }
+
+    return response.json();
+  },
+
+  // Friendly title methods
+  async updatePatentFriendlyTitle(
+    patentId: string,
+    friendlyTitle: string
+  ): Promise<void> {
+    const response = await fetch(`/api/patent/${patentId}/friendly-title`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ friendlyTitle }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update friendly title');
+    }
+  },
+
+  // System prompt methods (super admin only)
+  async getAllSystemPrompts(): Promise<SystemPrompt[]> {
+    const response = await fetch('/api/admin/system-prompts', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to load system prompts');
+    }
+
+    return response.json();
+  },
+
+  async getSystemPromptVersions(
+    promptType: 'elia15' | 'business_narrative' | 'golden_circle'
+  ): Promise<SystemPrompt[]> {
+    const response = await fetch(
+      `/api/admin/system-prompts/${promptType}/versions`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to load prompt versions');
+    }
+
+    return response.json();
+  },
+
+  async updateSystemPrompt(
+    promptType: 'elia15' | 'business_narrative' | 'golden_circle',
+    newPrompt: string,
+    notes?: string
+  ): Promise<SystemPrompt> {
+    const response = await fetch(`/api/admin/system-prompts/${promptType}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ newPrompt, notes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update system prompt');
+    }
+
+    return response.json();
+  },
+
+  async rollbackSystemPrompt(
+    promptType: 'elia15' | 'business_narrative' | 'golden_circle',
+    versionId: string
+  ): Promise<SystemPrompt> {
+    const response = await fetch('/api/admin/system-prompts/rollback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ promptType, versionId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to rollback system prompt');
+    }
+
+    return response.json();
   },
 };

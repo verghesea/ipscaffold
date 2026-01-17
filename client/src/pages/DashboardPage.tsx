@@ -18,6 +18,7 @@ import { analytics } from '@/lib/analytics';
 export function DashboardPage() {
   const [, setLocation] = useLocation();
   const [patents, setPatents] = useState<Patent[]>([]);
+  const [heroImages, setHeroImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -35,6 +36,26 @@ export function DashboardPage() {
     try {
       const data = await api.getDashboard();
       setPatents(data.patents);
+
+      // Fetch hero images for all completed patents
+      const imagePromises = data.patents
+        .filter(p => p.status === 'completed')
+        .map(async (patent) => {
+          try {
+            const heroImage = await api.getPatentHeroImage(patent.id);
+            return { patentId: patent.id, imageUrl: heroImage?.image_url };
+          } catch (error) {
+            return { patentId: patent.id, imageUrl: null };
+          }
+        });
+
+      const images = await Promise.all(imagePromises);
+      const imageMap = images.reduce((acc, { patentId, imageUrl }) => {
+        if (imageUrl) acc[patentId] = imageUrl;
+        return acc;
+      }, {} as Record<string, string>);
+
+      setHeroImages(imageMap);
     } catch (error) {
       toast({
         title: 'Error',
@@ -275,6 +296,7 @@ export function DashboardPage() {
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {patents.map((patent) => {
+                    const heroImage = heroImages[patent.id];
                     const avatarSvg = createAvatar(shapes, {
                       seed: patent.id,
                       backgroundColor: ['b6e3f4', 'c0aede', 'd1d4f9', 'ffd5dc', 'ffdfbf'],
@@ -287,14 +309,25 @@ export function DashboardPage() {
                         onClick={() => setLocation(`/patent/${patent.id}`)}
                         data-testid={`card-patent-${patent.id}`}
                       >
-                        <div className="h-48 relative bg-gradient-to-br from-primary/10 to-primary/5">
-                          <div
-                            className="w-full h-full opacity-30 group-hover:opacity-40 transition"
-                            dangerouslySetInnerHTML={{ __html: avatarSvg }}
-                          />
+                        <div className="h-48 relative bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden">
+                          {heroImage ? (
+                            <img
+                              src={heroImage}
+                              alt={patent.title || 'Patent'}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div
+                              className="w-full h-full opacity-30 group-hover:opacity-40 transition"
+                              dangerouslySetInnerHTML={{ __html: avatarSvg }}
+                            />
+                          )}
+
+                          {/* Gradient overlay for better badge visibility */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/20" />
 
                           <Badge
-                            className="absolute top-3 right-3"
+                            className="absolute top-3 right-3 shadow-sm"
                             variant={
                               patent.status === 'completed' ? 'default' :
                               patent.status === 'failed' ? 'destructive' :
@@ -305,7 +338,7 @@ export function DashboardPage() {
                           </Badge>
 
                           <div className="absolute bottom-3 left-3 right-3">
-                            <div className="bg-white/90 backdrop-blur-sm rounded-full h-2 overflow-hidden">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-full h-2 overflow-hidden shadow-sm">
                               <div
                                 className="bg-primary h-full transition-all"
                                 style={{ width: `${((patent.artifactCount || 0) / 3) * 100}%` }}
@@ -316,7 +349,7 @@ export function DashboardPage() {
 
                         <CardContent className="p-4">
                           <h3 className="font-semibold font-playfair text-lg mb-2 line-clamp-2 group-hover:text-primary transition">
-                            {patent.title || 'Untitled Patent'}
+                            {patent.friendlyTitle || patent.title || 'Untitled Patent'}
                           </h3>
                           <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
                             {patent.assignee || 'Unknown Assignee'}
