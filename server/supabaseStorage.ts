@@ -52,6 +52,7 @@ export interface PatentHeroImage {
   patent_id: string;
   image_url: string;
   prompt_used: string;
+  image_title: string | null;
   generation_metadata: any | null;
   created_at: string;
   updated_at: string;
@@ -64,6 +65,7 @@ export interface SectionImage {
   section_title: string;
   image_url: string;
   prompt_used: string;
+  image_title: string | null;
   generation_metadata: any | null;
   created_at: string;
   updated_at: string;

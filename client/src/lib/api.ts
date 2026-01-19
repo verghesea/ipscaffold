@@ -22,6 +22,7 @@ export interface SectionImage {
   section_title: string;
   image_url: string;
   prompt_used: string;
+  image_title?: string | null;
   generation_metadata: {
     model: string;
     size: string;

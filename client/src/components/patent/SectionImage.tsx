@@ -99,13 +99,24 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
               Image failed to load
             </div>
           ) : (
-            <img
-              src={image.image_url}
-              alt={`Figure ${image.section_number} - ${image.section_title}`}
-              className="w-full h-full object-cover relative z-10"
-              loading="lazy"
-              onError={() => setImageError(true)}
-            />
+            <>
+              <img
+                src={image.image_url}
+                alt={`Figure ${image.section_number} - ${image.section_title}`}
+                className="w-full h-full object-cover relative z-10"
+                loading="lazy"
+                onError={() => setImageError(true)}
+              />
+
+              {/* Image title overlay (DALL-E revised prompt) */}
+              {image.image_title && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 z-20">
+                  <p className="text-white text-sm italic line-clamp-2">
+                    {image.image_title}
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Action buttons (hover) */}

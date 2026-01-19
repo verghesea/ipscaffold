@@ -859,6 +859,7 @@ export async function registerRoutes(
         patent_id: patentId,
         image_url: heroImageResult.imageUrl,
         prompt_used: heroImageResult.promptUsed,
+        image_title: heroImageResult.revisedPrompt || 'Patent hero visualization',
         generation_metadata: {
           model: 'dall-e-3',
           size: '1024x1024',
@@ -1086,6 +1087,7 @@ async function generateRemainingArtifactsWithNotifications(
         patent_id: patentId,
         image_url: heroImageResult.imageUrl,
         prompt_used: heroImageResult.promptUsed,
+        image_title: heroImageResult.revisedPrompt || 'Patent hero visualization',
         generation_metadata: {
           model: 'dall-e-3',
           size: '1024x1024',

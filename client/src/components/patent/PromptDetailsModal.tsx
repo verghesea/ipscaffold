@@ -96,6 +96,18 @@ export function PromptDetailsModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Image Title (DALL-E Revised Prompt) */}
+          {!editing && image.image_title && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">
+                Image Title (What DALL-E Created)
+              </h3>
+              <div className="p-3 bg-blue-50 border-l-4 border-blue-500 rounded text-sm italic text-blue-900">
+                {image.image_title}
+              </div>
+            </div>
+          )}
+
           {/* Prompt Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
