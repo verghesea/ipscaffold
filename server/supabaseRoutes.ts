@@ -1292,12 +1292,62 @@ async function generateRemainingArtifactsWithNotifications(
       // Don't fail the whole process if hero image fails
     }
 
+    // Stage 4: Auto-generate section images for all artifacts (parallel)
+    console.log(`[SectionImages] Starting auto-generation for all artifacts...`);
+
+    try {
+      const artifacts = await supabaseStorage.getArtifactsByPatent(patentId);
+      const { generateArtifactImagesParallel } = await import('./services/parallelImageGenerator');
+
+      // Count total sections across all artifacts
+      const { parseMarkdownSections } = await import('./services/sectionParser');
+      let totalSections = 0;
+      for (const artifact of artifacts) {
+        const sections = parseMarkdownSections(artifact.content);
+        totalSections += sections.length;
+      }
+
+      console.log(`[SectionImages] Generating images for ${totalSections} sections across ${artifacts.length} artifacts`);
+
+      await updateProgress({
+        patentId,
+        stage: 'section_images',
+        current: 0,
+        total: totalSections,
+        message: 'Generating section images...',
+        complete: false,
+      });
+
+      // Generate images for all artifacts in parallel (3 at a time to respect rate limits)
+      await generateArtifactImagesParallel(
+        artifacts,
+        patentId,
+        totalSections,
+        async (current: number) => {
+          await updateProgress({
+            patentId,
+            stage: 'section_images',
+            current,
+            total: totalSections,
+            message: `Generating images (${current}/${totalSections})...`,
+            complete: false,
+          });
+        }
+      );
+
+      console.log(`✓ Generated all section images for patent ${patentId}`);
+    } catch (error) {
+      console.error('❌ FAILED to auto-generate section images for patent', patentId);
+      console.error('Error details:', error);
+      // Don't fail the whole process if section images fail
+    }
+
     // Complete!
     await updateProgress({
       patentId,
-      stage: 'hero_image',
-      current: 1,
-      total: 1,
+      stage: 'section_images',
+      current: 0,
+      total: 0,
       message: 'Patent processing complete!',
       complete: true,
     });
