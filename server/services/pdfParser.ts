@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { logExtraction, extractContext } from './extractionLogger';
 
 export interface ParsedPatent {
   title: string | null;
@@ -22,7 +23,14 @@ async function getPdfParseClass(): Promise<any> {
   }
 }
 
-export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
+/**
+ * Parse patent PDF with optional extraction logging
+ *
+ * @param filePath - Path to PDF file
+ * @param patentId - Optional patent ID for logging (if re-extracting)
+ * @returns Parsed patent metadata
+ */
+export async function parsePatentPDF(filePath: string, patentId?: string): Promise<ParsedPatent> {
   const dataBuffer = await fs.readFile(filePath);
   
   const PDFParse = await getPdfParseClass();
@@ -43,20 +51,43 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   
   // Extract inventors (multiple patterns for robustness)
   let inventors = null;
+  let inventorsPatternUsed: string | null = null;
+  let inventorsPatternIndex: number | null = null;
   const inventorPatterns = [
     /\(\s*72\s*\)\s*Inventors?:\s*([^\n]+?)(?:\n|$)/i, // (72) Inventor: format
     /Inventors?:\s*([^\n]+?)(?:\n|$)/i, // Simple Inventor: format
     /Inventors?:\s*(.+?)(?:\n\n|Assignee:|Appl\.|Filed:)/is, // Multiline with stopwords
   ];
 
-  for (const pattern of inventorPatterns) {
+  for (let i = 0; i < inventorPatterns.length; i++) {
+    const pattern = inventorPatterns[i];
     const match = text.match(pattern);
     if (match && match[1]) {
       inventors = match[1].trim();
       // Clean up location info in parentheses
       inventors = inventors.replace(/\s*,?\s*\([A-Z]{2}\)\s*$/g, '').trim();
+      inventorsPatternUsed = pattern.source;
+      inventorsPatternIndex = i;
       console.log(`[PDF Parser] Extracted inventors: "${inventors.substring(0, 50)}..."`);
       break;
+    }
+  }
+
+  // Log extraction attempt (if patentId provided for logging)
+  if (patentId) {
+    const context = extractContext(text, 'Inventor', 200, 200, 500);
+    if (context) {
+      await logExtraction({
+        patentId,
+        fieldName: 'inventors',
+        extractedValue: inventors,
+        patternUsed: inventorsPatternUsed,
+        patternIndex: inventorsPatternIndex,
+        success: !!inventors,
+        contextBefore: context.before,
+        contextAfter: context.after,
+        fullContext: context.full,
+      });
     }
   }
 
@@ -71,6 +102,8 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   
   // Extract assignee (multiple patterns for robustness)
   let assignee = null;
+  let assigneePatternUsed: string | null = null;
+  let assigneePatternIndex: number | null = null;
   const assigneePatterns = [
     /\(\s*73\s*\)\s*Assignee:\s*([^\n]+?)(?:\n|$)/i, // (73) Assignee: format
     /Assignee:\s*([^\n]+?)(?:\n|$)/i, // Simple Assignee: format
@@ -79,7 +112,8 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
     /\*?\s*Assignee[:\s]*([A-Za-z0-9\s,\.&]+?)(?:,\s*[A-Z]{2}|$)/im, // Flexible format with state code
   ];
 
-  for (const pattern of assigneePatterns) {
+  for (let i = 0; i < assigneePatterns.length; i++) {
+    const pattern = assigneePatterns[i];
     const match = text.match(pattern);
     if (match && match[1]) {
       assignee = match[1].trim();
@@ -93,11 +127,31 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
       assignee = assignee.replace(/\*+/g, '').trim();
       // Only accept if it's reasonable (2-100 chars, not all numbers)
       if (assignee.length >= 2 && assignee.length <= 100 && !/^\d+$/.test(assignee)) {
+        assigneePatternUsed = pattern.source;
+        assigneePatternIndex = i;
         console.log(`[PDF Parser] Extracted assignee: "${assignee}"`);
         break;
       } else {
         assignee = null; // Invalid, keep searching
       }
+    }
+  }
+
+  // Log extraction attempt (if patentId provided for logging)
+  if (patentId) {
+    const context = extractContext(text, 'Assignee', 200, 200, 500);
+    if (context) {
+      await logExtraction({
+        patentId,
+        fieldName: 'assignee',
+        extractedValue: assignee,
+        patternUsed: assigneePatternUsed,
+        patternIndex: assigneePatternIndex,
+        success: !!assignee,
+        contextBefore: context.before,
+        contextAfter: context.after,
+        fullContext: context.full,
+      });
     }
   }
 
@@ -135,11 +189,35 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
     /Serial\s+No\.?:\s*(\d+)/i,
   ];
 
-  for (const pattern of applicationNumberPatterns) {
+  let applicationNumberPatternUsed: string | null = null;
+  let applicationNumberPatternIndex: number | null = null;
+
+  for (let i = 0; i < applicationNumberPatterns.length; i++) {
+    const pattern = applicationNumberPatterns[i];
     const match = text.match(pattern);
     if (match && match[1]) {
       applicationNumber = match[1].trim();
+      applicationNumberPatternUsed = pattern.source;
+      applicationNumberPatternIndex = i;
       break;
+    }
+  }
+
+  // Log application number extraction
+  if (patentId) {
+    const context = extractContext(text, 'Appl', 200, 200, 500);
+    if (context) {
+      await logExtraction({
+        patentId,
+        fieldName: 'applicationNumber',
+        extractedValue: applicationNumber,
+        patternUsed: applicationNumberPatternUsed,
+        patternIndex: applicationNumberPatternIndex,
+        success: !!applicationNumber,
+        contextBefore: context.before,
+        contextAfter: context.after,
+        fullContext: context.full,
+      });
     }
   }
 
@@ -161,6 +239,24 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   // Extract filing date
   const filingDateMatch = text.match(/Filed:\s*(\w+\.?\s+\d{1,2},?\s+\d{4})/i);
   const filingDate = filingDateMatch ? filingDateMatch[1].trim() : null;
+
+  // Log filing date extraction
+  if (patentId) {
+    const context = extractContext(text, 'Filed:', 200, 200, 500);
+    if (context) {
+      await logExtraction({
+        patentId,
+        fieldName: 'filingDate',
+        extractedValue: filingDate,
+        patternUsed: filingDateMatch ? '/Filed:\\s*(\\w+\\.?\\s+\\d{1,2},?\\s+\\d{4})/i' : null,
+        patternIndex: 0,
+        success: !!filingDate,
+        contextBefore: context.before,
+        contextAfter: context.after,
+        fullContext: context.full,
+      });
+    }
+  }
 
   // Extract issue date (or publication date)
   const issueDateMatch = text.match(/(?:Date of Patent|Patent No\.|Pub\. No\.).*?(\w+\.?\s+\d{1,2},?\s+\d{4})/i);

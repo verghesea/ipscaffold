@@ -8,6 +8,7 @@ import fs from "fs/promises";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
 import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
+import { logMetadataCorrection, findValueContext } from "./services/extractionLogger";
 
 declare global {
   namespace Express {
@@ -720,8 +721,8 @@ export async function registerRoutes(
       const pdfPath = `uploads/${patent.pdf_filename}`;
       console.log(`[Re-extract] Re-parsing PDF for patent ${patentId}: ${pdfPath}`);
 
-      // Re-parse the PDF
-      const parsedPatent = await parsePatentPDF(pdfPath);
+      // Re-parse the PDF (pass patentId to enable extraction logging)
+      const parsedPatent = await parsePatentPDF(pdfPath, patentId);
 
       // Update patent metadata (keep full_text, status, and other fields intact)
       await supabaseAdmin
@@ -785,6 +786,35 @@ export async function registerRoutes(
         .from('patents')
         .update(updates)
         .eq('id', patentId);
+
+      // Log manual corrections for learning system
+      const fieldsToLog = [
+        { key: 'inventors', oldValue: patent.inventors, newValue: inventors },
+        { key: 'assignee', oldValue: patent.assignee, newValue: assignee },
+        { key: 'filingDate', oldValue: patent.filing_date, newValue: filingDate },
+        { key: 'applicationNumber', oldValue: patent.application_number, newValue: applicationNumber },
+      ];
+
+      for (const field of fieldsToLog) {
+        // Only log if value actually changed
+        if (field.newValue !== undefined && field.oldValue !== field.newValue) {
+          const context = findValueContext(patent.full_text, field.newValue);
+
+          await logMetadataCorrection({
+            patentId,
+            fieldName: field.key,
+            originalValue: field.oldValue,
+            correctedValue: field.newValue,
+            correctedBy: req.user!.id,
+            contextBefore: context?.before,
+            contextAfter: context?.after,
+            valuePositionStart: context?.valueStart,
+            valuePositionEnd: context?.valueEnd,
+          });
+
+          console.log(`[Manual Update] Logged correction for ${field.key}`);
+        }
+      }
 
       console.log(`[Manual Update] ✓ Metadata updated for patent ${patentId}`);
 
