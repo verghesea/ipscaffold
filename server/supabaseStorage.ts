@@ -19,6 +19,9 @@ export interface Patent {
   assignee: string | null;
   filing_date: string | null;
   issue_date: string | null;
+  patent_number: string | null;
+  application_number: string | null;
+  patent_classification: string | null;
   full_text: string;
   pdf_filename: string | null;
   status: string;

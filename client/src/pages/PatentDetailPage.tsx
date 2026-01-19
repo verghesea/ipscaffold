@@ -250,6 +250,17 @@ export function PatentDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {patent.patentNumber && (
+                    <div className="pb-4 border-b">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Patent Number</span>
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="font-mono text-sm">
+                          {patent.patentNumber}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-3 text-sm">
                     {patent.inventors && (
                       <div>
@@ -267,6 +278,12 @@ export function PatentDetailPage() {
                       <div>
                         <span className="font-medium text-primary-900">Filing Date</span>
                         <p className="text-muted-foreground">{patent.filingDate}</p>
+                      </div>
+                    )}
+                    {patent.applicationNumber && (
+                      <div>
+                        <span className="font-medium text-primary-900">Application Number</span>
+                        <p className="text-muted-foreground font-mono text-xs">{patent.applicationNumber}</p>
                       </div>
                     )}
                     <div>

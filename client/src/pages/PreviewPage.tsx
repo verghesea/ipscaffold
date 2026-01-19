@@ -5,6 +5,7 @@ import { ArrowRight, Lock, Check, Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Layout } from '@/components/layout/Layout';
 import { GenerationProgress } from '@/components/patent/GenerationProgress';
+import { Badge } from '@/components/ui/badge';
 
 export function PreviewPage() {
   const [, params] = useRoute('/preview/:id');
@@ -110,6 +111,13 @@ export function PreviewPage() {
               <h1 className="font-display font-bold text-3xl md:text-4xl text-primary-900 leading-tight" data-testid="text-patent-title">
                 {patent.title}
               </h1>
+              {patent.patentNumber && (
+                <div className="flex justify-center">
+                  <Badge variant="secondary" className="font-mono">
+                    {patent.patentNumber}
+                  </Badge>
+                </div>
+              )}
               <p className="text-muted-foreground text-sm">
                 {patent.filingDate && `Filed: ${patent.filingDate}`}
                 {patent.assignee && ` • Assignee: ${patent.assignee}`}

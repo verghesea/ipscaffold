@@ -4,6 +4,9 @@ export interface Patent {
   friendlyTitle?: string | null;
   assignee: string | null;
   filingDate: string | null;
+  patentNumber?: string | null;
+  applicationNumber?: string | null;
+  patentClassification?: string | null;
   status: string;
   artifactCount?: number;
   createdAt?: string;

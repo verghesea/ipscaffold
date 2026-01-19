@@ -348,9 +348,16 @@ export function DashboardPage() {
                         </div>
 
                         <CardContent className="p-4">
-                          <h3 className="font-semibold font-playfair text-lg mb-2 line-clamp-2 group-hover:text-primary transition">
-                            {patent.friendlyTitle || patent.title || 'Untitled Patent'}
-                          </h3>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <h3 className="font-semibold font-playfair text-lg line-clamp-2 group-hover:text-primary transition flex-1">
+                              {patent.friendlyTitle || patent.title || 'Untitled Patent'}
+                            </h3>
+                            {patent.patentNumber && (
+                              <Badge variant="secondary" className="text-xs shrink-0 font-mono">
+                                {patent.patentNumber}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
                             {patent.assignee || 'Unknown Assignee'}
                           </p>
@@ -374,7 +381,8 @@ export function DashboardPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40%]">Title</TableHead>
+                        <TableHead className="w-[35%]">Title</TableHead>
+                        <TableHead>Patent Number</TableHead>
                         <TableHead>Assignee</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Artifacts</TableHead>
@@ -393,6 +401,15 @@ export function DashboardPage() {
                             <span className="line-clamp-1" data-testid={`text-title-${patent.id}`}>
                               {patent.friendlyTitle || patent.title || 'Untitled Patent'}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {patent.patentNumber ? (
+                              <Badge variant="secondary" className="font-mono text-xs">
+                                {patent.patentNumber}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             <span className="line-clamp-1">{patent.assignee || '-'}</span>
