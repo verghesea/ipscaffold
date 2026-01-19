@@ -305,7 +305,6 @@ export function PatentDetailPage() {
                     </CardContent>
                   </Card>
                 </>
-              )
               ) : artifacts.length === 0 ? (
                 <Card>
                   <CardContent className="py-16 text-center">
