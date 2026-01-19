@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { ArrowRight, Lock, Check, Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Layout } from '@/components/layout/Layout';
+import { GenerationProgress } from '@/components/patent/GenerationProgress';
 
 export function PreviewPage() {
   const [, params] = useRoute('/preview/:id');
@@ -82,11 +83,14 @@ export function PreviewPage() {
   if (!patent || !elia15) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-900 mx-auto" />
-            <p className="text-muted-foreground">Generating analysis...</p>
-            <p className="text-sm text-muted-foreground/60">This usually takes 30-60 seconds</p>
+        <div className="min-h-screen flex items-center justify-center px-6">
+          <div className="max-w-2xl w-full">
+            {params?.id && <GenerationProgress patentId={params.id} onComplete={() => loadPreview(params.id)} />}
+            <div className="text-center space-y-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary-900 mx-auto" />
+              <p className="text-muted-foreground">Generating analysis...</p>
+              <p className="text-sm text-muted-foreground/60">This usually takes 30-60 seconds</p>
+            </div>
           </div>
         </div>
       </Layout>

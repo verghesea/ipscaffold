@@ -5,6 +5,7 @@ export interface Profile {
   email: string;
   credits: number;
   is_admin: boolean;
+  is_super_admin: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -488,6 +489,46 @@ export class SupabaseStorage {
       .eq('id', patentId);
 
     if (error) throw new Error(`Failed to update friendly title: ${error.message}`);
+  }
+
+  // Super Admin User Management methods
+  async createUserByAdmin(email: string, credits: number = 100): Promise<Profile> {
+    // Use Supabase Admin API to create user
+    const { data: authUser, error } = await supabaseAdmin.auth.admin.createUser({
+      email: email.toLowerCase(),
+      email_confirm: true, // Auto-confirm email
+    });
+
+    if (error) throw new Error(`Failed to create user: ${error.message}`);
+
+    // Profile created automatically by trigger, but update credits
+    await this.updateProfileCredits(authUser.user.id, credits);
+
+    const profile = await this.getProfile(authUser.user.id);
+    if (!profile) throw new Error('Failed to retrieve created profile');
+
+    return profile;
+  }
+
+  async deleteUserByAdmin(userId: string): Promise<void> {
+    // Use Supabase Admin API to delete user
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (error) throw new Error(`Failed to delete user: ${error.message}`);
+  }
+
+  async logUserManagementAction(
+    adminId: string,
+    action: string,
+    targetUserId: string,
+    details: any
+  ): Promise<void> {
+    await supabaseAdmin.from('user_management_log').insert({
+      admin_id: adminId,
+      action,
+      target_user_id: targetUserId,
+      details,
+    });
   }
 }
 

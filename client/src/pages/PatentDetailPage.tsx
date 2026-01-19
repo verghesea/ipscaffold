@@ -15,6 +15,7 @@ import { EnhancedMarkdownRenderer } from '@/components/patent/EnhancedMarkdownRe
 import { ArtifactHeader } from '@/components/patent/ArtifactHeader';
 import { useSectionImages } from '@/hooks/useSectionImages';
 import { countSections } from '@/lib/markdownParser';
+import { GenerationProgress } from '@/components/patent/GenerationProgress';
 
 const ARTIFACT_TYPES = {
   elia15: {
@@ -294,13 +295,17 @@ export function PatentDetailPage() {
 
             <div className="lg:col-span-2">
               {artifacts.length === 0 && patent.status !== 'failed' && patent.status !== 'partial' ? (
-                <Card>
-                  <CardContent className="py-16 text-center">
-                    <div className="animate-spin w-8 h-8 border-2 border-primary-900 border-t-transparent rounded-full mx-auto mb-4" />
-                    <h3 className="font-display text-xl font-bold text-primary-900 mb-2">Generating artifacts...</h3>
-                    <p className="text-muted-foreground">Your analysis is being generated. Check back soon.</p>
-                  </CardContent>
-                </Card>
+                <>
+                  {params?.id && <GenerationProgress patentId={params.id} onComplete={() => loadPatent(params.id)} />}
+                  <Card>
+                    <CardContent className="py-16 text-center">
+                      <div className="animate-spin w-8 h-8 border-2 border-primary-900 border-t-transparent rounded-full mx-auto mb-4" />
+                      <h3 className="font-display text-xl font-bold text-primary-900 mb-2">Generating artifacts...</h3>
+                      <p className="text-muted-foreground">Your analysis is being generated. Check back soon.</p>
+                    </CardContent>
+                  </Card>
+                </>
+              )
               ) : artifacts.length === 0 ? (
                 <Card>
                   <CardContent className="py-16 text-center">

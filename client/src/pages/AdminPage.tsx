@@ -27,6 +27,7 @@ interface User {
   email: string;
   credits: number;
   is_admin: boolean;
+  is_super_admin: boolean;
   created_at: string;
 }
 
@@ -72,6 +73,10 @@ export default function AdminPage() {
   const [newPromoCode, setNewPromoCode] = useState('');
   const [newPromoCredits, setNewPromoCredits] = useState('');
   const [newPromoMaxRedemptions, setNewPromoMaxRedemptions] = useState('');
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserCredits, setNewUserCredits] = useState('100');
+  const [newUserIsAdmin, setNewUserIsAdmin] = useState(false);
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<SystemMetrics>({
     queryKey: ['admin-metrics'],
@@ -192,6 +197,45 @@ export default function AdminPage() {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async ({ email, credits, isAdmin }: { email: string; credits: number; isAdmin: boolean }) => {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, credits, isAdmin }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setCreateUserOpen(false);
+      setNewUserEmail('');
+      setNewUserCredits('100');
+      setNewUserIsAdmin(false);
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+  });
+
   if (!profile?.is_admin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -223,9 +267,9 @@ export default function AdminPage() {
               <p className="text-sm text-muted-foreground">Manage users and monitor system</p>
             </div>
           </div>
-          <Badge variant="outline" className="text-amber-600 border-amber-600">
+          <Badge variant="outline" className={profile?.is_super_admin ? "text-purple-600 border-purple-600" : "text-amber-600 border-amber-600"}>
             <Shield className="w-3 h-3 mr-1" />
-            Administrator
+            {profile?.is_super_admin ? 'Super Administrator' : 'Administrator'}
           </Badge>
         </div>
       </header>
@@ -320,8 +364,76 @@ export default function AdminPage() {
 
           <TabsContent value="users" className="mt-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="font-playfair">User Management</CardTitle>
+                {profile?.is_super_admin && (
+                  <Dialog open={createUserOpen} onOpenChange={setCreateUserOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" data-testid="button-create-user">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create User
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New User</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div>
+                          <Label>Email</Label>
+                          <Input
+                            type="email"
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            placeholder="user@example.com"
+                            data-testid="input-user-email"
+                          />
+                        </div>
+                        <div>
+                          <Label>Initial Credits</Label>
+                          <Input
+                            type="number"
+                            value={newUserCredits}
+                            onChange={(e) => setNewUserCredits(e.target.value)}
+                            placeholder="100"
+                            data-testid="input-user-credits"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={newUserIsAdmin}
+                            onCheckedChange={setNewUserIsAdmin}
+                            data-testid="switch-user-admin"
+                          />
+                          <Label>Make Admin</Label>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            if (newUserEmail) {
+                              createUserMutation.mutate({
+                                email: newUserEmail,
+                                credits: parseInt(newUserCredits) || 100,
+                                isAdmin: newUserIsAdmin,
+                              });
+                            }
+                          }}
+                          disabled={!newUserEmail || createUserMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-user"
+                        >
+                          {createUserMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            'Create User'
+                          )}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </CardHeader>
               <CardContent>
                 {usersLoading ? (
@@ -344,7 +456,9 @@ export default function AdminPage() {
                             <td className="py-3 px-4" onClick={() => setSelectedUserId(u.id)}>{u.email}</td>
                             <td className="py-3 px-4" onClick={() => setSelectedUserId(u.id)}>{u.credits}</td>
                             <td className="py-3 px-4" onClick={() => setSelectedUserId(u.id)}>
-                              {u.is_admin ? (
+                              {u.is_super_admin ? (
+                                <Badge variant="outline" className="text-purple-600 border-purple-600">Super Admin</Badge>
+                              ) : u.is_admin ? (
                                 <Badge variant="outline" className="text-amber-600 border-amber-600">Admin</Badge>
                               ) : (
                                 <Badge variant="secondary">User</Badge>
@@ -407,16 +521,31 @@ export default function AdminPage() {
                                     </div>
                                   </DialogContent>
                                 </Dialog>
-                                {u.id !== user?.id && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => toggleAdminMutation.mutate({ userId: u.id, isAdmin: !u.is_admin })}
-                                    disabled={toggleAdminMutation.isPending}
-                                    data-testid={`button-toggle-admin-${u.id}`}
-                                  >
-                                    {u.is_admin ? 'Remove Admin' : 'Make Admin'}
-                                  </Button>
+                                {profile?.is_super_admin && u.id !== user?.id && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => toggleAdminMutation.mutate({ userId: u.id, isAdmin: !u.is_admin })}
+                                      disabled={toggleAdminMutation.isPending}
+                                      data-testid={`button-toggle-admin-${u.id}`}
+                                    >
+                                      {u.is_admin ? 'Remove Admin' : 'Make Admin'}
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Are you sure you want to delete ${u.email}? This action cannot be undone.`)) {
+                                          deleteUserMutation.mutate(u.id);
+                                        }
+                                      }}
+                                      disabled={deleteUserMutation.isPending}
+                                      data-testid={`button-delete-user-${u.id}`}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -664,9 +793,13 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Admin Status</Label>
-                    <Badge variant={userDetails.is_admin ? "default" : "secondary"}>
-                      {userDetails.is_admin ? "Admin" : "User"}
-                    </Badge>
+                    {userDetails.is_super_admin ? (
+                      <Badge variant="outline" className="text-purple-600 border-purple-600">Super Admin</Badge>
+                    ) : userDetails.is_admin ? (
+                      <Badge variant="default">Admin</Badge>
+                    ) : (
+                      <Badge variant="secondary">User</Badge>
+                    )}
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Member Since</Label>
@@ -743,16 +876,26 @@ export default function AdminPage() {
                   }} data-testid="button-profile-adjust-credits">
                     Adjust Credits
                   </Button>
-                  {userDetails.id !== user?.id && (
-                    <Button variant="outline" onClick={() => {
-                      toggleAdminMutation.mutate({
-                        userId: userDetails.id,
-                        isAdmin: !userDetails.is_admin
-                      });
-                      queryClient.invalidateQueries({ queryKey: ['admin-user-details', selectedUserId] });
-                    }} data-testid="button-profile-toggle-admin">
-                      {userDetails.is_admin ? 'Remove Admin' : 'Make Admin'}
-                    </Button>
+                  {profile?.is_super_admin && userDetails.id !== user?.id && (
+                    <>
+                      <Button variant="outline" onClick={() => {
+                        toggleAdminMutation.mutate({
+                          userId: userDetails.id,
+                          isAdmin: !userDetails.is_admin
+                        });
+                        queryClient.invalidateQueries({ queryKey: ['admin-user-details', selectedUserId] });
+                      }} data-testid="button-profile-toggle-admin">
+                        {userDetails.is_admin ? 'Remove Admin' : 'Make Admin'}
+                      </Button>
+                      <Button variant="destructive" onClick={() => {
+                        if (confirm(`Are you sure you want to delete ${userDetails.email}? This action cannot be undone.`)) {
+                          deleteUserMutation.mutate(userDetails.id);
+                          setSelectedUserId(null);
+                        }
+                      }} disabled={deleteUserMutation.isPending} data-testid="button-profile-delete-user">
+                        Delete User
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>

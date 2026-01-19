@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import fs from "fs/promises";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
+import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
 
 declare global {
   namespace Express {
@@ -230,6 +231,32 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/auth/refresh', async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ error: 'Refresh token required' });
+      }
+
+      const { data, error } = await supabaseAdmin.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+
+      if (error || !data.session) {
+        return res.status(401).json({ error: 'Invalid refresh token' });
+      }
+
+      res.json({
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+      });
+    } catch (error) {
+      console.error('Refresh token error:', error);
+      res.status(500).json({ error: 'Failed to refresh session' });
+    }
+  });
+
   app.get('/auth/confirm', async (req, res) => {
     const { token_hash, type } = req.query;
     const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
@@ -397,6 +424,58 @@ export async function registerRoutes(
     }
   });
 
+  // SSE endpoint for real-time progress tracking
+  app.get('/api/patent/:id/progress', requireAuth, async (req, res) => {
+    try {
+      const patentId = req.params.id;
+
+      // Verify ownership
+      const patent = await supabaseStorage.getPatent(patentId);
+      if (!patent || patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // SSE setup
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+      // Send initial progress from database if exists
+      const initialProgress = await getProgressFromDb(patentId);
+      if (initialProgress) {
+        res.write(`data: ${JSON.stringify(initialProgress)}\n\n`);
+        if (initialProgress.complete) {
+          return res.end();
+        }
+      }
+
+      // Poll for updates every 2 seconds
+      const sendProgress = () => {
+        const progress = getProgress(patentId);
+        if (progress) {
+          res.write(`data: ${JSON.stringify(progress)}\n\n`);
+          if (progress.complete) {
+            clearInterval(interval);
+            res.end();
+          }
+        }
+      };
+
+      const interval = setInterval(sendProgress, 2000);
+
+      // Clean up on client disconnect
+      req.on('close', () => {
+        clearInterval(interval);
+        res.end();
+      });
+
+    } catch (error) {
+      console.error('Progress SSE error:', error);
+      res.status(500).json({ error: 'Failed to stream progress' });
+    }
+  });
+
   app.get('/api/credits', requireAuth, async (req, res) => {
     try {
       const profile = await supabaseStorage.getProfile(req.user!.id);
@@ -467,6 +546,17 @@ export async function registerRoutes(
     next();
   };
 
+  const requireSuperAdmin = async (req: any, res: any, next: any) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const profile = await supabaseStorage.getProfile(req.user.id);
+    if (!profile?.is_super_admin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    next();
+  };
+
   app.get('/api/admin/metrics', requireAuth, requireAdmin, async (req, res) => {
     try {
       const metrics = await supabaseStorage.getSystemMetrics();
@@ -512,15 +602,66 @@ export async function registerRoutes(
     }
   });
 
-  app.post('/api/admin/users/:id/admin', requireAuth, requireAdmin, async (req, res) => {
+  app.post('/api/admin/users/:id/admin', requireAuth, requireSuperAdmin, async (req, res) => {
     try {
       const { isAdmin } = req.body;
       await supabaseStorage.updateProfileAdmin(req.params.id, !!isAdmin);
       await supabaseStorage.createAuditLog(req.user!.id, 'update_admin_status', 'user', req.params.id, { isAdmin });
+      await supabaseStorage.logUserManagementAction(req.user!.id, 'toggle_admin', req.params.id, { isAdmin });
       res.json({ success: true });
     } catch (error) {
       console.error('Admin update error:', error);
       res.status(500).json({ error: 'Failed to update admin status' });
+    }
+  });
+
+  // Create user (super admin only)
+  app.post('/api/admin/users', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { email, credits, isAdmin } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Check if user already exists
+      const existing = await supabaseStorage.getProfileByEmail(email);
+      if (existing) {
+        return res.status(400).json({ error: 'User already exists' });
+      }
+
+      const profile = await supabaseStorage.createUserByAdmin(email, credits || 100);
+
+      if (isAdmin) {
+        await supabaseStorage.updateProfileAdmin(profile.id, true);
+      }
+
+      await supabaseStorage.logUserManagementAction(req.user!.id, 'create_user', profile.id, { email, credits, isAdmin });
+
+      res.json({ success: true, user: profile });
+    } catch (error) {
+      console.error('Create user error:', error);
+      res.status(500).json({ error: 'Failed to create user' });
+    }
+  });
+
+  // Delete user (super admin only)
+  app.delete('/api/admin/users/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Prevent self-deletion
+      if (id === req.user!.id) {
+        return res.status(400).json({ error: 'Cannot delete yourself' });
+      }
+
+      await supabaseStorage.deleteUserByAdmin(id);
+      await supabaseStorage.logUserManagementAction(req.user!.id, 'delete_user', id, {});
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete user error:', error);
+      res.status(500).json({ error: 'Failed to delete user' });
     }
   });
 
@@ -1038,41 +1179,66 @@ async function generateRemainingArtifacts(patentId: string, fullText: string, el
 }
 
 async function generateRemainingArtifactsWithNotifications(
-  patentId: string, 
-  fullText: string, 
-  elia15Content: string, 
-  userId: string, 
+  patentId: string,
+  fullText: string,
+  elia15Content: string,
+  userId: string,
   patentTitle: string | null
 ) {
   const { NotificationService } = await import('./services/notificationService');
-  
-  try {
-    const [narrativeResult, goldenCircleResult] = await Promise.all([
-      generateBusinessNarrative(fullText, elia15Content),
-      generateGoldenCircle(fullText, elia15Content),
-    ]);
 
-    await Promise.all([
-      supabaseStorage.createArtifact({
-        patent_id: patentId,
-        artifact_type: 'business_narrative',
-        content: narrativeResult.content,
-        tokens_used: narrativeResult.tokensUsed,
-        generation_time_seconds: narrativeResult.generationTimeSeconds,
-      }),
-      supabaseStorage.createArtifact({
-        patent_id: patentId,
-        artifact_type: 'golden_circle',
-        content: goldenCircleResult.content,
-        tokens_used: goldenCircleResult.tokensUsed,
-        generation_time_seconds: goldenCircleResult.generationTimeSeconds,
-      }),
-    ]);
+  try {
+    // Stage 1: Generate Business Narrative (1/2)
+    updateProgress({
+      patentId,
+      stage: 'artifacts',
+      current: 1,
+      total: 2,
+      message: 'Generating Business Narrative...',
+      complete: false,
+    });
+
+    const narrativeResult = await generateBusinessNarrative(fullText, elia15Content);
+    await supabaseStorage.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'business_narrative',
+      content: narrativeResult.content,
+      tokens_used: narrativeResult.tokensUsed,
+      generation_time_seconds: narrativeResult.generationTimeSeconds,
+    });
+
+    // Stage 2: Generate Golden Circle (2/2)
+    updateProgress({
+      patentId,
+      stage: 'artifacts',
+      current: 2,
+      total: 2,
+      message: 'Generating Golden Circle...',
+      complete: false,
+    });
+
+    const goldenCircleResult = await generateGoldenCircle(fullText, elia15Content);
+    await supabaseStorage.createArtifact({
+      patent_id: patentId,
+      artifact_type: 'golden_circle',
+      content: goldenCircleResult.content,
+      tokens_used: goldenCircleResult.tokensUsed,
+      generation_time_seconds: goldenCircleResult.generationTimeSeconds,
+    });
 
     await supabaseStorage.updatePatentStatus(patentId, 'completed');
     console.log('All artifacts generated for patent:', patentId);
 
-    // Generate hero image for dashboard
+    // Stage 3: Generate hero image
+    updateProgress({
+      patentId,
+      stage: 'hero_image',
+      current: 0,
+      total: 1,
+      message: 'Generating hero image...',
+      complete: false,
+    });
+
     try {
       const patent = await supabaseStorage.getPatent(patentId);
       const { generatePatentHeroImage } = await import('./services/patentHeroImageService');
@@ -1104,11 +1270,31 @@ async function generateRemainingArtifactsWithNotifications(
       // Don't fail the whole process if hero image fails
     }
 
+    // Complete!
+    updateProgress({
+      patentId,
+      stage: 'hero_image',
+      current: 1,
+      total: 1,
+      message: 'Patent processing complete!',
+      complete: true,
+    });
+
     await NotificationService.sendPatentReady(userId, patentId, patentTitle);
 
   } catch (error) {
     console.error('Error generating remaining artifacts:', error);
     await supabaseStorage.updatePatentStatus(patentId, 'failed', 'Failed to generate all artifacts');
+
+    updateProgress({
+      patentId,
+      stage: 'artifacts',
+      current: 0,
+      total: 0,
+      message: `Error: ${(error as Error).message}`,
+      complete: true,
+    });
+
     await NotificationService.sendProcessingError(userId, patentId, patentTitle, (error as Error).message);
   }
 }
