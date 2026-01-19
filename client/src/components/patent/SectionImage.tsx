@@ -107,15 +107,6 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
                 loading="lazy"
                 onError={() => setImageError(true)}
               />
-
-              {/* Image title overlay (DALL-E revised prompt) */}
-              {image.image_title && (
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 z-20">
-                  <p className="text-white text-sm italic line-clamp-2">
-                    {image.image_title}
-                  </p>
-                </div>
-              )}
             </>
           )}
 
@@ -162,12 +153,21 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
         </div>
       </div>
 
-      {/* Caption */}
-      <div className="mt-3 font-mono text-xs text-[#2563eb] flex items-center gap-2">
-        <span>&#9656;</span>
-        <span>
-          Fig {image.section_number} — {image.section_title}
-        </span>
+      {/* Caption with descriptive title */}
+      <div className="mt-3 space-y-2">
+        {/* Figure number and section title */}
+        <div className="font-mono text-xs text-[#2563eb] flex items-center gap-2">
+          <span>&#9656;</span>
+          <span>
+            Fig {image.section_number} — {image.section_title}
+          </span>
+        </div>
+        {/* Descriptive title explaining what the image shows */}
+        {image.image_title && (
+          <p className="text-sm text-gray-700 leading-relaxed pl-4">
+            {image.image_title}
+          </p>
+        )}
       </div>
 
       {/* Prompt Details Modal (admin only) */}

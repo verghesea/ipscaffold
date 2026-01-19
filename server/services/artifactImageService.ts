@@ -98,7 +98,7 @@ export async function generateArtifactImages(
         section_title: section.title,
         image_url: storedImageUrl,
         prompt_used: imageResult.promptUsed,
-        image_title: imageResult.revisedPrompt || `Visualization for: ${section.title}`,
+        image_title: imageResult.imageTitle, // Use Claude-generated descriptive title
         generation_metadata: {
           model: 'dall-e-3',
           size: '1792x1024',
@@ -161,7 +161,7 @@ export async function generateSingleSectionImage(
     section_title: sectionTitle,
     image_url: storedImageUrl,
     prompt_used: imageResult.promptUsed,
-    image_title: imageResult.revisedPrompt || `Visualization for: ${sectionTitle}`,
+    image_title: imageResult.imageTitle, // Use Claude-generated descriptive title
     generation_metadata: {
       model: 'dall-e-3',
       size: '1792x1024',

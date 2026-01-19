@@ -21,6 +21,7 @@ export interface ImageGenerationResult {
   imageUrl: string;
   promptUsed: string;
   revisedPrompt?: string;
+  imageTitle: string; // Descriptive title explaining what the image shows
 }
 
 export interface ImageGenerationError {
@@ -57,21 +58,22 @@ export async function generateSectionImage(
 ): Promise<ImageGenerationResult> {
   const { artifactType, sectionNumber, sectionTitle, sectionContent } = request;
 
-  // Generate patent-specific prompt using Claude
+  // Generate patent-specific prompt AND title using Claude
   console.log(`[ImageGenerator] Generating custom prompt for ${artifactType} section ${sectionNumber}...`);
-  const prompt = await generateImagePrompt({
+  const { prompt, title } = await generateImagePrompt({
     artifactType,
     sectionNumber,
     sectionTitle,
     sectionContent,
   });
 
-  if (!prompt) {
+  if (!prompt || !title) {
     throw new Error(
       `Failed to generate prompt for ${artifactType} section ${sectionNumber}`
     );
   }
 
+  console.log(`[ImageGenerator] Title: ${title}`);
   console.log(`[ImageGenerator] Using prompt: ${prompt.substring(0, 100)}...`);
 
   try {
@@ -93,6 +95,7 @@ export async function generateSectionImage(
       imageUrl: response.data[0].url,
       promptUsed: prompt,
       revisedPrompt: response.data[0].revised_prompt,
+      imageTitle: title, // Use Claude-generated descriptive title
     };
   } catch (error) {
     console.error(`Error generating image for section ${sectionNumber}:`, error);

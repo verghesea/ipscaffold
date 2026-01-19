@@ -24,24 +24,31 @@ export interface ImagePromptRequest {
   sectionContent: string;
 }
 
+export interface ImagePromptResult {
+  prompt: string;
+  title: string; // Human-readable title explaining what the image shows
+}
+
 /**
- * Generate a custom image prompt using Claude
+ * Generate a custom image prompt AND descriptive title using Claude
  *
- * Claude analyzes the patent section content and creates a specific prompt
- * for DALL-E/SDXL that describes a simple 4-color pen sketch illustrating
- * the concept.
+ * Claude analyzes the patent section content and creates:
+ * 1. A specific DALL-E prompt for generating the image
+ * 2. A descriptive title explaining what the image illustrates
  *
  * Cost: ~$0.001 per prompt (Haiku model)
  * Time: ~2-3 seconds
  */
 export async function generateImagePrompt(
   request: ImagePromptRequest
-): Promise<string> {
+): Promise<ImagePromptResult> {
   const { artifactType, sectionNumber, sectionTitle, sectionContent } = request;
 
   const systemPrompt = `You are an expert at creating image generation prompts for AI image generators like DALL-E and Stable Diffusion.
 
-Your task is to read patent section content and create a prompt for a simple 4-color pen sketch that illustrates the key concept.
+Your task is to read patent section content and create:
+1. A DALL-E prompt for a simple 4-color pen sketch
+2. A descriptive title that explains what the image illustrates
 
 STYLE REQUIREMENTS (CRITICAL):
 - Simple hand-drawn sketch style (like quick working notes)
@@ -57,16 +64,15 @@ CONTENT REQUIREMENTS:
 - Use simple shapes, arrows, labels to convey the idea
 - Make it conceptually accurate to THIS patent (not generic)
 
-PROMPT FORMAT:
-Write a single paragraph prompt starting with "Simple hand-drawn sketch showing..." that describes:
-1. What is being illustrated (specific to this patent)
-2. Which colored pens are used and for what elements
-3. The sketchy, minimal style
-4. Graph paper background and 16:9 ratio
+OUTPUT FORMAT - Return your response in this exact format:
 
-IMPORTANT: Make the prompt SPECIFIC to the content provided. Avoid generic descriptions.`;
+TITLE: [A concise 1-2 sentence description of what this image shows and why it matters for understanding this section]
 
-  const userPrompt = `Create an image prompt for this patent section:
+PROMPT: [Single paragraph starting with "Simple hand-drawn sketch showing..." that describes what to draw, which colors to use, and the sketchy style]
+
+IMPORTANT: Make both the title and prompt SPECIFIC to the content provided. Avoid generic descriptions.`;
+
+  const userPrompt = `Create an image prompt and title for this patent section:
 
 **Artifact Type:** ${getArtifactTypeDescription(artifactType)}
 **Section ${sectionNumber}: ${sectionTitle}**
@@ -74,7 +80,7 @@ IMPORTANT: Make the prompt SPECIFIC to the content provided. Avoid generic descr
 **Content:**
 ${sectionContent}
 
-Generate a DALL-E prompt for a simple 4-color pen sketch that illustrates the key concept from this specific section.`;
+Generate both a descriptive TITLE and a DALL-E PROMPT following the exact format specified.`;
 
   try {
     const response = await anthropic.messages.create({
@@ -90,18 +96,26 @@ Generate a DALL-E prompt for a simple 4-color pen sketch that illustrates the ke
       system: systemPrompt,
     });
 
-    const generatedPrompt = response.content[0].type === 'text'
+    const generatedText = response.content[0].type === 'text'
       ? response.content[0].text.trim()
       : '';
 
-    if (!generatedPrompt) {
-      throw new Error('Claude returned empty prompt');
+    if (!generatedText) {
+      throw new Error('Claude returned empty response');
     }
 
-    console.log(`[ImagePromptGenerator] Generated prompt for ${artifactType} section ${sectionNumber}`);
-    console.log(`[ImagePromptGenerator] Prompt length: ${generatedPrompt.length} chars`);
+    // Parse the structured response
+    const titleMatch = generatedText.match(/TITLE:\s*(.+?)(?=\n\nPROMPT:|$)/is);
+    const promptMatch = generatedText.match(/PROMPT:\s*(.+?)$/is);
 
-    return generatedPrompt;
+    const title = titleMatch?.[1]?.trim() || generateFallbackTitle(request);
+    const prompt = promptMatch?.[1]?.trim() || generateFallbackPrompt(request).prompt;
+
+    console.log(`[ImagePromptGenerator] Generated for ${artifactType} section ${sectionNumber}`);
+    console.log(`[ImagePromptGenerator] Title: ${title.substring(0, 80)}...`);
+    console.log(`[ImagePromptGenerator] Prompt length: ${prompt.length} chars`);
+
+    return { prompt, title };
   } catch (error) {
     console.error('[ImagePromptGenerator] Error generating prompt:', error);
 
@@ -125,36 +139,47 @@ function getArtifactTypeDescription(artifactType: ArtifactType): string {
 }
 
 /**
+ * Generate a basic fallback title if parsing fails
+ */
+function generateFallbackTitle(request: ImagePromptRequest): string {
+  const { sectionTitle } = request;
+  return `Illustration of ${sectionTitle}`;
+}
+
+/**
  * Generate a basic fallback prompt if Claude fails
  * Better than hardcoded prompts because it still uses section title
  */
-function generateFallbackPrompt(request: ImagePromptRequest): string {
+function generateFallbackPrompt(request: ImagePromptRequest): ImagePromptResult {
   const { sectionTitle, sectionContent } = request;
 
   // Extract first sentence or use title
   const firstSentence = sectionContent.split('.')[0] || sectionTitle;
 
-  return `Simple hand-drawn sketch illustrating "${sectionTitle}", quick diagram with blue, red, green, and black pens, showing concept of ${firstSentence}, loose sketchy style, minimal detail, like quick working notes, graph paper background visible, 16:9 aspect ratio`;
+  return {
+    title: generateFallbackTitle(request),
+    prompt: `Simple hand-drawn sketch illustrating "${sectionTitle}", quick diagram with blue, red, green, and black pens, showing concept of ${firstSentence}, loose sketchy style, minimal detail, like quick working notes, graph paper background visible, 16:9 aspect ratio`,
+  };
 }
 
 /**
- * Batch generate prompts for multiple sections
+ * Batch generate prompts and titles for multiple sections
  * Useful for generating all prompts for an artifact at once
  */
 export async function generateBatchImagePrompts(
   requests: ImagePromptRequest[]
-): Promise<Map<number, string>> {
-  const prompts = new Map<number, string>();
+): Promise<Map<number, ImagePromptResult>> {
+  const results = new Map<number, ImagePromptResult>();
 
   for (const request of requests) {
     try {
-      const prompt = await generateImagePrompt(request);
-      prompts.set(request.sectionNumber, prompt);
+      const result = await generateImagePrompt(request);
+      results.set(request.sectionNumber, result);
     } catch (error) {
       console.error(`Error generating prompt for section ${request.sectionNumber}:`, error);
       // Continue with other sections even if one fails
     }
   }
 
-  return prompts;
+  return results;
 }
