@@ -1201,7 +1201,7 @@ async function generateRemainingArtifactsWithNotifications(
 
   try {
     // Stage 1: Generate Business Narrative (1/2)
-    updateProgress({
+    await updateProgress({
       patentId,
       stage: 'artifacts',
       current: 1,
@@ -1220,7 +1220,7 @@ async function generateRemainingArtifactsWithNotifications(
     });
 
     // Stage 2: Generate Golden Circle (2/2)
-    updateProgress({
+    await updateProgress({
       patentId,
       stage: 'artifacts',
       current: 2,
@@ -1242,7 +1242,7 @@ async function generateRemainingArtifactsWithNotifications(
     console.log('All artifacts generated for patent:', patentId);
 
     // Stage 3: Generate hero image
-    updateProgress({
+    await updateProgress({
       patentId,
       stage: 'hero_image',
       current: 0,
@@ -1283,7 +1283,7 @@ async function generateRemainingArtifactsWithNotifications(
     }
 
     // Complete!
-    updateProgress({
+    await updateProgress({
       patentId,
       stage: 'hero_image',
       current: 1,
@@ -1298,7 +1298,7 @@ async function generateRemainingArtifactsWithNotifications(
     console.error('Error generating remaining artifacts:', error);
     await supabaseStorage.updatePatentStatus(patentId, 'failed', 'Failed to generate all artifacts');
 
-    updateProgress({
+    await updateProgress({
       patentId,
       stage: 'artifacts',
       current: 0,

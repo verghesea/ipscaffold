@@ -12,11 +12,12 @@ export interface ProgressUpdate {
 // In-memory store for SSE connections
 const progressStore = new Map<string, ProgressUpdate>();
 
-export function updateProgress(update: ProgressUpdate): void {
+export async function updateProgress(update: ProgressUpdate): Promise<void> {
   progressStore.set(update.patentId, update);
 
-  // Persist to database (fire and forget)
-  supabaseAdmin.from('patent_progress')
+  // Persist to database
+  const { error } = await supabaseAdmin
+    .from('patent_progress')
     .upsert({
       patent_id: update.patentId,
       stage: update.stage,
@@ -25,10 +26,11 @@ export function updateProgress(update: ProgressUpdate): void {
       message: update.message,
       complete: update.complete,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'patent_id' })
-    .catch(error => {
-      console.error('Failed to persist progress:', error);
-    });
+    }, { onConflict: 'patent_id' });
+
+  if (error) {
+    console.error('Failed to persist progress:', error);
+  }
 }
 
 export function getProgress(patentId: string): ProgressUpdate | null {
