@@ -1254,12 +1254,17 @@ async function generateRemainingArtifactsWithNotifications(
     try {
       const patent = await supabaseStorage.getPatent(patentId);
       const { generatePatentHeroImage } = await import('./services/patentHeroImageService');
+
+      console.log(`[HeroImage] Starting hero image generation for patent ${patentId}`);
+
       const heroImageResult = await generatePatentHeroImage({
         patentId,
         elia15Content,
         patentTitle: patentTitle || 'Untitled Patent',
         friendlyTitle: patent?.friendly_title || undefined,
       });
+
+      console.log(`[HeroImage] Hero image generated, saving to database...`);
 
       await supabaseStorage.upsertPatentHeroImage({
         patent_id: patentId,
@@ -1278,7 +1283,12 @@ async function generateRemainingArtifactsWithNotifications(
 
       console.log('✓ Generated hero image for patent', patentId);
     } catch (error) {
-      console.error('Failed to generate hero image:', error);
+      console.error('❌ FAILED to generate hero image for patent', patentId);
+      console.error('Error details:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       // Don't fail the whole process if hero image fails
     }
 
