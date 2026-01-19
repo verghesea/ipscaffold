@@ -68,6 +68,7 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
 
   if (!assignee) {
     console.log('[PDF Parser] ⚠️ No assignee found in PDF');
+  }
 
   // Extract patent number (multiple formats)
   let patentNumber = null;
