@@ -41,9 +41,28 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
     title = lines[1] || lines[0] || 'Untitled Patent';
   }
   
-  // Extract inventors
-  const inventorsMatch = text.match(/Inventors?:\s*(.+?)(?:\n\n|Assignee:|Appl\.|Filed:)/i);
-  const inventors = inventorsMatch ? inventorsMatch[1].trim() : null;
+  // Extract inventors (multiple patterns for robustness)
+  let inventors = null;
+  const inventorPatterns = [
+    /\(\s*72\s*\)\s*Inventors?:\s*([^\n]+?)(?:\n|$)/i, // (72) Inventor: format
+    /Inventors?:\s*([^\n]+?)(?:\n|$)/i, // Simple Inventor: format
+    /Inventors?:\s*(.+?)(?:\n\n|Assignee:|Appl\.|Filed:)/is, // Multiline with stopwords
+  ];
+
+  for (const pattern of inventorPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      inventors = match[1].trim();
+      // Clean up location info in parentheses
+      inventors = inventors.replace(/\s*,?\s*\([A-Z]{2}\)\s*$/g, '').trim();
+      console.log(`[PDF Parser] Extracted inventors: "${inventors.substring(0, 50)}..."`);
+      break;
+    }
+  }
+
+  if (!inventors) {
+    console.log('[PDF Parser] ⚠️ No inventors found in PDF');
+  }
   
   // Extract assignee (multiple patterns for robustness)
   let assignee = null;
