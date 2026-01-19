@@ -703,6 +703,101 @@ export async function registerRoutes(
     }
   });
 
+  // Re-extract metadata from stored PDF (admin only)
+  app.post('/api/admin/patent/:id/re-extract', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const patentId = req.params.id;
+      const patent = await supabaseStorage.getPatent(patentId);
+
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
+      }
+
+      if (!patent.pdf_filename) {
+        return res.status(400).json({ error: 'No PDF file stored for this patent' });
+      }
+
+      const pdfPath = `uploads/${patent.pdf_filename}`;
+      console.log(`[Re-extract] Re-parsing PDF for patent ${patentId}: ${pdfPath}`);
+
+      // Re-parse the PDF
+      const parsedPatent = await parsePatentPDF(pdfPath);
+
+      // Update patent metadata (keep full_text, status, and other fields intact)
+      await supabaseAdmin
+        .from('patents')
+        .update({
+          title: parsedPatent.title,
+          inventors: parsedPatent.inventors,
+          assignee: parsedPatent.assignee,
+          filing_date: parsedPatent.filingDate,
+          issue_date: parsedPatent.issueDate,
+          patent_number: parsedPatent.patentNumber,
+          application_number: parsedPatent.applicationNumber,
+          patent_classification: parsedPatent.patentClassification,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', patentId);
+
+      console.log(`[Re-extract] ✓ Updated metadata for patent ${patentId}`);
+      console.log(`  Assignee: ${parsedPatent.assignee || 'NOT FOUND'}`);
+      console.log(`  Inventors: ${parsedPatent.inventors || 'NOT FOUND'}`);
+
+      // Return updated patent
+      const updatedPatent = await supabaseStorage.getPatent(patentId);
+      res.json({ success: true, patent: updatedPatent });
+
+    } catch (error) {
+      console.error('Re-extract metadata error:', error);
+      res.status(500).json({ error: 'Failed to re-extract metadata', details: (error as Error).message });
+    }
+  });
+
+  // Manually update patent metadata (admin only)
+  app.put('/api/admin/patent/:id/metadata', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const patentId = req.params.id;
+      const { inventors, assignee, filingDate, issueDate, patentNumber, applicationNumber, patentClassification } = req.body;
+
+      const patent = await supabaseStorage.getPatent(patentId);
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
+      }
+
+      console.log(`[Manual Update] Updating metadata for patent ${patentId}`);
+      console.log(`  Assignee: ${assignee || '(no change)'}`);
+      console.log(`  Inventors: ${inventors || '(no change)'}`);
+
+      // Build update object (only update provided fields)
+      const updates: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (inventors !== undefined) updates.inventors = inventors;
+      if (assignee !== undefined) updates.assignee = assignee;
+      if (filingDate !== undefined) updates.filing_date = filingDate;
+      if (issueDate !== undefined) updates.issue_date = issueDate;
+      if (patentNumber !== undefined) updates.patent_number = patentNumber;
+      if (applicationNumber !== undefined) updates.application_number = applicationNumber;
+      if (patentClassification !== undefined) updates.patent_classification = patentClassification;
+
+      await supabaseAdmin
+        .from('patents')
+        .update(updates)
+        .eq('id', patentId);
+
+      console.log(`[Manual Update] ✓ Metadata updated for patent ${patentId}`);
+
+      // Return updated patent
+      const updatedPatent = await supabaseStorage.getPatent(patentId);
+      res.json({ success: true, patent: updatedPatent });
+
+    } catch (error) {
+      console.error('Manual metadata update error:', error);
+      res.status(500).json({ error: 'Failed to update metadata' });
+    }
+  });
+
   app.post('/api/patent/:id/retry', requireAuth, async (req, res) => {
     try {
       const patent = await supabaseStorage.getPatent(req.params.id);

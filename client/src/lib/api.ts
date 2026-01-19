@@ -520,4 +520,48 @@ export const api = {
       throw new Error(error.error || 'Failed to delete user');
     }
   },
+
+  // Re-extract metadata from stored PDF (admin only)
+  async reExtractMetadata(patentId: string): Promise<Patent> {
+    const response = await fetch(`/api/admin/patent/${patentId}/re-extract`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to re-extract metadata');
+    }
+
+    const data = await response.json();
+    return data.patent;
+  },
+
+  // Manually update patent metadata (admin only)
+  async updatePatentMetadata(patentId: string, metadata: {
+    inventors?: string | null;
+    assignee?: string | null;
+    filingDate?: string | null;
+    issueDate?: string | null;
+    patentNumber?: string | null;
+    applicationNumber?: string | null;
+    patentClassification?: string | null;
+  }): Promise<Patent> {
+    const response = await fetch(`/api/admin/patent/${patentId}/metadata`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(metadata),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update metadata');
+    }
+
+    const data = await response.json();
+    return data.patent;
+  },
 };
