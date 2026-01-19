@@ -58,6 +58,7 @@ CREATE TABLE public.patent_hero_images (
 ALTER TABLE public.patent_hero_images ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view hero images for patents they own
+DROP POLICY IF EXISTS "Users can view hero images for own patents" ON public.patent_hero_images;
 CREATE POLICY "Users can view hero images for own patents"
     ON public.patent_hero_images FOR SELECT
     USING (
@@ -69,6 +70,7 @@ CREATE POLICY "Users can view hero images for own patents"
     );
 
 -- Policy: Service role can manage hero images
+DROP POLICY IF EXISTS "Service role can manage hero images" ON public.patent_hero_images;
 CREATE POLICY "Service role can manage hero images"
     ON public.patent_hero_images FOR ALL
     USING (true)
@@ -82,6 +84,9 @@ ON public.patent_hero_images(patent_id);
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
+        -- Drop trigger if it exists
+        DROP TRIGGER IF EXISTS update_patent_hero_images_updated_at ON public.patent_hero_images;
+        -- Create trigger
         CREATE TRIGGER update_patent_hero_images_updated_at
             BEFORE UPDATE ON public.patent_hero_images
             FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -123,6 +128,7 @@ CREATE TABLE IF NOT EXISTS public.patent_progress (
 ALTER TABLE public.patent_progress ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view progress for their own patents
+DROP POLICY IF EXISTS "Users can view own patent progress" ON public.patent_progress;
 CREATE POLICY "Users can view own patent progress"
     ON public.patent_progress FOR SELECT
     USING (
@@ -134,6 +140,7 @@ CREATE POLICY "Users can view own patent progress"
     );
 
 -- Policy: Service role can manage progress
+DROP POLICY IF EXISTS "Service role can manage progress" ON public.patent_progress;
 CREATE POLICY "Service role can manage progress"
     ON public.patent_progress FOR ALL
     USING (true)
@@ -170,6 +177,7 @@ CREATE TABLE IF NOT EXISTS public.user_management_log (
 ALTER TABLE public.user_management_log ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Super admins can view logs
+DROP POLICY IF EXISTS "Super admins can view logs" ON public.user_management_log;
 CREATE POLICY "Super admins can view logs"
     ON public.user_management_log FOR SELECT
     USING (
