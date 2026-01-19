@@ -30,7 +30,47 @@ export function DashboardPage() {
 
   useEffect(() => {
     loadDashboard();
-  }, []);
+
+    // Auto-refresh hero images every 15 seconds for recently completed patents
+    const interval = setInterval(async () => {
+      try {
+        // Only fetch hero images for patents that:
+        // 1. Are completed
+        // 2. Don't have a hero image yet
+        // 3. Were created in the last hour (to avoid unnecessary requests)
+        const recentPatents = patents.filter(p => {
+          const isCompleted = p.status === 'completed';
+          const hasNoHeroImage = !heroImages[p.id];
+          const isRecent = p.createdAt &&
+            (Date.now() - new Date(p.createdAt).getTime()) < 60 * 60 * 1000; // 1 hour
+          return isCompleted && hasNoHeroImage && isRecent;
+        });
+
+        if (recentPatents.length === 0) return;
+
+        console.log(`[Dashboard] Checking for hero images on ${recentPatents.length} recent patents...`);
+
+        for (const patent of recentPatents) {
+          try {
+            const heroImage = await api.getPatentHeroImage(patent.id);
+            if (heroImage?.image_url) {
+              console.log(`[Dashboard] Found hero image for patent ${patent.id}`);
+              setHeroImages(prev => ({
+                ...prev,
+                [patent.id]: heroImage.image_url
+              }));
+            }
+          } catch (error) {
+            // 404 is expected if hero image isn't ready yet, ignore
+          }
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error checking for hero images:', error);
+      }
+    }, 15000); // Check every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [patents, heroImages]);
 
   const loadDashboard = async () => {
     try {

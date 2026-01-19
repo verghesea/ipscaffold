@@ -48,20 +48,26 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   // Extract assignee (multiple patterns for robustness)
   let assignee = null;
   const assigneePatterns = [
-    /(?:\(\s*73\s*\)|Assignee):\s*(.+?)(?:\n\n|Appl\.|Filed:|Notice:|$)/is,
-    /Assignee:\s*(.+?)(?:,\s+[A-Z]{2}(?:\s+\([A-Z]{2}\))?)?(?:\n|$)/i,
-    /\(\s*73\s*\)\s*Assignee:\s*(.+?)(?:\n|$)/i,
+    /\(\s*73\s*\)\s*Assignee:\s*([^\n]+?)(?:\n|$)/i, // (73) Assignee: format
+    /Assignee:\s*([^\n]+?)(?:\n|$)/i, // Simple Assignee: format
+    /(?:\(\s*73\s*\)|Assignee):\s*(.+?)(?:\n\n|Appl\.|Filed:|Notice:)/is, // Multiline with stopwords
   ];
 
   for (const pattern of assigneePatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
       assignee = match[1].trim();
-      // Clean up location info in parentheses
-      assignee = assignee.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      // Remove trailing location codes like (US) but keep the company name
+      assignee = assignee.replace(/\s*,?\s*\([A-Z]{2}\)\s*$/, '').trim();
+      // Remove "care of" addresses
+      assignee = assignee.replace(/\s*,\s*c\/o.+$/i, '').trim();
+      console.log(`[PDF Parser] Extracted assignee: "${assignee}"`);
       break;
     }
   }
+
+  if (!assignee) {
+    console.log('[PDF Parser] ⚠️ No assignee found in PDF');
 
   // Extract patent number (multiple formats)
   let patentNumber = null;
@@ -119,7 +125,7 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
   const issueDateMatch = text.match(/(?:Date of Patent|Patent No\.|Pub\. No\.).*?(\w+\.?\s+\d{1,2},?\s+\d{4})/i);
   const issueDate = issueDateMatch ? issueDateMatch[1].trim() : null;
 
-  return {
+  const parsed = {
     title,
     inventors,
     assignee,
@@ -130,4 +136,15 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
     patentClassification,
     fullText: text
   };
+
+  // Log extracted metadata for debugging
+  console.log('[PDF Parser] Extraction complete:');
+  console.log(`  Title: ${title?.substring(0, 50)}...`);
+  console.log(`  Inventors: ${inventors || 'NOT FOUND'}`);
+  console.log(`  Assignee: ${assignee || 'NOT FOUND'}`);
+  console.log(`  Patent Number: ${patentNumber || 'NOT FOUND'}`);
+  console.log(`  Application Number: ${applicationNumber || 'NOT FOUND'}`);
+  console.log(`  Classification: ${patentClassification?.substring(0, 50) || 'NOT FOUND'}`);
+
+  return parsed;
 }
