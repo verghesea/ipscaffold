@@ -391,7 +391,7 @@ export function DashboardPage() {
                         >
                           <TableCell className="font-medium">
                             <span className="line-clamp-1" data-testid={`text-title-${patent.id}`}>
-                              {patent.title || 'Untitled Patent'}
+                              {patent.friendlyTitle || patent.title || 'Untitled Patent'}
                             </span>
                           </TableCell>
                           <TableCell className="text-muted-foreground">

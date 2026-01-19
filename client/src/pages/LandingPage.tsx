@@ -45,7 +45,7 @@ export function LandingPage() {
             <div className="grid md:grid-cols-3 gap-12">
               {[
                 {
-                  title: "ELIA15 Explanation",
+                  title: "Scientific Narrative",
                   desc: "Clear, jargon-free summaries explained as if to a 15-year-old.",
                   delay: "0ms"
                 },

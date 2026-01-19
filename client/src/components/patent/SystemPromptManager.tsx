@@ -1,7 +1,7 @@
 /**
  * SystemPromptManager Component
  * Super-admin interface for managing AI generation system prompts
- * Controls prompts for ELIA15, Business Narrative, and Golden Circle
+ * Controls prompts for Scientific Narrative, Business Narrative, and Golden Circle
  */
 
 import { useState } from 'react';
@@ -29,7 +29,7 @@ type PromptType = 'elia15' | 'business_narrative' | 'golden_circle';
 
 const PROMPT_LABELS: Record<PromptType, { title: string; description: string }> = {
   elia15: {
-    title: 'ELIA15 (Explain Like I\'m 15)',
+    title: 'Scientific Narrative (Explain Like I\'m 15)',
     description: 'Simplified technical explanation for accessibility',
   },
   business_narrative: {
@@ -328,7 +328,7 @@ export function SystemPromptManager() {
       <CardHeader>
         <CardTitle className="font-playfair text-2xl">System Prompt Management</CardTitle>
         <CardDescription>
-          Configure Claude system prompts for artifact generation (ELIA15, Business Narrative, Golden Circle)
+          Configure Claude system prompts for artifact generation (Scientific Narrative, Business Narrative, Golden Circle)
         </CardDescription>
       </CardHeader>
       <CardContent>

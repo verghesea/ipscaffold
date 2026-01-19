@@ -341,6 +341,7 @@ export async function registerRoutes(
           return {
             id: patent.id,
             title: patent.title,
+            friendlyTitle: patent.friendly_title,
             assignee: patent.assignee,
             filingDate: patent.filing_date,
             status: patent.status,

@@ -22,7 +22,7 @@ const ARTIFACT_TYPES = {
     color: 'text-amber-600',
     bgColor: 'bg-amber-50',
     borderColor: 'border-amber-200',
-    label: 'ELIA15',
+    label: 'Scientific Narrative',
     description: 'Simplified Explanation',
     emoji: '💡',
     tagline: "Explain Like I'm 15"

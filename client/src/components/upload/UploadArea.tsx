@@ -50,7 +50,7 @@ export function UploadArea() {
       
       toast({
         title: "Upload successful",
-        description: "Your patent is being analyzed. Generating ELIA15...",
+        description: "Your patent is being analyzed. Generating Scientific Narrative...",
       });
       
       setLocation(`/preview/${result.patentId}`);
