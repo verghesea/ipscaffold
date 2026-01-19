@@ -62,6 +62,11 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
 
   if (!inventors) {
     console.log('[PDF Parser] ⚠️ No inventors found in PDF');
+    // Debug: Show what's near "Inventor" keyword
+    const inventorContext = text.match(/.{0,200}[Ii]nventor.{0,200}/);
+    if (inventorContext) {
+      console.log('[PDF Parser] DEBUG - Inventor context:', inventorContext[0].substring(0, 150));
+    }
   }
   
   // Extract assignee (multiple patterns for robustness)
@@ -70,23 +75,39 @@ export async function parsePatentPDF(filePath: string): Promise<ParsedPatent> {
     /\(\s*73\s*\)\s*Assignee:\s*([^\n]+?)(?:\n|$)/i, // (73) Assignee: format
     /Assignee:\s*([^\n]+?)(?:\n|$)/i, // Simple Assignee: format
     /(?:\(\s*73\s*\)|Assignee):\s*(.+?)(?:\n\n|Appl\.|Filed:|Notice:)/is, // Multiline with stopwords
+    /Assignee[:\s]+([^(\n]+?)(?:\([A-Z]{2}\)|$)/i, // Assignee with location in parens
+    /\*?\s*Assignee[:\s]*([A-Za-z0-9\s,\.&]+?)(?:,\s*[A-Z]{2}|$)/im, // Flexible format with state code
   ];
 
   for (const pattern of assigneePatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
       assignee = match[1].trim();
-      // Remove trailing location codes like (US) but keep the company name
-      assignee = assignee.replace(/\s*,?\s*\([A-Z]{2}\)\s*$/, '').trim();
+      // Remove trailing location codes like (US), (JP), etc
+      assignee = assignee.replace(/\s*,?\s*\([A-Z]{2}\)\s*$/g, '').trim();
+      // Remove state codes at end (e.g. ", CA", ", TX")
+      assignee = assignee.replace(/\s*,\s*[A-Z]{2}\s*$/g, '').trim();
       // Remove "care of" addresses
       assignee = assignee.replace(/\s*,\s*c\/o.+$/i, '').trim();
-      console.log(`[PDF Parser] Extracted assignee: "${assignee}"`);
-      break;
+      // Remove asterisks and extra whitespace
+      assignee = assignee.replace(/\*+/g, '').trim();
+      // Only accept if it's reasonable (2-100 chars, not all numbers)
+      if (assignee.length >= 2 && assignee.length <= 100 && !/^\d+$/.test(assignee)) {
+        console.log(`[PDF Parser] Extracted assignee: "${assignee}"`);
+        break;
+      } else {
+        assignee = null; // Invalid, keep searching
+      }
     }
   }
 
   if (!assignee) {
     console.log('[PDF Parser] ⚠️ No assignee found in PDF');
+    // Debug: Show what's near "Assignee" keyword
+    const assigneeContext = text.match(/.{0,200}[Aa]ssignee.{0,200}/);
+    if (assigneeContext) {
+      console.log('[PDF Parser] DEBUG - Assignee context:', assigneeContext[0].substring(0, 150));
+    }
   }
 
   // Extract patent number (multiple formats)

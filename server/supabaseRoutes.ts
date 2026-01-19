@@ -70,7 +70,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
+  // Startup log to confirm Stage 4 auto-generation is enabled
+  console.log('🚀 Server starting with parallel section image auto-generation (Stage 4) ENABLED');
+
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
   });
