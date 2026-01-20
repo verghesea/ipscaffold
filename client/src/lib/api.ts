@@ -2,11 +2,15 @@ export interface Patent {
   id: string;
   title: string;
   friendlyTitle?: string | null;
+  inventors?: string | null;
   assignee: string | null;
   filingDate: string | null;
+  issueDate?: string | null;
   patentNumber?: string | null;
   applicationNumber?: string | null;
   patentClassification?: string | null;
+  fullText?: string;
+  pdfFilename?: string | null;
   status: string;
   artifactCount?: number;
   createdAt?: string;

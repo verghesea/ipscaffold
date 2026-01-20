@@ -11,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, RefreshCw, Edit2, Check, X, Loader2, Sparkles, TrendingUp } from 'lucide-react';
+import { AlertCircle, RefreshCw, Edit2, Check, X, Loader2, Sparkles, TrendingUp, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface MetadataCorrectionPanelProps {
   patents: Patent[];
@@ -41,6 +42,7 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
     patentClassification: '',
   });
   const [saving, setSaving] = useState(false);
+  const [showPdfText, setShowPdfText] = useState(false);
 
   // Filter patents with missing metadata
   const patentsWithMissingMetadata = patents.filter(p =>
@@ -216,6 +218,7 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
             {patentsWithMissingMetadata.map((patent) => {
               const isReExtracting = reExtracting.has(patent.id);
               const missingFields = getMissingFields(patent);
+              const hasPdfFile = !!patent.pdfFilename;
 
               return (
                 <div
@@ -234,26 +237,45 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
                         Assignee: {patent.assignee}
                       </p>
                     )}
+                    {!hasPdfFile && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        PDF file not available - use Manual Edit
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2 ml-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleReExtract(patent.id)}
-                      disabled={isReExtracting}
-                    >
-                      {isReExtracting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Re-extracting...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Re-extract
-                        </>
-                      )}
-                    </Button>
+                    {hasPdfFile ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleReExtract(patent.id)}
+                        disabled={isReExtracting}
+                      >
+                        {isReExtracting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Re-extracting...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Re-extract
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        className="opacity-50 cursor-not-allowed"
+                        title="PDF file no longer available"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Re-extract (N/A)
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -281,6 +303,44 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* PDF Text Reference - Collapsible */}
+            {editingPatent?.fullText && (
+              <Collapsible open={showPdfText} onOpenChange={setShowPdfText}>
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardHeader className="pb-3">
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-between hover:bg-blue-100"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">
+                            View PDF Text (for reference)
+                          </span>
+                        </div>
+                        {showPdfText ? (
+                          <ChevronUp className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-blue-600" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent>
+                      <div className="max-h-96 overflow-y-auto bg-white p-4 rounded border text-xs font-mono whitespace-pre-wrap">
+                        {editingPatent.fullText}
+                      </div>
+                      <p className="text-xs text-blue-700 mt-2">
+                        💡 Use Cmd+F (Mac) or Ctrl+F (Windows) to search for fields like "Assignee", "Inventor", etc.
+                      </p>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            )}
             <div>
               <Label htmlFor="assignee">Assignee</Label>
               <Input

@@ -721,11 +721,24 @@ export async function registerRoutes(
       }
 
       if (!patent.pdf_filename) {
-        return res.status(400).json({ error: 'No PDF file stored for this patent' });
+        return res.status(400).json({
+          error: 'No PDF file stored for this patent',
+          details: 'PDF file was not saved during upload. Use Manual Edit instead.'
+        });
       }
 
       const pdfPath = `uploads/${patent.pdf_filename}`;
       console.log(`[Re-extract] Re-parsing PDF for patent ${patentId}: ${pdfPath}`);
+
+      // Check if file exists before trying to parse
+      try {
+        await fs.access(pdfPath);
+      } catch {
+        return res.status(404).json({
+          error: 'PDF file no longer available',
+          details: 'The PDF file has been deleted or is no longer accessible. This is common on cloud platforms. Use Manual Edit to update metadata - you can reference the PDF text in the edit dialog.'
+        });
+      }
 
       // Re-parse the PDF (pass patentId to enable extraction logging)
       const parsedPatent = await parsePatentPDF(pdfPath, patentId);
