@@ -218,7 +218,7 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
             {patentsWithMissingMetadata.map((patent) => {
               const isReExtracting = reExtracting.has(patent.id);
               const missingFields = getMissingFields(patent);
-              const hasPdfFile = !!patent.pdfFilename;
+              const canReExtract = !!patent.fullText; // Re-extract works with full_text now!
 
               return (
                 <div
@@ -237,45 +237,32 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
                         Assignee: {patent.assignee}
                       </p>
                     )}
-                    {!hasPdfFile && (
+                    {!canReExtract && (
                       <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
-                        PDF file not available - use Manual Edit
+                        No text available - use Manual Edit
                       </p>
                     )}
                   </div>
                   <div className="flex gap-2 ml-4">
-                    {hasPdfFile ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReExtract(patent.id)}
-                        disabled={isReExtracting}
-                      >
-                        {isReExtracting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Re-extracting...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Re-extract
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled
-                        className="opacity-50 cursor-not-allowed"
-                        title="PDF file no longer available"
-                      >
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Re-extract (N/A)
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleReExtract(patent.id)}
+                      disabled={isReExtracting || !canReExtract}
+                    >
+                      {isReExtracting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Re-extracting...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Re-extract
+                        </>
+                      )}
+                    </Button>
                     <Button
                       size="sm"
                       variant="secondary"
