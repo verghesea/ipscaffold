@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import { logExtraction, extractContext, trackPatternUsage } from './extractionLogger';
 import { supabaseAdmin } from '../lib/supabase';
+import Anthropic from '@anthropic-ai/sdk';
 
 export interface ParsedPatent {
   title: string | null;
@@ -110,6 +111,80 @@ async function getPdfParseClass(): Promise<any> {
   } catch {
     return eval('require')('pdf-parse').PDFParse;
   }
+}
+
+/**
+ * Check if extracted text is meaningful (not just page numbers/whitespace)
+ */
+function isTextMeaningful(text: string): boolean {
+  // Remove common page number patterns
+  const cleanText = text
+    .replace(/--\s*\d+\s*of\s*\d+\s*--/g, '')
+    .replace(/Page\s+\d+/gi, '')
+    .trim();
+
+  // Count actual words (more than 2 characters)
+  const words = cleanText.split(/\s+/).filter(w => w.length > 2);
+
+  // Check for patent keywords
+  const hasPatentKeywords = /inventor|assignee|patent|claim|filed|application|abstract/i.test(cleanText);
+
+  // Meaningful if:
+  // 1. More than 100 words, OR
+  // 2. More than 50 words AND contains patent keywords
+  return words.length > 100 || (words.length > 50 && hasPatentKeywords);
+}
+
+/**
+ * Extract text from PDF using Claude API (fallback for complex PDFs)
+ */
+async function extractTextWithClaude(filePath: string): Promise<string> {
+  console.log('[PDF Parser] Using Claude API to extract PDF text...');
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY not configured - cannot use Claude fallback parser');
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  // Read PDF as base64
+  const pdfBuffer = await fs.readFile(filePath);
+  const base64Pdf = pdfBuffer.toString('base64');
+
+  console.log(`[PDF Parser] Sending ${(pdfBuffer.length / 1024 / 1024).toFixed(2)}MB PDF to Claude API...`);
+
+  const message = await client.messages.create({
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 16000,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: 'application/pdf',
+            data: base64Pdf,
+          },
+        },
+        {
+          type: 'text',
+          text: 'Extract ALL text from this patent PDF. Return ONLY the raw text with no commentary, analysis, or formatting. Include all sections: title page, inventor names, assignee, filing dates, abstract, claims, detailed description, everything. Do not skip any text.',
+        },
+      ],
+    }],
+  });
+
+  const extractedText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+  console.log(`[PDF Parser] Claude API extracted ${extractedText.length} characters`);
+
+  if (!extractedText || extractedText.length < 100) {
+    throw new Error('Claude API failed to extract meaningful text from PDF');
+  }
+
+  return extractedText;
 }
 
 /**
@@ -436,19 +511,60 @@ export async function extractMetadataFromText(
 
 /**
  * Parse patent PDF with optional extraction logging
+ * Uses pdf-parse first, falls back to Claude API if extraction fails
  *
  * @param filePath - Path to PDF file
  * @param patentId - Optional patent ID for logging (if re-extracting)
  * @returns Parsed patent metadata with fullText
  */
 export async function parsePatentPDF(filePath: string, patentId?: string): Promise<ParsedPatent> {
-  const dataBuffer = await fs.readFile(filePath);
+  let text = '';
+  let usedClaudeFallback = false;
 
-  const PDFParse = await getPdfParseClass();
-  const parser = new PDFParse({ data: dataBuffer });
-  await parser.load();
-  const result = await parser.getText();
-  const text = result.text;
+  try {
+    // Try pdf-parse first (fast, free, works for most PDFs)
+    console.log('[PDF Parser] Attempting pdf-parse extraction...');
+    const dataBuffer = await fs.readFile(filePath);
+
+    const PDFParse = await getPdfParseClass();
+    const parser = new PDFParse({ data: dataBuffer });
+    await parser.load();
+    const result = await parser.getText();
+    text = result.text;
+
+    // Check if extraction was successful
+    const meaningful = isTextMeaningful(text);
+
+    if (!meaningful) {
+      console.log('[PDF Parser] ⚠️ pdf-parse extracted insufficient text (only page numbers/whitespace)');
+      console.log('[PDF Parser] Sample of extracted text:', text.substring(0, 200));
+      console.log('[PDF Parser] Falling back to Claude API...');
+
+      // Fallback: Use Claude API to read PDF
+      text = await extractTextWithClaude(filePath);
+      usedClaudeFallback = true;
+    } else {
+      console.log(`[PDF Parser] ✓ pdf-parse successfully extracted ${text.length} characters`);
+    }
+  } catch (error) {
+    console.error('[PDF Parser] pdf-parse error:', error);
+    console.log('[PDF Parser] Falling back to Claude API...');
+
+    try {
+      text = await extractTextWithClaude(filePath);
+      usedClaudeFallback = true;
+    } catch (claudeError) {
+      console.error('[PDF Parser] Claude API fallback also failed:', claudeError);
+      throw new Error('Failed to extract text from PDF using both pdf-parse and Claude API');
+    }
+  }
+
+  // Final sanity check
+  if (!text || text.length < 100) {
+    throw new Error('PDF text extraction failed - no meaningful text found');
+  }
+
+  console.log(`[PDF Parser] Final text length: ${text.length} characters (used ${usedClaudeFallback ? 'Claude API' : 'pdf-parse'})`);
 
   // Extract metadata from text
   const metadata = await extractMetadataFromText(text, patentId);
