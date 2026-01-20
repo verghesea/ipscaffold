@@ -134,13 +134,18 @@ export class SupabaseStorage {
   }
 
   async getPatentsByUser(userId: string): Promise<Patent[]> {
+    console.log('[getPatentsByUser] Querying patents for user:', userId);
     const { data, error } = await supabaseAdmin
       .from('patents')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    
-    if (error) return [];
+
+    if (error) {
+      console.error('[getPatentsByUser] Error:', error);
+      return [];
+    }
+    console.log('[getPatentsByUser] Found', data?.length || 0, 'patents');
     return data || [];
   }
 
