@@ -398,9 +398,19 @@ export async function registerRoutes(
   });
 
   app.get('/api/dashboard', requireAuth, async (req, res) => {
+    // Prevent HTTP caching for user-specific data
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+
+    console.log('[Dashboard] Request from user:', req.user?.id);
+
     try {
       const patents = await supabaseStorage.getPatentsByUser(req.user!.id);
-      
+      console.log('[Dashboard] Found', patents.length, 'patents for user');
+
       const patentsWithArtifactCount = await Promise.all(
         patents.map(async (patent) => {
           const artifacts = await supabaseStorage.getArtifactsByPatent(patent.id);
@@ -420,10 +430,11 @@ export async function registerRoutes(
         })
       );
 
+      console.log('[Dashboard] Responding with', patentsWithArtifactCount.length, 'patents');
       res.json({ patents: patentsWithArtifactCount });
 
     } catch (error) {
-      console.error('Dashboard error:', error);
+      console.error('[Dashboard] Error:', error);
       res.status(500).json({ error: 'Failed to load dashboard' });
     }
   });
