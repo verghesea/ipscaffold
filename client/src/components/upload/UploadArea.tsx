@@ -22,7 +22,10 @@ export function UploadArea() {
   }, []);
 
   const processFile = async (file: File) => {
+    console.log('[Upload] Processing file:', file.name, 'Size:', file.size, 'Type:', file.type);
+
     if (file.type !== 'application/pdf') {
+      console.error('[Upload] Invalid file type:', file.type);
       toast({
         title: "Invalid file type",
         description: "Please upload a PDF file.",
@@ -32,6 +35,7 @@ export function UploadArea() {
     }
 
     if (file.size > 10 * 1024 * 1024) {
+      console.error('[Upload] File too large:', file.size, 'bytes');
       toast({
         title: "File too large",
         description: "Maximum file size is 10MB.",
@@ -40,10 +44,13 @@ export function UploadArea() {
       return;
     }
 
+    console.log('[Upload] Validation passed, starting upload...');
     setIsUploading(true);
 
     try {
+      console.log('[Upload] Calling api.uploadPatent...');
       const result = await api.uploadPatent(file);
+      console.log('[Upload] Upload successful, patentId:', result.patentId);
       setIsUploading(false);
 
       analytics.trackPatentUpload(file.name);
@@ -55,6 +62,9 @@ export function UploadArea() {
 
       setLocation(`/preview/${result.patentId}`);
     } catch (error: any) {
+      console.error('[Upload] Upload failed:', error);
+      console.error('[Upload] Error message:', error.message);
+      console.error('[Upload] Error stack:', error.stack);
       setIsUploading(false);
       toast({
         title: "Upload failed",

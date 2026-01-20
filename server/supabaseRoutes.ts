@@ -93,12 +93,25 @@ export async function registerRoutes(
   });
 
   app.post('/api/upload', upload.single('pdf'), async (req, res) => {
+    console.log('[Upload] ========== NEW UPLOAD REQUEST ==========');
+    console.log('[Upload] Timestamp:', new Date().toISOString());
+    console.log('[Upload] Request headers:', JSON.stringify(req.headers, null, 2));
+
     try {
       if (!req.file) {
+        console.error('[Upload] ERROR: No file in request');
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      console.log('[Upload] File received:');
+      console.log('[Upload]   - Original name:', req.file.originalname);
+      console.log('[Upload]   - Size:', req.file.size, 'bytes');
+      console.log('[Upload]   - Type:', req.file.mimetype);
+      console.log('[Upload]   - Path:', req.file.path);
+
       const user = await getUserFromToken(req);
+      console.log('[Upload] User authentication:', user ? `Authenticated (${user.id})` : 'Anonymous');
+
       const filePath = req.file.path;
       const filename = req.file.filename;
 
@@ -193,13 +206,18 @@ export async function registerRoutes(
         }
 
       } catch (error) {
-        console.error('Error generating ELIA15:', error);
+        console.error('[Upload] ERROR: Failed to generate ELIA15');
+        console.error('[Upload] Error details:', error);
+        console.error('[Upload] Stack trace:', (error as Error).stack);
         await supabaseStorage.updatePatentStatus(patent.id, 'failed', 'Failed to generate ELIA15');
         res.status(500).json({ error: 'Failed to generate analysis' });
       }
 
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('[Upload] ERROR: Upload failed');
+      console.error('[Upload] Error details:', error);
+      console.error('[Upload] Error message:', (error as Error).message);
+      console.error('[Upload] Stack trace:', (error as Error).stack);
       res.status(500).json({ error: 'Failed to process patent' });
     }
   });

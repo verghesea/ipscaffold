@@ -147,28 +147,41 @@ export async function refreshSession(): Promise<boolean> {
 export function getAuthHeaders(): HeadersInit {
   const token = getStoredToken();
   if (token) {
+    console.log('[Auth] Token found, length:', token.length);
     return { 'Authorization': `Bearer ${token}` };
   }
+  console.warn('[Auth] No token found in localStorage');
   return {};
 }
 
 export const api = {
   async uploadPatent(file: File): Promise<{ success: boolean; patentId: string }> {
+    console.log('[API] uploadPatent called with file:', file.name);
+
     const formData = new FormData();
     formData.append('pdf', file);
-    
+
+    const authHeaders = getAuthHeaders();
+    console.log('[API] Auth headers present:', Object.keys(authHeaders).length > 0);
+
+    console.log('[API] Making POST request to /api/upload...');
     const response = await fetch('/api/upload', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: authHeaders,
       body: formData,
     });
-    
+
+    console.log('[API] Response status:', response.status, response.statusText);
+
     if (!response.ok) {
       const error = await response.json();
+      console.error('[API] Upload failed with error:', error);
       throw new Error(error.error || 'Upload failed');
     }
-    
-    return response.json();
+
+    const result = await response.json();
+    console.log('[API] Upload successful:', result);
+    return result;
   },
   
   async getPreview(id: string): Promise<{
