@@ -101,7 +101,30 @@ export async function registerRoutes(
       const user = await getUserFromToken(req);
       const filePath = req.file.path;
       const filename = req.file.filename;
+
+      // Parse PDF for metadata extraction
       const parsedPatent = await parsePatentPDF(filePath);
+
+      // Upload PDF to Supabase Storage
+      let pdfStoragePath: string | null = null;
+      try {
+        const fileBuffer = await fs.readFile(filePath);
+        const { storagePath } = await supabaseStorage.uploadPdfToStorage(
+          fileBuffer,
+          filename,
+          user?.id || null
+        );
+        pdfStoragePath = storagePath;
+        console.log(`[Upload] ✓ PDF uploaded to Supabase Storage: ${storagePath}`);
+
+        // Delete local file after successful upload to storage
+        await fs.unlink(filePath);
+        console.log(`[Upload] ✓ Local file cleaned up: ${filePath}`);
+      } catch (storageError) {
+        console.error('[Upload] ⚠️ Failed to upload to Supabase Storage:', storageError);
+        console.log('[Upload] Continuing with local file fallback');
+        // Continue anyway - we'll keep the local file as fallback
+      }
 
       const patent = await supabaseStorage.createPatent({
         user_id: user?.id || null,
@@ -115,6 +138,7 @@ export async function registerRoutes(
         patent_classification: parsedPatent.patentClassification,
         full_text: parsedPatent.fullText,
         pdf_filename: filename,
+        pdf_storage_path: pdfStoragePath,
         status: 'processing',
         error_message: null,
       });
@@ -720,28 +744,69 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Patent not found' });
       }
 
-      if (!patent.pdf_filename) {
+      if (!patent.pdf_filename && !patent.pdf_storage_path) {
         return res.status(400).json({
           error: 'No PDF file stored for this patent',
           details: 'PDF file was not saved during upload. Use Manual Edit instead.'
         });
       }
 
-      const pdfPath = `uploads/${patent.pdf_filename}`;
-      console.log(`[Re-extract] Re-parsing PDF for patent ${patentId}: ${pdfPath}`);
+      let pdfPath: string;
+      let cleanupTempFile = false;
 
-      // Check if file exists before trying to parse
-      try {
-        await fs.access(pdfPath);
-      } catch {
-        return res.status(404).json({
-          error: 'PDF file no longer available',
-          details: 'The PDF file has been deleted or is no longer accessible. This is common on cloud platforms. Use Manual Edit to update metadata - you can reference the PDF text in the edit dialog.'
-        });
+      // Try Supabase Storage first (preferred)
+      if (patent.pdf_storage_path) {
+        try {
+          console.log(`[Re-extract] Downloading PDF from Supabase Storage: ${patent.pdf_storage_path}`);
+          const pdfBuffer = await supabaseStorage.downloadPdfFromStorage(patent.pdf_storage_path);
+
+          // Write to temporary file for parsing
+          pdfPath = `uploads/temp-${nanoid()}.pdf`;
+          await fs.writeFile(pdfPath, pdfBuffer);
+          cleanupTempFile = true;
+          console.log(`[Re-extract] ✓ Downloaded PDF to temporary file: ${pdfPath}`);
+        } catch (storageError) {
+          console.error('[Re-extract] ⚠️ Failed to download from Supabase Storage:', storageError);
+
+          // Fall back to local file if available
+          if (patent.pdf_filename) {
+            pdfPath = `uploads/${patent.pdf_filename}`;
+            console.log(`[Re-extract] Falling back to local file: ${pdfPath}`);
+          } else {
+            return res.status(404).json({
+              error: 'PDF file no longer available',
+              details: 'Failed to download PDF from storage and no local file available. Use Manual Edit to update metadata.'
+            });
+          }
+        }
+      } else {
+        // Try local file (legacy behavior)
+        pdfPath = `uploads/${patent.pdf_filename}`;
+        console.log(`[Re-extract] Using local PDF file: ${pdfPath}`);
+
+        // Check if file exists
+        try {
+          await fs.access(pdfPath);
+        } catch {
+          return res.status(404).json({
+            error: 'PDF file no longer available',
+            details: 'The PDF file has been deleted or is no longer accessible. Use Manual Edit to update metadata - you can reference the PDF text in the edit dialog.'
+          });
+        }
       }
 
       // Re-parse the PDF (pass patentId to enable extraction logging)
       const parsedPatent = await parsePatentPDF(pdfPath, patentId);
+
+      // Clean up temporary file if we downloaded from storage
+      if (cleanupTempFile) {
+        try {
+          await fs.unlink(pdfPath);
+          console.log(`[Re-extract] ✓ Cleaned up temporary file: ${pdfPath}`);
+        } catch (unlinkError) {
+          console.error('[Re-extract] Failed to cleanup temp file:', unlinkError);
+        }
+      }
 
       // Update patent metadata (keep full_text, status, and other fields intact)
       await supabaseAdmin

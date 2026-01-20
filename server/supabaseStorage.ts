@@ -24,6 +24,7 @@ export interface Patent {
   patent_classification: string | null;
   full_text: string;
   pdf_filename: string | null;
+  pdf_storage_path: string | null;
   status: string;
   error_message: string | null;
   created_at: string;
@@ -532,6 +533,68 @@ export class SupabaseStorage {
       target_user_id: targetUserId,
       details,
     });
+  }
+
+  // PDF Storage methods
+  async uploadPdfToStorage(
+    fileBuffer: Buffer,
+    filename: string,
+    userId: string | null
+  ): Promise<{ storagePath: string; publicUrl: string }> {
+    const bucket = 'patent-pdfs';
+    const folder = userId || 'anonymous';
+    const storagePath = `${folder}/${filename}`;
+
+    // Upload to Supabase Storage
+    const { error } = await supabaseAdmin.storage
+      .from(bucket)
+      .upload(storagePath, fileBuffer, {
+        contentType: 'application/pdf',
+        upsert: false, // Don't overwrite existing files
+      });
+
+    if (error) {
+      throw new Error(`Failed to upload PDF to storage: ${error.message}`);
+    }
+
+    // Get public URL
+    const { data } = supabaseAdmin.storage
+      .from(bucket)
+      .getPublicUrl(storagePath);
+
+    return {
+      storagePath,
+      publicUrl: data.publicUrl,
+    };
+  }
+
+  async downloadPdfFromStorage(storagePath: string): Promise<Buffer> {
+    const bucket = 'patent-pdfs';
+
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .download(storagePath);
+
+    if (error) {
+      throw new Error(`Failed to download PDF from storage: ${error.message}`);
+    }
+
+    // Convert Blob to Buffer
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
+  async deletePdfFromStorage(storagePath: string): Promise<void> {
+    const bucket = 'patent-pdfs';
+
+    const { error } = await supabaseAdmin.storage
+      .from(bucket)
+      .remove([storagePath]);
+
+    if (error) {
+      console.error(`Failed to delete PDF from storage: ${error.message}`);
+      // Don't throw - deletion is not critical
+    }
   }
 }
 
