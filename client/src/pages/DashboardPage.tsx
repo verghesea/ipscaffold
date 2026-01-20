@@ -28,10 +28,13 @@ export function DashboardPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const { toast } = useToast();
 
+  // Load dashboard on mount only
   useEffect(() => {
     loadDashboard();
+  }, []); // Empty deps - run once on mount
 
-    // Auto-refresh hero images every 15 seconds for recently completed patents
+  // Auto-refresh hero images every 15 seconds for recently completed patents
+  useEffect(() => {
     const interval = setInterval(async () => {
       try {
         // Only fetch hero images for patents that:
