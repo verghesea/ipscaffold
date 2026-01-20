@@ -8,7 +8,13 @@ import fs from "fs/promises";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
 import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
-import { logMetadataCorrection, findValueContext } from "./services/extractionLogger";
+import { logMetadataCorrection, findValueContext, getPendingCorrections } from "./services/extractionLogger";
+import {
+  analyzeFieldCorrections,
+  deployPattern,
+  getPendingCorrectionCounts,
+  type PatternSuggestion,
+} from "./services/patternLearningService";
 
 declare global {
   namespace Express {
@@ -818,13 +824,153 @@ export async function registerRoutes(
 
       console.log(`[Manual Update] ✓ Metadata updated for patent ${patentId}`);
 
-      // Return updated patent
+      // Get correction counts for smart notifications
+      const opportunities = await getPendingCorrectionCounts();
+
+      // Return updated patent with smart notifications
       const updatedPatent = await supabaseStorage.getPatent(patentId);
-      res.json({ success: true, patent: updatedPatent });
+      res.json({
+        success: true,
+        patent: updatedPatent,
+        // Smart notifications for hybrid learning system
+        opportunities: opportunities.map((opp) => ({
+          fieldName: opp.fieldName,
+          count: opp.count,
+          ready: opp.ready,
+          message:
+            opp.ready
+              ? `${opp.count} corrections collected for ${opp.fieldName}. Pattern analysis ready!`
+              : `${opp.count} corrections collected for ${opp.fieldName}`,
+        })),
+      });
 
     } catch (error) {
       console.error('Manual metadata update error:', error);
       res.status(500).json({ error: 'Failed to update metadata' });
+    }
+  });
+
+  // ============================================================================
+  // PATTERN LEARNING ENDPOINTS (Admin only)
+  // ============================================================================
+
+  // Get pattern opportunities (correction counts by field)
+  app.get('/api/admin/patterns/opportunities', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const opportunities = await getPendingCorrectionCounts();
+      res.json({ opportunities });
+    } catch (error) {
+      console.error('Error getting pattern opportunities:', error);
+      res.status(500).json({ error: 'Failed to get opportunities' });
+    }
+  });
+
+  // Analyze corrections for a field and generate pattern suggestions
+  app.post('/api/admin/patterns/analyze', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { fieldName, minCorrections } = req.body;
+
+      if (!fieldName) {
+        return res.status(400).json({ error: 'Field name required' });
+      }
+
+      console.log(`[Pattern Analysis] Analyzing field: ${fieldName}`);
+
+      const suggestions = await analyzeFieldCorrections(fieldName, minCorrections || 5);
+
+      res.json({
+        success: true,
+        fieldName,
+        suggestionsCount: suggestions.length,
+        suggestions,
+      });
+    } catch (error) {
+      console.error('Error analyzing corrections:', error);
+      res.status(500).json({
+        error: 'Failed to analyze corrections',
+        details: (error as Error).message,
+      });
+    }
+  });
+
+  // Deploy a learned pattern
+  app.post('/api/admin/patterns/deploy', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { fieldName, pattern, description, correctionIds, priority } = req.body;
+
+      if (!fieldName || !pattern || !correctionIds) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      console.log(`[Pattern Deploy] Deploying pattern for ${fieldName}`);
+
+      const patternId = await deployPattern(
+        fieldName,
+        pattern,
+        description || 'Pattern learned from corrections',
+        correctionIds,
+        priority || 50, // Default priority for AI-generated patterns
+        req.user!.id
+      );
+
+      res.json({
+        success: true,
+        patternId,
+      });
+    } catch (error) {
+      console.error('Error deploying pattern:', error);
+      res.status(500).json({
+        error: 'Failed to deploy pattern',
+        details: (error as Error).message,
+      });
+    }
+  });
+
+  // Get all learned patterns
+  app.get('/api/admin/patterns', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('learned_patterns')
+        .select('*')
+        .order('field_name', { ascending: true })
+        .order('priority', { ascending: true });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      res.json({ patterns: data || [] });
+    } catch (error) {
+      console.error('Error getting patterns:', error);
+      res.status(500).json({ error: 'Failed to get patterns' });
+    }
+  });
+
+  // Toggle pattern active status
+  app.put('/api/admin/patterns/:id/toggle', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const patternId = req.params.id;
+      const { isActive } = req.body;
+
+      if (isActive === undefined) {
+        return res.status(400).json({ error: 'isActive required' });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('learned_patterns')
+        .update({ is_active: isActive })
+        .eq('id', patternId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      console.log(`[Pattern Toggle] Pattern ${patternId} ${isActive ? 'activated' : 'deactivated'}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error toggling pattern:', error);
+      res.status(500).json({ error: 'Failed to toggle pattern' });
     }
   });
 
