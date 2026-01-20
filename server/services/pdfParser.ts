@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
-import { logExtraction, extractContext } from './extractionLogger';
+import { logExtraction, extractContext, trackPatternUsage } from './extractionLogger';
+import { supabaseAdmin } from '../lib/supabase';
 
 export interface ParsedPatent {
   title: string | null;
@@ -11,6 +12,94 @@ export interface ParsedPatent {
   applicationNumber: string | null;
   patentClassification: string | null;
   fullText: string;
+}
+
+interface LearnedPattern {
+  id: string;
+  field_name: string;
+  pattern: string;
+  pattern_description: string;
+  priority: number;
+  is_active: boolean;
+  source: string;
+}
+
+interface PatternWithMetadata {
+  regex: RegExp;
+  patternId: string | null;
+  source: string;
+  description: string;
+}
+
+// Pattern cache - refreshed periodically
+let patternCache: Map<string, PatternWithMetadata[]> | null = null;
+let lastPatternCacheTime: number = 0;
+const PATTERN_CACHE_TTL = 60000; // 1 minute
+
+/**
+ * Load learned patterns from database and merge with built-in patterns
+ * Returns patterns sorted by priority (lower = tried first)
+ */
+async function loadPatternsForField(
+  fieldName: string,
+  builtInPatterns: RegExp[]
+): Promise<PatternWithMetadata[]> {
+  const now = Date.now();
+
+  // Refresh cache if expired or not initialized
+  if (!patternCache || now - lastPatternCacheTime > PATTERN_CACHE_TTL) {
+    patternCache = new Map();
+    lastPatternCacheTime = now;
+
+    try {
+      const { data: learnedPatterns, error } = await supabaseAdmin
+        .from('learned_patterns')
+        .select('*')
+        .eq('is_active', true)
+        .order('priority', { ascending: true });
+
+      if (error) {
+        console.error('[PDF Parser] Failed to load learned patterns:', error);
+      } else if (learnedPatterns && learnedPatterns.length > 0) {
+        console.log(`[PDF Parser] Loaded ${learnedPatterns.length} learned patterns from database`);
+
+        // Group by field name
+        for (const pattern of learnedPatterns) {
+          if (!patternCache.has(pattern.field_name)) {
+            patternCache.set(pattern.field_name, []);
+          }
+
+          try {
+            const regex = new RegExp(pattern.pattern, 'i');
+            patternCache.get(pattern.field_name)!.push({
+              regex,
+              patternId: pattern.id,
+              source: pattern.source || 'learned',
+              description: pattern.pattern_description,
+            });
+          } catch (e) {
+            console.error(`[PDF Parser] Invalid regex pattern for ${pattern.field_name}:`, pattern.pattern);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[PDF Parser] Error loading learned patterns:', error);
+    }
+  }
+
+  // Get learned patterns for this field
+  const learnedPatternsForField = patternCache.get(fieldName) || [];
+
+  // Convert built-in patterns to PatternWithMetadata
+  const builtInPatternsWithMetadata: PatternWithMetadata[] = builtInPatterns.map((regex, idx) => ({
+    regex,
+    patternId: null,
+    source: 'built-in',
+    description: `Built-in pattern ${idx + 1}`,
+  }));
+
+  // Merge: learned patterns first (already sorted by priority), then built-in
+  return [...learnedPatternsForField, ...builtInPatternsWithMetadata];
 }
 
 // Dynamic import for pdf-parse that works in both ESM dev and CJS production
@@ -53,22 +142,34 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
   let inventors = null;
   let inventorsPatternUsed: string | null = null;
   let inventorsPatternIndex: number | null = null;
-  const inventorPatterns = [
+  let inventorsPatternId: string | null = null;
+  let inventorsPatternSource: string | null = null;
+
+  const builtInInventorPatterns = [
     /\(\s*72\s*\)\s*Inventors?:\s*([^\n]+?)(?:\n|$)/i, // (72) Inventor: format
     /Inventors?:\s*([^\n]+?)(?:\n|$)/i, // Simple Inventor: format
     /Inventors?:\s*(.+?)(?:\n\n|Assignee:|Appl\.|Filed:)/is, // Multiline with stopwords
   ];
 
+  const inventorPatterns = await loadPatternsForField('inventors', builtInInventorPatterns);
+
   for (let i = 0; i < inventorPatterns.length; i++) {
-    const pattern = inventorPatterns[i];
-    const match = text.match(pattern);
+    const patternMeta = inventorPatterns[i];
+    const match = text.match(patternMeta.regex);
     if (match && match[1]) {
       inventors = match[1].trim();
       // Clean up location info in parentheses
       inventors = inventors.replace(/\s*,?\s*\([A-Z]{2}\)\s*$/g, '').trim();
-      inventorsPatternUsed = pattern.source;
+      inventorsPatternUsed = patternMeta.regex.source;
       inventorsPatternIndex = i;
-      console.log(`[PDF Parser] Extracted inventors: "${inventors.substring(0, 50)}..."`);
+      inventorsPatternId = patternMeta.patternId;
+      inventorsPatternSource = patternMeta.source;
+      console.log(`[PDF Parser] Extracted inventors using ${patternMeta.source} pattern: "${inventors.substring(0, 50)}..."`);
+
+      // Track pattern usage if it's a learned pattern
+      if (patternMeta.patternId) {
+        await trackPatternUsage(patternMeta.patternId, true);
+      }
       break;
     }
   }
@@ -104,7 +205,10 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
   let assignee = null;
   let assigneePatternUsed: string | null = null;
   let assigneePatternIndex: number | null = null;
-  const assigneePatterns = [
+  let assigneePatternId: string | null = null;
+  let assigneePatternSource: string | null = null;
+
+  const builtInAssigneePatterns = [
     /\(\s*73\s*\)\s*Assignee:\s*([^\n]+?)(?:\n|$)/i, // (73) Assignee: format
     /Assignee:\s*([^\n]+?)(?:\n|$)/i, // Simple Assignee: format
     /(?:\(\s*73\s*\)|Assignee):\s*(.+?)(?:\n\n|Appl\.|Filed:|Notice:)/is, // Multiline with stopwords
@@ -112,9 +216,11 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
     /\*?\s*Assignee[:\s]*([A-Za-z0-9\s,\.&]+?)(?:,\s*[A-Z]{2}|$)/im, // Flexible format with state code
   ];
 
+  const assigneePatterns = await loadPatternsForField('assignee', builtInAssigneePatterns);
+
   for (let i = 0; i < assigneePatterns.length; i++) {
-    const pattern = assigneePatterns[i];
-    const match = text.match(pattern);
+    const patternMeta = assigneePatterns[i];
+    const match = text.match(patternMeta.regex);
     if (match && match[1]) {
       assignee = match[1].trim();
       // Remove trailing location codes like (US), (JP), etc
@@ -127,9 +233,16 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
       assignee = assignee.replace(/\*+/g, '').trim();
       // Only accept if it's reasonable (2-100 chars, not all numbers)
       if (assignee.length >= 2 && assignee.length <= 100 && !/^\d+$/.test(assignee)) {
-        assigneePatternUsed = pattern.source;
+        assigneePatternUsed = patternMeta.regex.source;
         assigneePatternIndex = i;
-        console.log(`[PDF Parser] Extracted assignee: "${assignee}"`);
+        assigneePatternId = patternMeta.patternId;
+        assigneePatternSource = patternMeta.source;
+        console.log(`[PDF Parser] Extracted assignee using ${patternMeta.source} pattern: "${assignee}"`);
+
+        // Track pattern usage if it's a learned pattern
+        if (patternMeta.patternId) {
+          await trackPatternUsage(patternMeta.patternId, true);
+        }
         break;
       } else {
         assignee = null; // Invalid, keep searching
@@ -183,22 +296,34 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
 
   // Extract application number
   let applicationNumber = null;
-  const applicationNumberPatterns = [
+  let applicationNumberPatternUsed: string | null = null;
+  let applicationNumberPatternIndex: number | null = null;
+  let applicationNumberPatternId: string | null = null;
+  let applicationNumberPatternSource: string | null = null;
+
+  const builtInApplicationNumberPatterns = [
     /(?:Appl\.?\s+No\.?|Application\s+No\.?)[\s:]*(\d{2}\/\d{3},?\d{3})/i,
     /\(\s*21\s*\)\s*Appl\.\s*No\.?:\s*(\d{2}\/\d{3},?\d{3})/i,
     /Serial\s+No\.?:\s*(\d+)/i,
   ];
 
-  let applicationNumberPatternUsed: string | null = null;
-  let applicationNumberPatternIndex: number | null = null;
+  const applicationNumberPatterns = await loadPatternsForField('applicationNumber', builtInApplicationNumberPatterns);
 
   for (let i = 0; i < applicationNumberPatterns.length; i++) {
-    const pattern = applicationNumberPatterns[i];
-    const match = text.match(pattern);
+    const patternMeta = applicationNumberPatterns[i];
+    const match = text.match(patternMeta.regex);
     if (match && match[1]) {
       applicationNumber = match[1].trim();
-      applicationNumberPatternUsed = pattern.source;
+      applicationNumberPatternUsed = patternMeta.regex.source;
       applicationNumberPatternIndex = i;
+      applicationNumberPatternId = patternMeta.patternId;
+      applicationNumberPatternSource = patternMeta.source;
+      console.log(`[PDF Parser] Extracted application number using ${patternMeta.source} pattern: "${applicationNumber}"`);
+
+      // Track pattern usage if it's a learned pattern
+      if (patternMeta.patternId) {
+        await trackPatternUsage(patternMeta.patternId, true);
+      }
       break;
     }
   }
@@ -237,8 +362,36 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
   }
 
   // Extract filing date
-  const filingDateMatch = text.match(/Filed:\s*(\w+\.?\s+\d{1,2},?\s+\d{4})/i);
-  const filingDate = filingDateMatch ? filingDateMatch[1].trim() : null;
+  let filingDate = null;
+  let filingDatePatternUsed: string | null = null;
+  let filingDatePatternIndex: number | null = null;
+  let filingDatePatternId: string | null = null;
+  let filingDatePatternSource: string | null = null;
+
+  const builtInFilingDatePatterns = [
+    /Filed:\s*(\w+\.?\s+\d{1,2},?\s+\d{4})/i,
+  ];
+
+  const filingDatePatterns = await loadPatternsForField('filingDate', builtInFilingDatePatterns);
+
+  for (let i = 0; i < filingDatePatterns.length; i++) {
+    const patternMeta = filingDatePatterns[i];
+    const match = text.match(patternMeta.regex);
+    if (match && match[1]) {
+      filingDate = match[1].trim();
+      filingDatePatternUsed = patternMeta.regex.source;
+      filingDatePatternIndex = i;
+      filingDatePatternId = patternMeta.patternId;
+      filingDatePatternSource = patternMeta.source;
+      console.log(`[PDF Parser] Extracted filing date using ${patternMeta.source} pattern: "${filingDate}"`);
+
+      // Track pattern usage if it's a learned pattern
+      if (patternMeta.patternId) {
+        await trackPatternUsage(patternMeta.patternId, true);
+      }
+      break;
+    }
+  }
 
   // Log filing date extraction
   if (patentId) {
@@ -248,8 +401,8 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
         patentId,
         fieldName: 'filingDate',
         extractedValue: filingDate,
-        patternUsed: filingDateMatch ? '/Filed:\\s*(\\w+\\.?\\s+\\d{1,2},?\\s+\\d{4})/i' : null,
-        patternIndex: 0,
+        patternUsed: filingDatePatternUsed,
+        patternIndex: filingDatePatternIndex,
         success: !!filingDate,
         contextBefore: context.before,
         contextAfter: context.after,

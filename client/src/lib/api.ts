@@ -546,7 +546,15 @@ export const api = {
     patentNumber?: string | null;
     applicationNumber?: string | null;
     patentClassification?: string | null;
-  }): Promise<Patent> {
+  }): Promise<{
+    patent: Patent;
+    opportunities?: Array<{
+      fieldName: string;
+      count: number;
+      ready: boolean;
+      message: string;
+    }>;
+  }> {
     const response = await fetch(`/api/admin/patent/${patentId}/metadata`, {
       method: 'PUT',
       headers: {
@@ -562,6 +570,9 @@ export const api = {
     }
 
     const data = await response.json();
-    return data.patent;
+    return {
+      patent: data.patent,
+      opportunities: data.opportunities,
+    };
   },
 };

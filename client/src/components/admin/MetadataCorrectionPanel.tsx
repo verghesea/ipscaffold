@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, RefreshCw, Edit2, Check, X, Loader2 } from 'lucide-react';
+import { AlertCircle, RefreshCw, Edit2, Check, X, Loader2, Sparkles, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface MetadataCorrectionPanelProps {
@@ -92,7 +92,7 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
 
     setSaving(true);
     try {
-      await api.updatePatentMetadata(editingPatent.id, {
+      const result = await api.updatePatentMetadata(editingPatent.id, {
         inventors: editForm.inventors || null,
         assignee: editForm.assignee || null,
         filingDate: editForm.filingDate || null,
@@ -102,10 +102,51 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
         patentClassification: editForm.patentClassification || null,
       });
 
+      // Primary success toast
       toast({
         title: 'Metadata updated',
         description: 'Patent metadata has been manually corrected.',
       });
+
+      // Show smart notifications for pattern learning opportunities
+      if (result.opportunities && result.opportunities.length > 0) {
+        result.opportunities.forEach((opp) => {
+          const fieldDisplayName = getFieldDisplayName(opp.fieldName);
+
+          if (opp.ready) {
+            // Pattern analysis ready - exciting notification
+            toast({
+              title: (
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Pattern Analysis Ready!</span>
+                </div>
+              ),
+              description: (
+                <div>
+                  <p>{opp.count} corrections collected for {fieldDisplayName}.</p>
+                  <p className="text-xs mt-1 text-gray-600">
+                    Visit the Pattern Learning tab to generate patterns
+                  </p>
+                </div>
+              ),
+              duration: 8000, // Longer for important notifications
+            });
+          } else {
+            // Still collecting - subtle progress update
+            toast({
+              title: (
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-blue-500" />
+                  <span>Progress: {fieldDisplayName}</span>
+                </div>
+              ),
+              description: `${opp.count} correction(s) collected. ${5 - opp.count} more needed for pattern analysis.`,
+              duration: 4000,
+            });
+          }
+        });
+      }
 
       setEditingPatent(null);
       onPatentUpdate();
@@ -118,6 +159,19 @@ export function MetadataCorrectionPanel({ patents, onPatentUpdate }: MetadataCor
     } finally {
       setSaving(false);
     }
+  };
+
+  const getFieldDisplayName = (fieldName: string): string => {
+    const names: Record<string, string> = {
+      assignee: 'Assignee',
+      inventors: 'Inventors',
+      filingDate: 'Filing Date',
+      applicationNumber: 'Application Number',
+      patentNumber: 'Patent Number',
+      issueDate: 'Issue Date',
+      patentClassification: 'Classification',
+    };
+    return names[fieldName] || fieldName;
   };
 
   const getMissingFields = (patent: Patent): string[] => {

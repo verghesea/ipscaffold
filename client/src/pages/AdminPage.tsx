@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { getAuthHeaders } from '@/lib/api';
-import { Users, FileText, CreditCard, TrendingUp, Shield, ArrowLeft, Gift, Plus, Loader2, Settings, AlertCircle } from 'lucide-react';
+import { Users, FileText, CreditCard, TrendingUp, Shield, ArrowLeft, Gift, Plus, Loader2, Settings, AlertCircle, Sparkles } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { SystemPromptManager } from '@/components/patent/SystemPromptManager';
 import { MetadataCorrectionPanel } from '@/components/admin/MetadataCorrectionPanel';
+import { PatternLearningDashboard } from '@/components/admin/PatternLearningDashboard';
 import { api } from '@/lib/api';
 
 interface SystemMetrics {
@@ -363,6 +364,10 @@ export default function AdminPage() {
               <AlertCircle className="w-4 h-4 mr-2" />
               Metadata
             </TabsTrigger>
+            <TabsTrigger value="pattern-learning" data-testid="tab-pattern-learning">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Pattern Learning
+            </TabsTrigger>
             <TabsTrigger value="promo-codes" data-testid="tab-promo-codes">Promo Codes</TabsTrigger>
             <TabsTrigger value="system-prompts" data-testid="tab-system-prompts">System Prompts</TabsTrigger>
             <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
@@ -612,6 +617,10 @@ export default function AdminPage() {
                 queryClient.invalidateQueries({ queryKey: ['/api/admin/patents'] });
               }}
             />
+          </TabsContent>
+
+          <TabsContent value="pattern-learning" className="mt-6">
+            <PatternLearningDashboard />
           </TabsContent>
 
           <TabsContent value="promo-codes" className="mt-6">
