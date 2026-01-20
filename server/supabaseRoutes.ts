@@ -411,6 +411,42 @@ export async function registerRoutes(
     });
   });
 
+  // DIAGNOSTIC ENDPOINT - Remove after debugging
+  app.get('/api/debug/patents', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      console.log('[DEBUG] Diagnostic query for user:', userId);
+
+      // Direct database query to see ALL patents
+      const { data: allPatents, error: allError } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id, title, friendly_title, status, created_at')
+        .order('created_at', { ascending: false });
+
+      // Query for user's patents
+      const { data: userPatents, error: userError } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id, title, friendly_title, status, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      res.json({
+        userId,
+        totalPatentsInDB: allPatents?.length || 0,
+        userPatentsCount: userPatents?.length || 0,
+        allPatents: allPatents?.slice(0, 10), // First 10
+        userPatents: userPatents,
+        errors: {
+          allError: allError?.message,
+          userError: userError?.message,
+        }
+      });
+    } catch (error) {
+      console.error('[DEBUG] Error:', error);
+      res.status(500).json({ error: 'Debug query failed' });
+    }
+  });
+
   app.post('/api/logout', (req, res) => {
     res.json({ success: true });
   });
