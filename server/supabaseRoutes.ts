@@ -626,7 +626,30 @@ export async function registerRoutes(
   app.get('/api/admin/patents', requireAuth, requireAdmin, async (req, res) => {
     try {
       const patents = await supabaseStorage.getAllPatents();
-      res.json({ patents });
+
+      // Map database fields (snake_case) to frontend fields (camelCase)
+      const mappedPatents = patents.map(patent => ({
+        id: patent.id,
+        userId: patent.user_id,
+        title: patent.title,
+        friendlyTitle: patent.friendly_title,
+        inventors: patent.inventors,
+        assignee: patent.assignee,
+        filingDate: patent.filing_date,
+        issueDate: patent.issue_date,
+        patentNumber: patent.patent_number,
+        applicationNumber: patent.application_number,
+        patentClassification: patent.patent_classification,
+        fullText: patent.full_text, // Include full_text for re-extraction
+        pdfFilename: patent.pdf_filename,
+        pdfStoragePath: patent.pdf_storage_path,
+        status: patent.status,
+        errorMessage: patent.error_message,
+        createdAt: patent.created_at,
+        updatedAt: patent.updated_at,
+      }));
+
+      res.json({ patents: mappedPatents });
     } catch (error) {
       console.error('Admin patents error:', error);
       res.status(500).json({ error: 'Failed to load patents' });
