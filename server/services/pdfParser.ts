@@ -113,20 +113,16 @@ async function getPdfParseClass(): Promise<any> {
 }
 
 /**
- * Parse patent PDF with optional extraction logging
+ * Extract metadata from patent text using regex patterns
  *
- * @param filePath - Path to PDF file
+ * @param text - Patent full text
  * @param patentId - Optional patent ID for logging (if re-extracting)
- * @returns Parsed patent metadata
+ * @returns Parsed patent metadata (without fullText)
  */
-export async function parsePatentPDF(filePath: string, patentId?: string): Promise<ParsedPatent> {
-  const dataBuffer = await fs.readFile(filePath);
-  
-  const PDFParse = await getPdfParseClass();
-  const parser = new PDFParse({ data: dataBuffer });
-  await parser.load();
-  const result = await parser.getText();
-  const text = result.text;
+export async function extractMetadataFromText(
+  text: string,
+  patentId?: string
+): Promise<Omit<ParsedPatent, 'fullText'>> {
   
   // Extract title (usually near the beginning, after "Title:" or as second line)
   const titleMatch = text.match(/(?:Title:|Patent Title:)\s*(.+?)(?:\n|Inventors?:|Abstract:)/i);
@@ -424,11 +420,10 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
     patentNumber,
     applicationNumber,
     patentClassification,
-    fullText: text
   };
 
   // Log extracted metadata for debugging
-  console.log('[PDF Parser] Extraction complete:');
+  console.log('[Metadata Extraction] Extraction complete:');
   console.log(`  Title: ${title?.substring(0, 50)}...`);
   console.log(`  Inventors: ${inventors || 'NOT FOUND'}`);
   console.log(`  Assignee: ${assignee || 'NOT FOUND'}`);
@@ -437,4 +432,29 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
   console.log(`  Classification: ${patentClassification?.substring(0, 50) || 'NOT FOUND'}`);
 
   return parsed;
+}
+
+/**
+ * Parse patent PDF with optional extraction logging
+ *
+ * @param filePath - Path to PDF file
+ * @param patentId - Optional patent ID for logging (if re-extracting)
+ * @returns Parsed patent metadata with fullText
+ */
+export async function parsePatentPDF(filePath: string, patentId?: string): Promise<ParsedPatent> {
+  const dataBuffer = await fs.readFile(filePath);
+
+  const PDFParse = await getPdfParseClass();
+  const parser = new PDFParse({ data: dataBuffer });
+  await parser.load();
+  const result = await parser.getText();
+  const text = result.text;
+
+  // Extract metadata from text
+  const metadata = await extractMetadataFromText(text, patentId);
+
+  return {
+    ...metadata,
+    fullText: text,
+  };
 }
