@@ -95,7 +95,6 @@ export async function registerRoutes(
   app.post('/api/upload', upload.single('pdf'), async (req, res) => {
     console.log('[Upload] ========== NEW UPLOAD REQUEST ==========');
     console.log('[Upload] Timestamp:', new Date().toISOString());
-    console.log('[Upload] Request headers:', JSON.stringify(req.headers, null, 2));
 
     try {
       if (!req.file) {
@@ -109,8 +108,22 @@ export async function registerRoutes(
       console.log('[Upload]   - Type:', req.file.mimetype);
       console.log('[Upload]   - Path:', req.file.path);
 
+      // CRITICAL: Check if Authorization header was provided but user resolution failed
+      const authHeader = req.headers.authorization;
       const user = await getUserFromToken(req);
-      console.log('[Upload] User authentication:', user ? `Authenticated (${user.id})` : 'Anonymous');
+
+      if (authHeader && !user) {
+        // User tried to authenticate but failed - this is the root cause of orphaned patents!
+        console.error('[Upload] CRITICAL WARNING: Authorization header present but user resolution FAILED!');
+        console.error('[Upload] Auth header starts with Bearer:', authHeader.startsWith('Bearer '));
+        console.error('[Upload] This would create an ORPHANED PATENT - rejecting request');
+        return res.status(401).json({
+          error: 'Authentication failed',
+          details: 'Your session may have expired. Please refresh the page and try again.'
+        });
+      }
+
+      console.log('[Upload] User authentication:', user ? `Authenticated (${user.id})` : 'Anonymous (no auth header)');
 
       const filePath = req.file.path;
       const filename = req.file.filename;
@@ -155,6 +168,26 @@ export async function registerRoutes(
         status: 'processing',
         error_message: null,
       });
+
+      // VERIFICATION: Ensure user_id was stored correctly
+      if (user && patent.user_id !== user.id) {
+        console.error('[Upload] CRITICAL: Patent created but user_id mismatch!');
+        console.error('[Upload] Expected user_id:', user.id);
+        console.error('[Upload] Got user_id:', patent.user_id);
+
+        // Attempt to fix immediately
+        await supabaseAdmin
+          .from('patents')
+          .update({ user_id: user.id })
+          .eq('id', patent.id);
+
+        console.log('[Upload] Attempted to fix user_id immediately');
+      }
+
+      console.log('[Upload] Patent created successfully:');
+      console.log('[Upload]   - Patent ID:', patent.id);
+      console.log('[Upload]   - User ID:', patent.user_id || 'NULL (anonymous)');
+      console.log('[Upload]   - Title:', patent.title?.substring(0, 50) || 'None');
 
       try {
         const elia15Result = await generateELIA15(
@@ -411,39 +444,104 @@ export async function registerRoutes(
     });
   });
 
-  // DIAGNOSTIC ENDPOINT - Remove after debugging
+  // DIAGNOSTIC ENDPOINT - Comprehensive database diagnosis
   app.get('/api/debug/patents', requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
-      console.log('[DEBUG] Diagnostic query for user:', userId);
+      console.log('[DEBUG] ========== COMPREHENSIVE DIAGNOSIS ==========');
+      console.log('[DEBUG] User ID:', userId);
 
-      // Direct database query to see ALL patents
+      // 1. Direct database query to see ALL patents
       const { data: allPatents, error: allError } = await supabaseAdmin
         .from('patents')
         .select('id, user_id, title, friendly_title, status, created_at')
         .order('created_at', { ascending: false });
 
-      // Query for user's patents
+      // 2. Query for user's patents specifically
       const { data: userPatents, error: userError } = await supabaseAdmin
         .from('patents')
         .select('id, user_id, title, friendly_title, status, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
+      // 3. Query for orphaned patents (user_id IS NULL)
+      const { data: orphanedPatents, error: orphanError } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id, title, friendly_title, status, created_at')
+        .is('user_id', null)
+        .order('created_at', { ascending: false });
+
+      // 4. Get user's notifications
+      const { data: notifications, error: notifError } = await supabaseAdmin
+        .from('webhook_notifications')
+        .select('id, notification_type, payload, created_at, read')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // 5. Extract patent IDs from notifications
+      const notificationPatentIds = new Set<string>();
+      notifications?.forEach((n: any) => {
+        if (n.payload?.patent_id) {
+          notificationPatentIds.add(n.payload.patent_id);
+        }
+      });
+
+      // 6. Check which notification patents exist and their status
+      const patentStatus: Record<string, any> = {};
+      for (const patentId of notificationPatentIds) {
+        const { data: patent } = await supabaseAdmin
+          .from('patents')
+          .select('id, user_id, title, status')
+          .eq('id', patentId)
+          .single();
+
+        patentStatus[patentId] = patent ? {
+          exists: true,
+          user_id: patent.user_id,
+          isOrphaned: patent.user_id === null,
+          belongsToUser: patent.user_id === userId,
+          title: patent.title?.substring(0, 50),
+          status: patent.status
+        } : { exists: false };
+      }
+
+      console.log('[DEBUG] Summary:');
+      console.log('[DEBUG] - Total patents in DB:', allPatents?.length || 0);
+      console.log('[DEBUG] - User patents:', userPatents?.length || 0);
+      console.log('[DEBUG] - Orphaned patents:', orphanedPatents?.length || 0);
+      console.log('[DEBUG] - User notifications:', notifications?.length || 0);
+      console.log('[DEBUG] - Unique patents in notifications:', notificationPatentIds.size);
+
       res.json({
         userId,
-        totalPatentsInDB: allPatents?.length || 0,
-        userPatentsCount: userPatents?.length || 0,
-        allPatents: allPatents?.slice(0, 10), // First 10
-        userPatents: userPatents,
+        summary: {
+          totalPatentsInDB: allPatents?.length || 0,
+          userPatentsCount: userPatents?.length || 0,
+          orphanedPatentsCount: orphanedPatents?.length || 0,
+          userNotificationsCount: notifications?.length || 0,
+          uniquePatentIdsInNotifications: notificationPatentIds.size,
+        },
+        userPatents: userPatents || [],
+        orphanedPatents: orphanedPatents || [],
+        notificationPatentStatus: patentStatus,
+        recentNotifications: notifications?.slice(0, 10).map((n: any) => ({
+          type: n.notification_type,
+          patent_id: n.payload?.patent_id || 'NONE',
+          patent_title: n.payload?.patent_title || 'Unknown',
+          created_at: n.created_at,
+          read: n.read,
+        })) || [],
         errors: {
           allError: allError?.message,
           userError: userError?.message,
+          orphanError: orphanError?.message,
+          notifError: notifError?.message,
         }
       });
     } catch (error) {
       console.error('[DEBUG] Error:', error);
-      res.status(500).json({ error: 'Debug query failed' });
+      res.status(500).json({ error: 'Debug query failed', details: (error as Error).message });
     }
   });
 
@@ -689,18 +787,27 @@ export async function registerRoutes(
   app.post('/api/fix-orphaned-patents', requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
-      console.log('[FixOrphaned] Starting fix for user:', userId);
+      console.log('[FixOrphaned] ========== STARTING FIX ==========');
+      console.log('[FixOrphaned] User ID:', userId);
 
-      // Get all notifications for this user
+      // STEP 1: Get all notifications for this user
       const { data: notifications, error: notifError } = await supabaseAdmin
         .from('webhook_notifications')
-        .select('payload')
-        .eq('user_id', userId);
+        .select('id, notification_type, payload, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
       if (notifError) {
         console.error('[FixOrphaned] Error fetching notifications:', notifError);
         return res.status(500).json({ error: 'Failed to fetch notifications' });
       }
+
+      console.log('[FixOrphaned] Found', notifications?.length || 0, 'total notifications');
+
+      // Debug: log all notification payloads
+      notifications?.slice(0, 5).forEach((n: any, i: number) => {
+        console.log(`[FixOrphaned] Notification ${i + 1}: type=${n.notification_type}, patent_id=${n.payload?.patent_id || 'NONE'}`);
+      });
 
       // Extract unique patent IDs from notifications
       const patentIds = new Set<string>();
@@ -710,11 +817,27 @@ export async function registerRoutes(
         }
       });
 
-      console.log('[FixOrphaned] Found', patentIds.size, 'patent IDs in notifications');
+      console.log('[FixOrphaned] Found', patentIds.size, 'unique patent IDs in notifications');
 
-      // Find patents that don't have a user_id set
+      // STEP 2: Check all patents in the database
+      const { data: allOrphanedPatents, error: orphanError } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id, title, status, created_at')
+        .is('user_id', null)
+        .order('created_at', { ascending: false });
+
+      console.log('[FixOrphaned] Total orphaned patents in DB:', allOrphanedPatents?.length || 0);
+
+      // Debug: Log first few orphaned patents
+      allOrphanedPatents?.slice(0, 5).forEach((p: any, i: number) => {
+        console.log(`[FixOrphaned] Orphaned patent ${i + 1}: id=${p.id}, title=${p.title?.substring(0, 50) || 'null'}`);
+      });
+
+      // STEP 3: Find patents that match notification patent_ids and need fixing
       let fixedCount = 0;
       const fixedPatents: string[] = [];
+      const notFoundPatents: string[] = [];
+      const alreadyLinkedPatents: string[] = [];
 
       for (const patentId of patentIds) {
         const { data: patent, error: patentError } = await supabaseAdmin
@@ -723,13 +846,14 @@ export async function registerRoutes(
           .eq('id', patentId)
           .single();
 
-        if (patentError) {
-          console.log('[FixOrphaned] Could not find patent:', patentId);
+        if (patentError || !patent) {
+          console.log('[FixOrphaned] Patent not found:', patentId);
+          notFoundPatents.push(patentId);
           continue;
         }
 
         // If patent has no user_id, update it
-        if (patent && !patent.user_id) {
+        if (!patent.user_id) {
           console.log('[FixOrphaned] Fixing orphaned patent:', patentId, '- Title:', patent.title);
 
           const { error: updateError } = await supabaseAdmin
@@ -744,24 +868,145 @@ export async function registerRoutes(
             fixedPatents.push(patentId);
             console.log('[FixOrphaned] Successfully fixed patent:', patentId);
           }
+        } else if (patent.user_id === userId) {
+          alreadyLinkedPatents.push(patentId);
+        } else {
+          console.log('[FixOrphaned] Patent belongs to different user:', patentId, 'owner:', patent.user_id);
         }
       }
 
-      console.log('[FixOrphaned] Completed. Fixed', fixedCount, 'patents');
+      // STEP 4: Also check if there are orphaned patents created around the same time as notifications
+      // This catches cases where notification was created but patent_id might not be in payload
+      const recentNotifications = notifications?.filter((n: any) => {
+        const created = new Date(n.created_at);
+        const hourAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24 hours
+        return created > hourAgo;
+      }) || [];
+
+      if (recentNotifications.length > 0 && allOrphanedPatents && allOrphanedPatents.length > 0) {
+        console.log('[FixOrphaned] Checking recent orphaned patents for time-based matching...');
+
+        for (const patent of allOrphanedPatents) {
+          // Skip if already fixed
+          if (fixedPatents.includes(patent.id)) continue;
+
+          // Check if patent was created around the same time as a notification
+          const patentCreated = new Date(patent.created_at);
+          const matchingNotification = recentNotifications.find((n: any) => {
+            const notifCreated = new Date(n.created_at);
+            const timeDiff = Math.abs(patentCreated.getTime() - notifCreated.getTime());
+            return timeDiff < 60 * 60 * 1000; // Within 1 hour
+          });
+
+          if (matchingNotification) {
+            console.log('[FixOrphaned] Found time-matched orphan:', patent.id, '- Title:', patent.title);
+
+            const { error: updateError } = await supabaseAdmin
+              .from('patents')
+              .update({ user_id: userId })
+              .eq('id', patent.id);
+
+            if (!updateError) {
+              fixedCount++;
+              fixedPatents.push(patent.id);
+              console.log('[FixOrphaned] Fixed time-matched patent:', patent.id);
+            }
+          }
+        }
+      }
+
+      console.log('[FixOrphaned] ========== COMPLETED ==========');
+      console.log('[FixOrphaned] Fixed:', fixedCount);
+      console.log('[FixOrphaned] Already linked:', alreadyLinkedPatents.length);
+      console.log('[FixOrphaned] Not found:', notFoundPatents.length);
 
       res.json({
         success: true,
         totalNotificationPatents: patentIds.size,
+        totalOrphanedInDb: allOrphanedPatents?.length || 0,
         fixedCount,
         fixedPatents,
+        alreadyLinkedCount: alreadyLinkedPatents.length,
+        notFoundCount: notFoundPatents.length,
         message: fixedCount > 0
           ? `Fixed ${fixedCount} orphaned patents. Your dashboard should now show them.`
-          : 'No orphaned patents found. All your patents are properly linked.'
+          : allOrphanedPatents && allOrphanedPatents.length > 0
+            ? `No patents matched your notifications, but ${allOrphanedPatents.length} orphaned patents exist in the database.`
+            : 'No orphaned patents found. All your patents are properly linked.'
       });
 
     } catch (error) {
       console.error('[FixOrphaned] Error:', error);
       res.status(500).json({ error: 'Failed to fix orphaned patents' });
+    }
+  });
+
+  // Claim specific patents by ID - allows user to manually claim orphaned patents
+  app.post('/api/claim-patents', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { patentIds } = req.body;
+
+      if (!patentIds || !Array.isArray(patentIds) || patentIds.length === 0) {
+        return res.status(400).json({ error: 'patentIds array is required' });
+      }
+
+      console.log('[ClaimPatents] User', userId, 'claiming patents:', patentIds);
+
+      let claimedCount = 0;
+      const claimedPatents: string[] = [];
+      const errors: string[] = [];
+
+      for (const patentId of patentIds) {
+        const { data: patent, error: fetchError } = await supabaseAdmin
+          .from('patents')
+          .select('id, user_id, title')
+          .eq('id', patentId)
+          .single();
+
+        if (fetchError || !patent) {
+          errors.push(`Patent ${patentId} not found`);
+          continue;
+        }
+
+        // Only allow claiming orphaned patents
+        if (patent.user_id !== null) {
+          if (patent.user_id === userId) {
+            errors.push(`Patent ${patentId} already belongs to you`);
+          } else {
+            errors.push(`Patent ${patentId} belongs to another user`);
+          }
+          continue;
+        }
+
+        // Claim the patent
+        const { error: updateError } = await supabaseAdmin
+          .from('patents')
+          .update({ user_id: userId })
+          .eq('id', patentId);
+
+        if (updateError) {
+          errors.push(`Failed to claim patent ${patentId}: ${updateError.message}`);
+        } else {
+          claimedCount++;
+          claimedPatents.push(patentId);
+          console.log('[ClaimPatents] Successfully claimed:', patentId);
+        }
+      }
+
+      res.json({
+        success: true,
+        claimedCount,
+        claimedPatents,
+        errors: errors.length > 0 ? errors : undefined,
+        message: claimedCount > 0
+          ? `Successfully claimed ${claimedCount} patents.`
+          : 'No patents were claimed.'
+      });
+
+    } catch (error) {
+      console.error('[ClaimPatents] Error:', error);
+      res.status(500).json({ error: 'Failed to claim patents' });
     }
   });
 

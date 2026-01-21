@@ -240,8 +240,11 @@ export const api = {
   async fixOrphanedPatents(): Promise<{
     success: boolean;
     totalNotificationPatents: number;
+    totalOrphanedInDb: number;
     fixedCount: number;
     fixedPatents: string[];
+    alreadyLinkedCount: number;
+    notFoundCount: number;
     message: string;
   }> {
     const response = await fetch('/api/fix-orphaned-patents', {
@@ -252,6 +255,57 @@ export const api = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fix orphaned patents');
+    }
+
+    return response.json();
+  },
+
+  async claimPatents(patentIds: string[]): Promise<{
+    success: boolean;
+    claimedCount: number;
+    claimedPatents: string[];
+    errors?: string[];
+    message: string;
+  }> {
+    const response = await fetch('/api/claim-patents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ patentIds }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to claim patents');
+    }
+
+    return response.json();
+  },
+
+  async debugPatents(): Promise<{
+    userId: string;
+    summary: {
+      totalPatentsInDB: number;
+      userPatentsCount: number;
+      orphanedPatentsCount: number;
+      userNotificationsCount: number;
+      uniquePatentIdsInNotifications: number;
+    };
+    userPatents: any[];
+    orphanedPatents: any[];
+    notificationPatentStatus: Record<string, any>;
+    recentNotifications: any[];
+    errors: Record<string, string | undefined>;
+  }> {
+    const response = await fetch('/api/debug/patents', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Debug query failed');
     }
 
     return response.json();
