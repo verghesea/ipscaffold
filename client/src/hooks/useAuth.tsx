@@ -90,8 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Don't check immediately on mount - wait for first interval
+    // This prevents "session expiring" warning right after login
     const interval = setInterval(checkSession, 60000); // Check every minute
-    checkSession(); // Check immediately on mount
 
     return () => clearInterval(interval);
   }, [token, sessionWarningShown, toast, refetch]);
