@@ -84,7 +84,15 @@ export function DashboardPage() {
         console.log('[Dashboard] No patents found, attempting to fix orphaned patents...');
         try {
           const fixResult = await api.fixOrphanedPatents();
-          console.log('[Dashboard] Fix result:', fixResult);
+          console.log('[Dashboard] Fix result:', JSON.stringify(fixResult, null, 2));
+
+          // Log detailed diagnostics
+          console.log('[Dashboard] Fix diagnostics:');
+          console.log('  - Total notification patents:', fixResult.totalNotificationPatents);
+          console.log('  - Total orphaned in DB:', fixResult.totalOrphanedInDb);
+          console.log('  - Fixed count:', fixResult.fixedCount);
+          console.log('  - Already linked:', fixResult.alreadyLinkedCount);
+          console.log('  - Not found:', fixResult.notFoundCount);
 
           if (fixResult.fixedCount > 0) {
             toast({
@@ -115,6 +123,35 @@ export function DashboardPage() {
 
             setHeroImages(imageMap);
             return; // Exit early, we've already set everything
+          } else if (fixResult.totalOrphanedInDb > 0) {
+            // There are orphaned patents but they didn't match - run debug
+            console.log('[Dashboard] Running debug diagnostics...');
+            try {
+              const debugResult = await api.debugPatents();
+              console.log('[Dashboard] Debug result:', JSON.stringify(debugResult, null, 2));
+
+              // If there are orphaned patents, try to claim them
+              if (debugResult.orphanedPatents.length > 0) {
+                const orphanIds = debugResult.orphanedPatents.map((p: any) => p.id);
+                console.log('[Dashboard] Attempting to claim orphaned patents:', orphanIds);
+
+                const claimResult = await api.claimPatents(orphanIds);
+                console.log('[Dashboard] Claim result:', claimResult);
+
+                if (claimResult.claimedCount > 0) {
+                  toast({
+                    title: 'Patents Recovered',
+                    description: `Recovered ${claimResult.claimedCount} patents.`,
+                  });
+                  // Reload dashboard
+                  const updatedData = await api.getDashboard();
+                  setPatents(updatedData.patents);
+                  return;
+                }
+              }
+            } catch (debugError) {
+              console.error('[Dashboard] Debug failed:', debugError);
+            }
           }
         } catch (fixError) {
           console.error('[Dashboard] Failed to fix orphaned patents:', fixError);
