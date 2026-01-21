@@ -3,6 +3,16 @@ import { logExtraction, extractContext, trackPatternUsage } from './extractionLo
 import { supabaseAdmin } from '../lib/supabase';
 import Anthropic from '@anthropic-ai/sdk';
 
+// Startup diagnostic: Check if ANTHROPIC_API_KEY is available
+console.log('[PDF Parser] Module loaded - Environment check:');
+console.log('[PDF Parser] ANTHROPIC_API_KEY present:', !!process.env.ANTHROPIC_API_KEY);
+if (process.env.ANTHROPIC_API_KEY) {
+  console.log('[PDF Parser] API key length:', process.env.ANTHROPIC_API_KEY.length, 'characters');
+  console.log('[PDF Parser] API key prefix:', process.env.ANTHROPIC_API_KEY.substring(0, 10) + '...');
+} else {
+  console.warn('[PDF Parser] ⚠️ WARNING: ANTHROPIC_API_KEY not found - Claude PDF fallback will not work');
+}
+
 export interface ParsedPatent {
   title: string | null;
   inventors: string | null;
@@ -139,49 +149,72 @@ function isTextMeaningful(text: string): boolean {
  * Extract text from PDF using Claude API (fallback for complex PDFs)
  */
 async function extractTextWithClaude(filePath: string): Promise<string> {
-  console.log('[PDF Parser] Using Claude API to extract PDF text...');
+  console.log('[PDF Parser] === STARTING CLAUDE API FALLBACK ===');
+  console.log('[PDF Parser] Environment check - ANTHROPIC_API_KEY present:', !!process.env.ANTHROPIC_API_KEY);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not configured - cannot use Claude fallback parser');
-  }
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.error('[PDF Parser] ❌ ANTHROPIC_API_KEY not found in environment');
+      throw new Error('ANTHROPIC_API_KEY not configured - cannot use Claude fallback parser');
+    }
 
-  const client = new Anthropic({ apiKey });
+    console.log('[PDF Parser] ✓ API key found, initializing Anthropic client...');
+    const client = new Anthropic({ apiKey });
 
-  // Read PDF as base64
-  const pdfBuffer = await fs.readFile(filePath);
-  const base64Pdf = pdfBuffer.toString('base64');
+    // Read PDF as base64
+    console.log('[PDF Parser] Reading PDF file from disk...');
+    const pdfBuffer = await fs.readFile(filePath);
+    const fileSizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(2);
+    console.log(`[PDF Parser] PDF file size: ${fileSizeMB}MB`);
 
-  console.log(`[PDF Parser] Sending ${(pdfBuffer.length / 1024 / 1024).toFixed(2)}MB PDF to Claude API...`);
+    console.log('[PDF Parser] Converting to base64...');
+    const base64Pdf = pdfBuffer.toString('base64');
+    console.log(`[PDF Parser] Base64 encoding complete (${base64Pdf.length} characters)`);
 
-  const message = await client.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
-    max_tokens: 16000,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: 'application/pdf',
-            data: base64Pdf,
+    console.log(`[PDF Parser] Sending ${fileSizeMB}MB PDF to Claude API...`);
+    console.log('[PDF Parser] API request parameters: model=claude-3-5-sonnet-20241022, max_tokens=16000');
+
+    const message = await client.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 16000,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: base64Pdf,
+            },
           },
-        },
-        {
-          type: 'text',
-          text: 'Extract ALL text from this patent PDF. Return ONLY the raw text with no commentary, analysis, or formatting. Include all sections: title page, inventor names, assignee, filing dates, abstract, claims, detailed description, everything. Do not skip any text.',
-        },
-      ],
-    }],
-  });
+          {
+            type: 'text',
+            text: 'Extract ALL text from this patent PDF. Return ONLY the raw text with no commentary, analysis, or formatting. Include all sections: title page, inventor names, assignee, filing dates, abstract, claims, detailed description, everything. Do not skip any text.',
+          },
+        ],
+      }],
+    });
 
-  const extractedText = message.content[0].type === 'text' ? message.content[0].text : '';
+    console.log('[PDF Parser] ✓ Claude API response received');
+    const extractedText = message.content[0].type === 'text' ? message.content[0].text : '';
 
-  console.log(`[PDF Parser] Claude API extracted ${extractedText.length} characters`);
+    console.log(`[PDF Parser] ✓ Claude API extracted ${extractedText.length} characters`);
 
-  if (!extractedText || extractedText.length < 100) {
-    throw new Error('Claude API failed to extract meaningful text from PDF');
+    if (!extractedText || extractedText.length < 100) {
+      console.error('[PDF Parser] ❌ Claude extracted text too short:', extractedText.length, 'characters');
+      throw new Error('Claude API failed to extract meaningful text from PDF');
+    }
+
+    console.log('[PDF Parser] === CLAUDE API FALLBACK SUCCESSFUL ===');
+    return extractedText;
+  } catch (error) {
+    console.error('[PDF Parser] ❌ ERROR in extractTextWithClaude:');
+    console.error('[PDF Parser] Error name:', (error as Error).name);
+    console.error('[PDF Parser] Error message:', (error as Error).message);
+    console.error('[PDF Parser] Error stack:', (error as Error).stack);
+    throw error;
   }
 
   return extractedText;
@@ -537,12 +570,22 @@ export async function parsePatentPDF(filePath: string, patentId?: string): Promi
 
     if (!meaningful) {
       console.log('[PDF Parser] ⚠️ pdf-parse extracted insufficient text (only page numbers/whitespace)');
+      console.log('[PDF Parser] Text length:', text.length, 'characters');
       console.log('[PDF Parser] Sample of extracted text:', text.substring(0, 200));
-      console.log('[PDF Parser] Falling back to Claude API...');
+      console.log('[PDF Parser] ========================================');
+      console.log('[PDF Parser] TRIGGERING CLAUDE API FALLBACK');
+      console.log('[PDF Parser] ========================================');
 
-      // Fallback: Use Claude API to read PDF
-      text = await extractTextWithClaude(filePath);
-      usedClaudeFallback = true;
+      try {
+        // Fallback: Use Claude API to read PDF
+        text = await extractTextWithClaude(filePath);
+        usedClaudeFallback = true;
+        console.log('[PDF Parser] ✓ Claude fallback completed successfully');
+      } catch (claudeError) {
+        console.error('[PDF Parser] ❌ Claude fallback failed:');
+        console.error('[PDF Parser]', claudeError);
+        throw new Error(`Failed to extract PDF text with Claude API: ${(claudeError as Error).message}`);
+      }
     } else {
       console.log(`[PDF Parser] ✓ pdf-parse successfully extracted ${text.length} characters`);
     }
