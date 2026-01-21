@@ -229,11 +229,31 @@ export const api = {
     const response = await fetch('/api/dashboard', {
       headers: getAuthHeaders(),
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to load dashboard');
     }
-    
+
+    return response.json();
+  },
+
+  async fixOrphanedPatents(): Promise<{
+    success: boolean;
+    totalNotificationPatents: number;
+    fixedCount: number;
+    fixedPatents: string[];
+    message: string;
+  }> {
+    const response = await fetch('/api/fix-orphaned-patents', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fix orphaned patents');
+    }
+
     return response.json();
   },
   

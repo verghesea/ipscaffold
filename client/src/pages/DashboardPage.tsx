@@ -78,6 +78,50 @@ export function DashboardPage() {
   const loadDashboard = async () => {
     try {
       const data = await api.getDashboard();
+
+      // If no patents found, try to fix orphaned patents
+      if (data.patents.length === 0) {
+        console.log('[Dashboard] No patents found, attempting to fix orphaned patents...');
+        try {
+          const fixResult = await api.fixOrphanedPatents();
+          console.log('[Dashboard] Fix result:', fixResult);
+
+          if (fixResult.fixedCount > 0) {
+            toast({
+              title: 'Patents Recovered',
+              description: fixResult.message,
+            });
+            // Reload the dashboard after fixing
+            const updatedData = await api.getDashboard();
+            setPatents(updatedData.patents);
+
+            // Fetch hero images for recovered patents
+            const imagePromises = updatedData.patents
+              .filter(p => p.status === 'completed')
+              .map(async (patent) => {
+                try {
+                  const heroImage = await api.getPatentHeroImage(patent.id);
+                  return { patentId: patent.id, imageUrl: heroImage?.image_url };
+                } catch {
+                  return { patentId: patent.id, imageUrl: null };
+                }
+              });
+
+            const images = await Promise.all(imagePromises);
+            const imageMap = images.reduce((acc, { patentId, imageUrl }) => {
+              if (imageUrl) acc[patentId] = imageUrl;
+              return acc;
+            }, {} as Record<string, string>);
+
+            setHeroImages(imageMap);
+            return; // Exit early, we've already set everything
+          }
+        } catch (fixError) {
+          console.error('[Dashboard] Failed to fix orphaned patents:', fixError);
+          // Continue with empty dashboard
+        }
+      }
+
       setPatents(data.patents);
 
       // Fetch hero images for all completed patents

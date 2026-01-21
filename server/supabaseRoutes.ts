@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { supabaseStorage } from "./supabaseStorage";
+import { supabaseStorage, type Patent } from "./supabaseStorage";
 import { supabaseAdmin, supabase, supabaseUrl, supabaseAnonKey } from "./lib/supabase";
 import multer from "multer";
 import { nanoid } from "nanoid";
@@ -682,6 +682,86 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Mark all read error:', error);
       res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
+  // Fix orphaned patents - finds patents referenced in user's notifications but missing user_id
+  app.post('/api/fix-orphaned-patents', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      console.log('[FixOrphaned] Starting fix for user:', userId);
+
+      // Get all notifications for this user
+      const { data: notifications, error: notifError } = await supabaseAdmin
+        .from('webhook_notifications')
+        .select('payload')
+        .eq('user_id', userId);
+
+      if (notifError) {
+        console.error('[FixOrphaned] Error fetching notifications:', notifError);
+        return res.status(500).json({ error: 'Failed to fetch notifications' });
+      }
+
+      // Extract unique patent IDs from notifications
+      const patentIds = new Set<string>();
+      notifications?.forEach((n: any) => {
+        if (n.payload?.patent_id) {
+          patentIds.add(n.payload.patent_id);
+        }
+      });
+
+      console.log('[FixOrphaned] Found', patentIds.size, 'patent IDs in notifications');
+
+      // Find patents that don't have a user_id set
+      let fixedCount = 0;
+      const fixedPatents: string[] = [];
+
+      for (const patentId of patentIds) {
+        const { data: patent, error: patentError } = await supabaseAdmin
+          .from('patents')
+          .select('id, user_id, title')
+          .eq('id', patentId)
+          .single();
+
+        if (patentError) {
+          console.log('[FixOrphaned] Could not find patent:', patentId);
+          continue;
+        }
+
+        // If patent has no user_id, update it
+        if (patent && !patent.user_id) {
+          console.log('[FixOrphaned] Fixing orphaned patent:', patentId, '- Title:', patent.title);
+
+          const { error: updateError } = await supabaseAdmin
+            .from('patents')
+            .update({ user_id: userId })
+            .eq('id', patentId);
+
+          if (updateError) {
+            console.error('[FixOrphaned] Failed to update patent:', patentId, updateError);
+          } else {
+            fixedCount++;
+            fixedPatents.push(patentId);
+            console.log('[FixOrphaned] Successfully fixed patent:', patentId);
+          }
+        }
+      }
+
+      console.log('[FixOrphaned] Completed. Fixed', fixedCount, 'patents');
+
+      res.json({
+        success: true,
+        totalNotificationPatents: patentIds.size,
+        fixedCount,
+        fixedPatents,
+        message: fixedCount > 0
+          ? `Fixed ${fixedCount} orphaned patents. Your dashboard should now show them.`
+          : 'No orphaned patents found. All your patents are properly linked.'
+      });
+
+    } catch (error) {
+      console.error('[FixOrphaned] Error:', error);
+      res.status(500).json({ error: 'Failed to fix orphaned patents' });
     }
   });
 
