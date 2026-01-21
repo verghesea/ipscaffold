@@ -103,6 +103,25 @@ export function getStoredRefreshToken(): string | null {
 export function setStoredTokens(accessToken: string, refreshToken: string): void {
   localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+
+  // Log token details for debugging
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1]));
+    const exp = new Date(payload.exp * 1000);
+    const iat = payload.iat ? new Date(payload.iat * 1000) : null;
+    const ttlMinutes = iat ? Math.round((exp.getTime() - iat.getTime()) / (1000 * 60)) : 'unknown';
+    const minutesUntilExpiry = Math.round((exp.getTime() - Date.now()) / (1000 * 60));
+
+    console.log('[Auth] Tokens stored:', {
+      expiresAt: exp.toISOString(),
+      issuedAt: iat?.toISOString() || 'unknown',
+      ttlMinutes,
+      minutesUntilExpiry,
+      userId: payload.sub || 'unknown',
+    });
+  } catch (e) {
+    console.log('[Auth] Tokens stored (could not parse details)');
+  }
 }
 
 export function clearStoredTokens(): void {
@@ -116,17 +135,54 @@ export function getTokenExpiration(): Date | null {
 
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return new Date(payload.exp * 1000);
-  } catch {
+    const expiration = new Date(payload.exp * 1000);
+
+    // Debug logging to help diagnose token expiration issues
+    if (typeof window !== 'undefined' && (window as any).__AUTH_DEBUG__) {
+      const now = new Date();
+      const minutesRemaining = (expiration.getTime() - now.getTime()) / (1000 * 60);
+      console.log('[Auth Debug] Token expiration:', {
+        exp: payload.exp,
+        expiresAt: expiration.toISOString(),
+        now: now.toISOString(),
+        minutesRemaining: Math.round(minutesRemaining * 10) / 10,
+        issuedAt: payload.iat ? new Date(payload.iat * 1000).toISOString() : 'unknown',
+      });
+    }
+
+    return expiration;
+  } catch (e) {
+    console.error('[Auth] Failed to parse token expiration:', e);
     return null;
+  }
+}
+
+// Enable auth debugging in browser console: window.__AUTH_DEBUG__ = true
+export function enableAuthDebug(): void {
+  if (typeof window !== 'undefined') {
+    (window as any).__AUTH_DEBUG__ = true;
+    console.log('[Auth Debug] Auth debugging enabled. Token expiration will be logged.');
+    // Immediately log current token state
+    const expiration = getTokenExpiration();
+    if (expiration) {
+      const now = new Date();
+      const minutesRemaining = (expiration.getTime() - now.getTime()) / (1000 * 60);
+      console.log('[Auth Debug] Current token expires in', Math.round(minutesRemaining), 'minutes');
+    } else {
+      console.log('[Auth Debug] No valid token found');
+    }
   }
 }
 
 export async function refreshSession(): Promise<boolean> {
   const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) return false;
+  if (!refreshToken) {
+    console.warn('[Auth] Cannot refresh session: no refresh token available');
+    return false;
+  }
 
   try {
+    console.log('[Auth] Attempting to refresh session...');
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -136,10 +192,15 @@ export async function refreshSession(): Promise<boolean> {
     if (response.ok) {
       const { accessToken, refreshToken: newRefreshToken } = await response.json();
       setStoredTokens(accessToken, newRefreshToken);
+      console.log('[Auth] Session refreshed successfully');
       return true;
     }
+
+    const error = await response.json().catch(() => ({}));
+    console.warn('[Auth] Session refresh failed:', response.status, error);
     return false;
-  } catch {
+  } catch (e) {
+    console.error('[Auth] Session refresh error:', e);
     return false;
   }
 }
