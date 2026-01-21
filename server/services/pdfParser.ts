@@ -173,10 +173,10 @@ async function extractTextWithClaude(filePath: string): Promise<string> {
     console.log(`[PDF Parser] Base64 encoding complete (${base64Pdf.length} characters)`);
 
     console.log(`[PDF Parser] Sending ${fileSizeMB}MB PDF to Claude API...`);
-    console.log('[PDF Parser] API request parameters: model=claude-3-5-sonnet-20241022, max_tokens=16000');
+    console.log('[PDF Parser] API request parameters: model=claude-3-5-sonnet-20240620, max_tokens=16000');
 
     const message = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 16000,
       messages: [{
         role: 'user',
