@@ -175,9 +175,11 @@ async function extractTextWithClaude(filePath: string): Promise<string> {
     console.log(`[PDF Parser] Sending ${fileSizeMB}MB PDF to Claude API...`);
     console.log('[PDF Parser] API request parameters: model=claude-3-5-sonnet-20240620, max_tokens=16000');
 
-    const message = await client.messages.create({
+    // Add timeout wrapper
+    const messagePromise = client.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 16000,
+      timeout: 120000, // 2 minute timeout
       messages: [{
         role: 'user',
         content: [
@@ -197,6 +199,9 @@ async function extractTextWithClaude(filePath: string): Promise<string> {
       }],
     });
 
+    console.log('[PDF Parser] Waiting for Claude API response...');
+    const message = await messagePromise;
+
     console.log('[PDF Parser] ✓ Claude API response received');
     const extractedText = message.content[0].type === 'text' ? message.content[0].text : '';
 
@@ -209,11 +214,21 @@ async function extractTextWithClaude(filePath: string): Promise<string> {
 
     console.log('[PDF Parser] === CLAUDE API FALLBACK SUCCESSFUL ===');
     return extractedText;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[PDF Parser] ❌ ERROR in extractTextWithClaude:');
-    console.error('[PDF Parser] Error name:', (error as Error).name);
-    console.error('[PDF Parser] Error message:', (error as Error).message);
-    console.error('[PDF Parser] Error stack:', (error as Error).stack);
+    console.error('[PDF Parser] Error type:', error?.constructor?.name || 'Unknown');
+    console.error('[PDF Parser] Error name:', error?.name);
+    console.error('[PDF Parser] Error message:', error?.message);
+
+    // Anthropic SDK errors may have additional properties
+    if (error?.status) console.error('[PDF Parser] HTTP Status:', error.status);
+    if (error?.headers) console.error('[PDF Parser] Response headers:', error.headers);
+    if (error?.error) console.error('[PDF Parser] Error details:', JSON.stringify(error.error, null, 2));
+
+    // Full error object for debugging
+    console.error('[PDF Parser] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error('[PDF Parser] Error stack:', error?.stack);
+
     throw error;
   }
 
