@@ -5,6 +5,7 @@ import { supabaseAdmin, supabase, supabaseUrl, supabaseAnonKey } from "./lib/sup
 import multer from "multer";
 import { nanoid } from "nanoid";
 import fs from "fs/promises";
+import rateLimit from "express-rate-limit";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
 import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
@@ -42,6 +43,26 @@ const upload = multer({
     } else {
       cb(new Error('Only PDF files are allowed'));
     }
+  }
+});
+
+// Rate limiter for upload endpoint to prevent abuse and control API costs
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 uploads per 15 minutes
+  message: {
+    error: 'Too many uploads. Please try again in 15 minutes.',
+    details: 'Upload rate limit exceeded. This helps us maintain service quality and manage costs.'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    console.log('[RateLimit] Upload rate limit exceeded for IP:', req.ip);
+    res.status(429).json({
+      error: 'Too many uploads',
+      details: 'You have exceeded the upload limit. Please try again in 15 minutes.',
+      retryAfter: 15 * 60 // seconds
+    });
   }
 });
 
@@ -92,7 +113,7 @@ export async function registerRoutes(
     });
   });
 
-  app.post('/api/upload', upload.single('pdf'), async (req, res) => {
+  app.post('/api/upload', uploadLimiter, upload.single('pdf'), async (req, res) => {
     console.log('[Upload] ========== NEW UPLOAD REQUEST ==========');
     console.log('[Upload] Timestamp:', new Date().toISOString());
 
@@ -124,6 +145,40 @@ export async function registerRoutes(
       }
 
       console.log('[Upload] User authentication:', user ? `Authenticated (${user.id})` : 'Anonymous (no auth header)');
+
+      // BLOCKER-2 FIX: Check credits BEFORE processing to prevent wasted API costs
+      if (user) {
+        console.log('[Upload] Checking user credits before processing...');
+        const profile = await supabaseStorage.getProfile(user.id);
+
+        if (!profile) {
+          console.error('[Upload] ERROR: User profile not found');
+          // Clean up uploaded file
+          await fs.unlink(req.file.path).catch(() => {});
+          return res.status(500).json({
+            error: 'Profile not found',
+            details: 'Unable to verify your account. Please try logging in again.'
+          });
+        }
+
+        console.log('[Upload] User has', profile.credits, 'credits');
+
+        if (profile.credits < 10) {
+          console.log('[Upload] REJECTED: Insufficient credits (need 10, has', profile.credits + ')');
+          // Clean up uploaded file
+          await fs.unlink(req.file.path).catch(() => {});
+          return res.status(402).json({
+            error: 'Insufficient credits',
+            details: 'You need at least 10 credits to upload a patent. Visit the dashboard to add credits.',
+            currentCredits: profile.credits,
+            required: 10
+          });
+        }
+
+        console.log('[Upload] ✓ Credit check passed');
+      } else {
+        console.log('[Upload] Skipping credit check for anonymous upload');
+      }
 
       const filePath = req.file.path;
       const filename = req.file.filename;
