@@ -135,6 +135,25 @@ export class SupabaseStorage {
 
   async getPatentsByUser(userId: string): Promise<Patent[]> {
     console.log('[getPatentsByUser] Querying patents for user:', userId);
+    console.log('[getPatentsByUser] User ID type:', typeof userId, 'Length:', userId.length);
+
+    // First, let's see what patents exist in the database
+    const { data: allPatents, error: allError } = await supabaseAdmin
+      .from('patents')
+      .select('id, user_id, title, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (allError) {
+      console.error('[getPatentsByUser] Error fetching all patents:', allError);
+    } else {
+      console.log('[getPatentsByUser] Sample of ALL patents in DB (first 10):');
+      allPatents?.forEach((p, i) => {
+        console.log(`  ${i + 1}. ID: ${p.id}, user_id: ${p.user_id}, title: ${p.title?.substring(0, 50) || 'null'}`);
+      });
+    }
+
+    // Now query for the specific user
     const { data, error } = await supabaseAdmin
       .from('patents')
       .select('*')
@@ -142,21 +161,43 @@ export class SupabaseStorage {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[getPatentsByUser] Error:', error);
+      console.error('[getPatentsByUser] Error querying user patents:', error);
+      console.error('[getPatentsByUser] Error details:', JSON.stringify(error, null, 2));
       return [];
     }
-    console.log('[getPatentsByUser] Found', data?.length || 0, 'patents');
+
+    console.log('[getPatentsByUser] Found', data?.length || 0, 'patents for user', userId);
+
+    // If no patents found, check if any patents have this user_id as a string match
+    if (!data || data.length === 0) {
+      console.log('[getPatentsByUser] DEBUG: Checking for potential user_id format mismatch...');
+      const { data: textMatch } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id')
+        .textSearch('user_id', userId);
+      console.log('[getPatentsByUser] Text search results:', textMatch?.length || 0, 'matches');
+    }
+
     return data || [];
   }
 
   async createPatent(patent: Omit<Patent, 'id' | 'created_at' | 'updated_at'>): Promise<Patent> {
+    console.log('[createPatent] Creating patent with user_id:', patent.user_id);
+    console.log('[createPatent] User ID type:', typeof patent.user_id);
+
     const { data, error } = await supabaseAdmin
       .from('patents')
       .insert(patent)
       .select()
       .single();
-    
-    if (error) throw new Error(`Failed to create patent: ${error.message}`);
+
+    if (error) {
+      console.error('[createPatent] Failed to create patent:', error);
+      throw new Error(`Failed to create patent: ${error.message}`);
+    }
+
+    console.log('[createPatent] Patent created with ID:', data.id);
+    console.log('[createPatent] Stored user_id:', data.user_id);
     return data;
   }
 
