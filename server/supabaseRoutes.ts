@@ -66,6 +66,58 @@ const uploadLimiter = rateLimit({
   }
 });
 
+// Rate limiter for magic link endpoint to prevent email spam abuse (HIGH-1 FIX)
+const magicLinkLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 requests per minute per IP
+  message: {
+    error: 'Too many login attempts',
+    details: 'Please wait a moment before requesting another magic link.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.log('[RateLimit] Magic link rate limit exceeded for IP:', req.ip);
+    res.status(429).json({
+      error: 'Too many requests',
+      details: 'Please wait a minute before requesting another magic link.',
+      retryAfter: 60, // seconds
+    });
+  },
+});
+
+// Per-email rate limiting to prevent email bombing (independent of IP)
+const emailLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkEmailLimit(email: string): boolean {
+  const now = Date.now();
+  const limit = emailLimitMap.get(email);
+
+  // Reset if window expired (5 minute window)
+  if (!limit || now > limit.resetTime) {
+    emailLimitMap.set(email, { count: 1, resetTime: now + 5 * 60 * 1000 });
+    return true;
+  }
+
+  // Check if under limit (5 per 5 minutes per email)
+  if (limit.count < 5) {
+    limit.count++;
+    return true;
+  }
+
+  return false;
+}
+
+// Clean up old entries periodically (every 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, limit] of emailLimitMap.entries()) {
+    if (now > limit.resetTime) {
+      emailLimitMap.delete(email);
+    }
+  }
+}, 10 * 60 * 1000);
+
 async function getUserFromToken(req: Request): Promise<{ id: string; email: string } | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -343,7 +395,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post('/api/auth/magic-link', async (req, res) => {
+  app.post('/api/auth/magic-link', magicLinkLimiter, async (req, res) => {
     try {
       const { email, patentId } = req.body;
 
@@ -351,10 +403,21 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Email required' });
       }
 
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check per-email rate limit (prevents email bombing to a single address)
+      if (!checkEmailLimit(normalizedEmail)) {
+        console.log('[RateLimit] Per-email limit exceeded for:', normalizedEmail);
+        return res.status(429).json({
+          error: 'Too many requests for this email',
+          details: 'Multiple magic links have been sent to this email. Please check your inbox (including spam) or wait 5 minutes.',
+        });
+      }
+
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
 
       const { data, error } = await supabase.auth.signInWithOtp({
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         options: {
           emailRedirectTo: `${appUrl}/auth/callback${patentId ? `?patent=${patentId}` : ''}`,
           shouldCreateUser: true,
@@ -366,7 +429,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: 'Failed to send magic link', details: error.message });
       }
 
-      console.log('Magic link sent to:', email);
+      console.log('Magic link sent to:', normalizedEmail);
 
       res.json({ success: true, message: 'Magic link sent to your email', patentId });
 
@@ -440,7 +503,7 @@ export async function registerRoutes(
           await supabaseStorage.createProfile({
             id: user.id,
             email: user.email || '',
-            credits: 100,
+            credits: 30, // 3 uploads max (10 credits each)
             is_admin: false,
           });
         } catch (e) {

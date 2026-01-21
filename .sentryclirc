@@ -1,0 +1,26 @@
+# Sentry CLI Configuration
+#
+# This file configures the Sentry CLI for source map uploads.
+# DO NOT commit real auth tokens to version control.
+#
+# For local development, create a .sentryclirc.local file with your token.
+# For CI/CD, use environment variables instead.
+
+[defaults]
+# Your Sentry organization slug
+# Replace with your actual organization
+org = your-org
+
+# Your Sentry project slug
+# Replace with your actual project name
+project = ip-scaffold
+
+[auth]
+# DO NOT put real tokens here!
+# Use SENTRY_AUTH_TOKEN environment variable instead
+# token = your-auth-token
+
+# How to get an auth token:
+# 1. Go to https://sentry.io/settings/account/api/auth-tokens/
+# 2. Create a token with project:releases and org:read scopes
+# 3. Set as SENTRY_AUTH_TOKEN environment variable

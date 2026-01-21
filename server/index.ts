@@ -75,8 +75,22 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Log the error with context for debugging
+    console.error('[Error Handler]', {
+      status,
+      message: err.message,
+      stack: err.stack,
+      path: _req.path,
+      method: _req.method,
+    });
+
+    // Only send response if headers haven't been sent (prevents "headers already sent" error)
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
+
+    // DO NOT re-throw - error is handled
+    // Previous code had: throw err; - This was removed to prevent unhandled rejection warnings
   });
 
   // importantly only setup vite in development and after
