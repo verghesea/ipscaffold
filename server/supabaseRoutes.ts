@@ -5,6 +5,7 @@ import { supabaseAdmin, supabase, supabaseUrl, supabaseAnonKey } from "./lib/sup
 import multer from "multer";
 import { nanoid } from "nanoid";
 import fs from "fs/promises";
+import rateLimit from "express-rate-limit";
 import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
 import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
@@ -44,6 +45,78 @@ const upload = multer({
     }
   }
 });
+
+// Rate limiter for upload endpoint to prevent abuse and control API costs
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 uploads per 15 minutes
+  message: {
+    error: 'Too many uploads. Please try again in 15 minutes.',
+    details: 'Upload rate limit exceeded. This helps us maintain service quality and manage costs.'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    console.log('[RateLimit] Upload rate limit exceeded for IP:', req.ip);
+    res.status(429).json({
+      error: 'Too many uploads',
+      details: 'You have exceeded the upload limit. Please try again in 15 minutes.',
+      retryAfter: 15 * 60 // seconds
+    });
+  }
+});
+
+// Rate limiter for magic link endpoint to prevent email spam abuse (HIGH-1 FIX)
+const magicLinkLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 requests per minute per IP
+  message: {
+    error: 'Too many login attempts',
+    details: 'Please wait a moment before requesting another magic link.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.log('[RateLimit] Magic link rate limit exceeded for IP:', req.ip);
+    res.status(429).json({
+      error: 'Too many requests',
+      details: 'Please wait a minute before requesting another magic link.',
+      retryAfter: 60, // seconds
+    });
+  },
+});
+
+// Per-email rate limiting to prevent email bombing (independent of IP)
+const emailLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkEmailLimit(email: string): boolean {
+  const now = Date.now();
+  const limit = emailLimitMap.get(email);
+
+  // Reset if window expired (5 minute window)
+  if (!limit || now > limit.resetTime) {
+    emailLimitMap.set(email, { count: 1, resetTime: now + 5 * 60 * 1000 });
+    return true;
+  }
+
+  // Check if under limit (5 per 5 minutes per email)
+  if (limit.count < 5) {
+    limit.count++;
+    return true;
+  }
+
+  return false;
+}
+
+// Clean up old entries periodically (every 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, limit] of emailLimitMap.entries()) {
+    if (now > limit.resetTime) {
+      emailLimitMap.delete(email);
+    }
+  }
+}, 10 * 60 * 1000);
 
 async function getUserFromToken(req: Request): Promise<{ id: string; email: string } | null> {
   const authHeader = req.headers.authorization;
@@ -92,7 +165,7 @@ export async function registerRoutes(
     });
   });
 
-  app.post('/api/upload', upload.single('pdf'), async (req, res) => {
+  app.post('/api/upload', uploadLimiter, upload.single('pdf'), async (req, res) => {
     console.log('[Upload] ========== NEW UPLOAD REQUEST ==========');
     console.log('[Upload] Timestamp:', new Date().toISOString());
 
@@ -124,6 +197,40 @@ export async function registerRoutes(
       }
 
       console.log('[Upload] User authentication:', user ? `Authenticated (${user.id})` : 'Anonymous (no auth header)');
+
+      // BLOCKER-2 FIX: Check credits BEFORE processing to prevent wasted API costs
+      if (user) {
+        console.log('[Upload] Checking user credits before processing...');
+        const profile = await supabaseStorage.getProfile(user.id);
+
+        if (!profile) {
+          console.error('[Upload] ERROR: User profile not found');
+          // Clean up uploaded file
+          await fs.unlink(req.file.path).catch(() => {});
+          return res.status(500).json({
+            error: 'Profile not found',
+            details: 'Unable to verify your account. Please try logging in again.'
+          });
+        }
+
+        console.log('[Upload] User has', profile.credits, 'credits');
+
+        if (profile.credits < 10) {
+          console.log('[Upload] REJECTED: Insufficient credits (need 10, has', profile.credits + ')');
+          // Clean up uploaded file
+          await fs.unlink(req.file.path).catch(() => {});
+          return res.status(402).json({
+            error: 'Insufficient credits',
+            details: 'You need at least 10 credits to upload a patent. Visit the dashboard to add credits.',
+            currentCredits: profile.credits,
+            required: 10
+          });
+        }
+
+        console.log('[Upload] ✓ Credit check passed');
+      } else {
+        console.log('[Upload] Skipping credit check for anonymous upload');
+      }
 
       const filePath = req.file.path;
       const filename = req.file.filename;
@@ -288,7 +395,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post('/api/auth/magic-link', async (req, res) => {
+  app.post('/api/auth/magic-link', magicLinkLimiter, async (req, res) => {
     try {
       const { email, patentId } = req.body;
 
@@ -296,10 +403,21 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Email required' });
       }
 
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check per-email rate limit (prevents email bombing to a single address)
+      if (!checkEmailLimit(normalizedEmail)) {
+        console.log('[RateLimit] Per-email limit exceeded for:', normalizedEmail);
+        return res.status(429).json({
+          error: 'Too many requests for this email',
+          details: 'Multiple magic links have been sent to this email. Please check your inbox (including spam) or wait 5 minutes.',
+        });
+      }
+
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
 
       const { data, error } = await supabase.auth.signInWithOtp({
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         options: {
           emailRedirectTo: `${appUrl}/auth/callback${patentId ? `?patent=${patentId}` : ''}`,
           shouldCreateUser: true,
@@ -311,7 +429,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: 'Failed to send magic link', details: error.message });
       }
 
-      console.log('Magic link sent to:', email);
+      console.log('Magic link sent to:', normalizedEmail);
 
       res.json({ success: true, message: 'Magic link sent to your email', patentId });
 
@@ -385,7 +503,7 @@ export async function registerRoutes(
           await supabaseStorage.createProfile({
             id: user.id,
             email: user.email || '',
-            credits: 100,
+            credits: 30, // 3 uploads max (10 credits each)
             is_admin: false,
           });
         } catch (e) {
@@ -441,7 +559,60 @@ export async function registerRoutes(
       email: profile.email,
       credits: profile.credits,
       isAdmin: profile.is_admin,
+      displayName: profile.display_name,
+      organization: profile.organization,
+      profileCompleted: !!profile.profile_completed_at,
     });
+  });
+
+  // Complete user profile (name + organization)
+  app.post('/api/user/complete-profile', requireAuth, async (req, res) => {
+    try {
+      const { displayName, organization } = req.body;
+
+      if (!displayName || !organization) {
+        return res.status(400).json({
+          error: 'Both name and organization are required',
+        });
+      }
+
+      if (displayName.trim().length < 2) {
+        return res.status(400).json({
+          error: 'Name must be at least 2 characters',
+        });
+      }
+
+      if (organization.trim().length < 2) {
+        return res.status(400).json({
+          error: 'Organization must be at least 2 characters',
+        });
+      }
+
+      await supabaseStorage.updateProfilePersonalization(
+        req.user!.id,
+        displayName.trim(),
+        organization.trim()
+      );
+
+      console.log('[Profile] User completed profile:', req.user!.id, displayName, organization);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Profile] Error completing profile:', error);
+      res.status(500).json({ error: 'Failed to update profile', details: error?.message });
+    }
+  });
+
+  // Skip profile completion (will re-prompt after 7 days)
+  app.post('/api/user/skip-profile', requireAuth, async (req, res) => {
+    try {
+      await supabaseStorage.skipProfileCompletion(req.user!.id);
+      console.log('[Profile] User skipped profile completion:', req.user!.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Profile] Error skipping profile:', error);
+      res.status(500).json({ error: 'Failed to skip profile', details: error?.message });
+    }
   });
 
   // DIAGNOSTIC ENDPOINT - Comprehensive database diagnosis

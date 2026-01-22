@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { api, type User } from "@/lib/api";
-import { LogOut, LayoutDashboard, Shield } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
+import { UserAvatarDropdown } from "@/components/layout/UserAvatarDropdown";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
@@ -37,36 +38,30 @@ export function Navbar() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
+              {/* Dashboard link - desktop only */}
+              <Link
+                href="/dashboard"
+                className={`hidden md:flex text-sm font-medium transition-colors hover:text-accent-600 items-center gap-2 ${location === '/dashboard' ? 'text-accent-600' : 'text-muted-foreground'}`}
+                data-testid="link-dashboard"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </Link>
+
+              {/* Credits badge - desktop only */}
               <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-secondary rounded-full" data-testid="text-credits">
                 <span className="text-sm font-medium text-primary-900">{user.credits} Credits</span>
               </div>
 
+              {/* Notification bell */}
               <NotificationDropdown />
-              
-              <Link href="/dashboard" className={`text-sm font-medium transition-colors hover:text-accent-600 flex items-center gap-2 ${location === '/dashboard' ? 'text-accent-600' : 'text-muted-foreground'}`} data-testid="link-dashboard">
-                <LayoutDashboard className="w-4 h-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Link>
 
-              {user.isAdmin && (
-                <Link href="/admin" className={`text-sm font-medium transition-colors hover:text-amber-600 flex items-center gap-2 ${location === '/admin' ? 'text-amber-600' : 'text-muted-foreground'}`} data-testid="link-admin">
-                  <Shield className="w-4 h-4" />
-                  <span className="hidden sm:inline">Admin</span>
-                </Link>
-              )}
-              
-              <button 
-                onClick={handleLogout}
-                className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-2"
-                data-testid="button-logout"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
+              {/* User avatar dropdown */}
+              <UserAvatarDropdown user={user} onLogout={handleLogout} />
             </>
           ) : (
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="text-sm font-medium px-4 py-2 bg-primary-900 text-white rounded-lg hover:bg-primary-800 transition-colors"
               data-testid="link-login"
             >

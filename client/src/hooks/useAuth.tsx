@@ -18,6 +18,9 @@ interface User {
   credits: number;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  displayName?: string | null;
+  organization?: string | null;
+  profileCompleted?: boolean;
 }
 
 interface AuthContextType {
