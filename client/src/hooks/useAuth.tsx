@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getStoredToken, clearStoredTokens, getTokenExpiration, refreshSession } from '@/lib/api';
+import { api, getStoredToken, clearStoredTokens, getTokenExpiration, refreshSession, type User } from '@/lib/api';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
@@ -10,17 +10,9 @@ interface Profile {
   credits: number;
   is_admin: boolean;
   is_super_admin: boolean;
-}
-
-interface User {
-  id: string;
-  email: string;
-  credits: number;
-  isAdmin: boolean;
-  isSuperAdmin: boolean;
-  displayName?: string | null;
+  display_name?: string | null;
   organization?: string | null;
-  profileCompleted?: boolean;
+  profile_completed?: boolean;
 }
 
 interface AuthContextType {
@@ -72,7 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: user.email,
     credits: user.credits,
     is_admin: user.isAdmin,
-    is_super_admin: user.isSuperAdmin,
+    is_super_admin: user.isSuperAdmin || false,
+    display_name: user.displayName || null,
+    organization: user.organization || null,
+    profile_completed: user.profileCompleted || false,
   } : null;
 
   const logout = () => {
