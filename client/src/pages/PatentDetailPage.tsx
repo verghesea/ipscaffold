@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact } from '@/lib/api';
 import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loader2 } from 'lucide-react';
@@ -16,6 +16,7 @@ import { ArtifactHeader } from '@/components/patent/ArtifactHeader';
 import { useSectionImages } from '@/hooks/useSectionImages';
 import { countSections } from '@/lib/markdownParser';
 import { GenerationProgress } from '@/components/patent/GenerationProgress';
+import { ProfileCompletionModal } from '@/components/ProfileCompletionModal';
 
 const ARTIFACT_TYPES = {
   elia15: {
@@ -58,8 +59,10 @@ export function PatentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('elia15');
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const hasShownProfileModal = useRef(false);
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { user, profile, refetch: refetchUser } = useAuth();
 
   // Get current artifact based on active tab
   const currentArtifact = artifacts.find(a => a.type === activeTab);
@@ -83,6 +86,24 @@ export function PatentDetailPage() {
       loadPatent(params.id);
     }
   }, [params?.id]);
+
+  // Show profile completion modal when patent is completed and user hasn't completed their profile
+  useEffect(() => {
+    if (
+      patent?.status === 'completed' &&
+      user &&
+      !user.profileCompleted &&
+      !user.displayName &&
+      !hasShownProfileModal.current
+    ) {
+      // Small delay to let the user see the completed analysis first
+      const timer = setTimeout(() => {
+        setShowProfileModal(true);
+        hasShownProfileModal.current = true;
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [patent?.status, user]);
 
   const loadPatent = async (id: string) => {
     try {
@@ -212,6 +233,16 @@ export function PatentDetailPage() {
 
   return (
     <Layout>
+      {/* Profile completion modal */}
+      <ProfileCompletionModal
+        open={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onComplete={() => {
+          refetchUser();
+          setShowProfileModal(false);
+        }}
+      />
+
       <div className="min-h-screen bg-background py-8">
         <div className="container mx-auto px-6">
           <button

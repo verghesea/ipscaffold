@@ -6,6 +6,10 @@ export interface Profile {
   credits: number;
   is_admin: boolean;
   is_super_admin: boolean;
+  display_name: string | null;
+  organization: string | null;
+  profile_prompt_skipped_at: string | null;
+  profile_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +107,32 @@ export class SupabaseStorage {
     await supabaseAdmin
       .from('profiles')
       .update({ credits })
+      .eq('id', userId);
+  }
+
+  async updateProfilePersonalization(
+    userId: string,
+    displayName: string,
+    organization: string
+  ): Promise<void> {
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        display_name: displayName,
+        organization: organization,
+        profile_completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+  }
+
+  async skipProfileCompletion(userId: string): Promise<void> {
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        profile_prompt_skipped_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', userId);
   }
 

@@ -86,7 +86,10 @@ export interface User {
   email: string;
   credits: number;
   isAdmin: boolean;
-  isSuperAdmin: boolean;
+  isSuperAdmin?: boolean;
+  displayName?: string | null;
+  organization?: string | null;
+  profileCompleted?: boolean;
 }
 
 const AUTH_TOKEN_KEY = 'ip_scaffold_access_token';
@@ -278,14 +281,41 @@ export const api = {
     const response = await fetch('/api/user', {
       headers: getAuthHeaders(),
     });
-    
+
     if (!response.ok) {
       throw new Error('Not authenticated');
     }
-    
+
     return response.json();
   },
-  
+
+  async completeProfile(displayName: string, organization: string): Promise<void> {
+    const response = await fetch('/api/user/complete-profile', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ displayName, organization }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to complete profile');
+    }
+  },
+
+  async skipProfile(): Promise<void> {
+    const response = await fetch('/api/user/skip-profile', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to skip profile');
+    }
+  },
+
   async getDashboard(): Promise<{ patents: Patent[] }> {
     const response = await fetch('/api/dashboard', {
       headers: getAuthHeaders(),

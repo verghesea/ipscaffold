@@ -559,7 +559,60 @@ export async function registerRoutes(
       email: profile.email,
       credits: profile.credits,
       isAdmin: profile.is_admin,
+      displayName: profile.display_name,
+      organization: profile.organization,
+      profileCompleted: !!profile.profile_completed_at,
     });
+  });
+
+  // Complete user profile (name + organization)
+  app.post('/api/user/complete-profile', requireAuth, async (req, res) => {
+    try {
+      const { displayName, organization } = req.body;
+
+      if (!displayName || !organization) {
+        return res.status(400).json({
+          error: 'Both name and organization are required',
+        });
+      }
+
+      if (displayName.trim().length < 2) {
+        return res.status(400).json({
+          error: 'Name must be at least 2 characters',
+        });
+      }
+
+      if (organization.trim().length < 2) {
+        return res.status(400).json({
+          error: 'Organization must be at least 2 characters',
+        });
+      }
+
+      await supabaseStorage.updateProfilePersonalization(
+        req.user!.id,
+        displayName.trim(),
+        organization.trim()
+      );
+
+      console.log('[Profile] User completed profile:', req.user!.id, displayName, organization);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Profile] Error completing profile:', error);
+      res.status(500).json({ error: 'Failed to update profile', details: error?.message });
+    }
+  });
+
+  // Skip profile completion (will re-prompt after 7 days)
+  app.post('/api/user/skip-profile', requireAuth, async (req, res) => {
+    try {
+      await supabaseStorage.skipProfileCompletion(req.user!.id);
+      console.log('[Profile] User skipped profile completion:', req.user!.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Profile] Error skipping profile:', error);
+      res.status(500).json({ error: 'Failed to skip profile', details: error?.message });
+    }
   });
 
   // DIAGNOSTIC ENDPOINT - Comprehensive database diagnosis
