@@ -26,15 +26,15 @@
 |--------|-------------|------------|
 | **Cost per upload** | $4.00 | $2.50 |
 | **Free users supported ($500)** | 41 users | 66 users |
-| **Break-even paid packs** | 25 packs | 16 packs |
+| **Break-even paid packs** | 39 packs | 27 packs |
 | **Recommended alpha cap** | 30 users | 50 users |
 
 ### Critical Numbers
 
 - **Free tier:** 30 credits = 3 uploads per user
-- **Paid tier:** $20 for 30 credits (3 more uploads)
+- **Paid tier:** $25 for 30 credits (3 more uploads)
 - **Cost per upload:** $4.00 (conservative average)
-- **Margin per paid pack:** $8.00 (at $4/upload) to $12.50 (at $2.50/upload)
+- **Margin per paid pack:** $13.00 (52% margin at $4/upload) to $17.50 (70% margin at $2.50/upload)
 
 ---
 
@@ -194,27 +194,27 @@ Using Claude Sonnet 4 (`claude-sonnet-4-20250514`):
 
 At $4.00 per upload (conservative):
 - Cost for 3 uploads = $12.00
-- Revenue per pack = $20.00
-- **Profit per pack = $8.00**
+- Revenue per pack = $25.00
+- **Profit per pack = $13.00** (52% margin)
 
 | Scenario | Total Uploads | Total Cost | Packs to Break Even |
 |----------|--------------|------------|---------------------|
-| 30 free users (90 uploads) | 90 | $360 | 45 packs ($900) |
-| 40 free users (120 uploads) | 120 | $480 | 60 packs ($1,200) |
-| 50 free users (150 uploads) | 150 | $600 | 75 packs ($1,500) |
+| 30 free users (90 uploads) | 90 | $360 | 28 packs ($700) |
+| 40 free users (120 uploads) | 120 | $480 | 37 packs ($925) |
+| 50 free users (150 uploads) | 150 | $600 | 47 packs ($1,175) |
 
 **To break even on the $500 budget:**
-- At $4/upload: Need **63 paid packs** ($1,260 revenue) to cover $500 in costs
-- At $2.50/upload: Need **42 paid packs** ($840 revenue)
+- At $4/upload with $25 pricing: Need **39 paid packs** ($975 revenue) to cover $500 in costs
+- At $2.50/upload with $25 pricing: Need **27 paid packs** ($675 revenue)
 
-**More realistically - to achieve cost neutrality:**
+**To achieve cost neutrality:**
 
-| Metric | Calculation |
-|--------|-------------|
-| Cost per pack (3 uploads) | $12.00 (conservative) |
-| Revenue per pack | $20.00 |
-| Margin per pack | $8.00 |
-| To cover $500 | 500 / 8 = **63 packs** |
+| Metric | Conservative | Optimistic |
+|--------|-------------|------------|
+| Cost per pack (3 uploads) | $12.00 | $7.50 |
+| Revenue per pack | $25.00 | $25.00 |
+| Margin per pack | $13.00 | $17.50 |
+| Packs to cover $500 | **39 packs** | **27 packs** |
 
 ---
 
@@ -222,27 +222,28 @@ At $4.00 per upload (conservative):
 
 ### Current Pricing Assessment
 
-| Tier | Credits | Uploads | Price | Cost (Conservative) | Margin |
-|------|---------|---------|-------|---------------------|--------|
-| Free | 30 | 3 | $0 | $12.00 | -$12.00 |
-| Paid | 30 | 3 | $20 | $12.00 | +$8.00 |
+| Tier | Credits | Uploads | Price | Cost (Conservative) | Margin | Margin % |
+|------|---------|---------|-------|---------------------|--------|----------|
+| Free | 30 | 3 | $0 | $12.00 | -$12.00 | N/A |
+| Paid | 30 | 3 | $25 | $12.00 | +$13.00 | 52% |
 
-**Is $20/pack profitable?** YES, with $8.00 margin (40% profit margin)
+**Is $25/pack profitable?** YES, with $13.00 margin (52% profit margin) ✅
 
 ### Alternative Pricing Models
 
-#### Option A: Volume Discounts
+#### Option A: Volume Discounts (RECOMMENDED)
 
-| Pack | Uploads | Price | Per Upload | Margin |
-|------|---------|-------|------------|--------|
-| Starter | 3 | $20 | $6.67 | $8.00 (40%) |
-| Growth | 10 | $50 | $5.00 | $10.00 (20%) |
-| Pro | 25 | $100 | $4.00 | $0 (0%) |
+| Pack | Credits | Uploads | Price | Cost | Margin | Margin % | Per Upload |
+|------|---------|---------|-------|------|--------|----------|------------|
+| Starter | 30 | 3 | $25 | $12 | $13 | 52% | $8.33 |
+| Pro | 100 | 10 | $65 | $40 | $25 | 38% | $6.50 |
+| Business | 300 | 30 | $175 | $120 | $55 | 31% | $5.83 |
 
-**Recommendation:** Offer Growth pack at $50 for 10 uploads
-- Still profitable at $10 margin
-- Better value proposition for serious users
-- Encourages larger purchases
+**Recommendation:** Offer these three tiers
+- All profitable (30%+ margins)
+- Volume discount encourages larger purchases
+- Lower per-upload price as volume increases
+- Pro tier sweet spot for serious users
 
 #### Option B: Subscription Model
 
