@@ -101,10 +101,10 @@ export function DashboardPage() {
             });
             // Reload the dashboard after fixing
             const updatedData = await api.getDashboard();
-            setPatents(updatedData.patents);
+            setPatents(updatedData.patents || []);
 
             // Fetch hero images for recovered patents
-            const imagePromises = updatedData.patents
+            const imagePromises = (updatedData.patents || [])
               .filter(p => p.status === 'completed')
               .map(async (patent) => {
                 try {
@@ -131,7 +131,7 @@ export function DashboardPage() {
               console.log('[Dashboard] Debug result:', JSON.stringify(debugResult, null, 2));
 
               // If there are orphaned patents, try to claim them
-              if (debugResult.orphanedPatents.length > 0) {
+              if (debugResult.orphanedPatents && Array.isArray(debugResult.orphanedPatents) && debugResult.orphanedPatents.length > 0) {
                 const orphanIds = debugResult.orphanedPatents.map((p: any) => p.id);
                 console.log('[Dashboard] Attempting to claim orphaned patents:', orphanIds);
 
@@ -159,10 +159,10 @@ export function DashboardPage() {
         }
       }
 
-      setPatents(data.patents);
+      setPatents(data.patents || []);
 
       // Fetch hero images for all completed patents
-      const imagePromises = data.patents
+      const imagePromises = (data.patents || [])
         .filter(p => p.status === 'completed')
         .map(async (patent) => {
           try {
