@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, getStoredToken, clearStoredTokens, getTokenExpiration, refreshSession, type User } from '@/lib/api';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { identifyUser as identifyAnalyticsUser, resetUser as resetAnalyticsUser } from '@/lib/analytics';
+import { identifyUser as identifySentryUser, clearUser as clearSentryUser } from '@/lib/sentry';
 
 interface Profile {
   id: string;
@@ -71,10 +73,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } : null;
 
   const logout = () => {
+    // Clear user identity from analytics and error monitoring
+    resetAnalyticsUser();
+    clearSentryUser();
+
     clearStoredTokens();
     queryClient.clear();
     navigate('/');
   };
+
+  // Identify user in analytics and error monitoring when logged in
+  useEffect(() => {
+    if (user) {
+      // PostHog - track user with properties
+      identifyAnalyticsUser(user.id, {
+        email: user.email,
+        credits: user.credits,
+        isAdmin: user.isAdmin,
+        isSuperAdmin: user.isSuperAdmin,
+        displayName: user.displayName,
+        organization: user.organization,
+      });
+
+      // Sentry - identify user for error context
+      identifySentryUser(user.id, user.email, {
+        credits: user.credits,
+        displayName: user.displayName,
+        organization: user.organization,
+      });
+    }
+  }, [user]);
 
   // Session monitoring - check every minute
   useEffect(() => {
