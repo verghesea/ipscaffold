@@ -1112,6 +1112,75 @@ export async function registerRoutes(
     }
   });
 
+  // Clean up notifications for deleted patents
+  app.post('/api/cleanup-notifications', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      console.log('[CleanupNotifications] Starting cleanup for user:', userId);
+
+      // Get all notifications for this user
+      const { data: notifications, error: notifError } = await supabaseAdmin
+        .from('webhook_notifications')
+        .select('id, payload')
+        .eq('user_id', userId);
+
+      if (notifError) {
+        console.error('[CleanupNotifications] Error fetching notifications:', notifError);
+        return res.status(500).json({ error: 'Failed to fetch notifications' });
+      }
+
+      console.log('[CleanupNotifications] Found', notifications?.length || 0, 'notifications');
+
+      // Check which patents still exist
+      const deletedNotificationIds: string[] = [];
+      for (const notif of notifications || []) {
+        const patentId = notif.payload?.patent_id;
+        if (patentId) {
+          // Check if patent exists
+          const { data: patent } = await supabaseAdmin
+            .from('patents')
+            .select('id')
+            .eq('id', patentId)
+            .single();
+
+          if (!patent) {
+            // Patent doesn't exist, mark notification for deletion
+            deletedNotificationIds.push(notif.id);
+          }
+        }
+      }
+
+      console.log('[CleanupNotifications] Found', deletedNotificationIds.length, 'orphaned notifications');
+
+      // Delete orphaned notifications
+      if (deletedNotificationIds.length > 0) {
+        const { error: deleteError } = await supabaseAdmin
+          .from('webhook_notifications')
+          .delete()
+          .in('id', deletedNotificationIds);
+
+        if (deleteError) {
+          console.error('[CleanupNotifications] Error deleting notifications:', deleteError);
+          return res.status(500).json({ error: 'Failed to delete orphaned notifications' });
+        }
+      }
+
+      console.log('[CleanupNotifications] Deleted', deletedNotificationIds.length, 'notifications');
+
+      res.json({
+        success: true,
+        deletedCount: deletedNotificationIds.length,
+        message: deletedNotificationIds.length > 0
+          ? `Cleaned up ${deletedNotificationIds.length} notifications for deleted patents.`
+          : 'No orphaned notifications found.'
+      });
+
+    } catch (error) {
+      console.error('[CleanupNotifications] Error:', error);
+      res.status(500).json({ error: 'Failed to cleanup notifications' });
+    }
+  });
+
   // Claim specific patents by ID - allows user to manually claim orphaned patents
   app.post('/api/claim-patents', requireAuth, async (req, res) => {
     try {
