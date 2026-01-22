@@ -188,7 +188,7 @@ export class SupabaseStorage {
       .from('patents')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false});
 
     if (error) {
       console.error('[getPatentsByUser] Error querying user patents:', error);
@@ -198,14 +198,65 @@ export class SupabaseStorage {
 
     console.log('[getPatentsByUser] Found', data?.length || 0, 'patents for user', userId);
 
-    // If no patents found, check if any patents have this user_id as a string match
+    // If no patents found, check for patents linked to duplicate accounts (same email)
     if (!data || data.length === 0) {
-      console.log('[getPatentsByUser] DEBUG: Checking for potential user_id format mismatch...');
-      const { data: textMatch } = await supabaseAdmin
-        .from('patents')
-        .select('id, user_id')
-        .textSearch('user_id', userId);
-      console.log('[getPatentsByUser] Text search results:', textMatch?.length || 0, 'matches');
+      console.log('[getPatentsByUser] No patents for user_id, checking by email for duplicate accounts...');
+
+      // Get user's email
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authError || !user?.email) {
+        console.log('[getPatentsByUser] Could not get user email:', authError);
+        return [];
+      }
+
+      console.log('[getPatentsByUser] Checking for other accounts with email:', user.email);
+
+      // Find all auth users with this email
+      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+      if (usersError) {
+        console.log('[getPatentsByUser] Could not list users:', usersError);
+        return [];
+      }
+
+      const duplicateUserIds = users
+        .filter(u => u.email?.toLowerCase() === user.email.toLowerCase())
+        .map(u => u.id);
+
+      console.log(`[getPatentsByUser] Found ${duplicateUserIds.length} accounts with email ${user.email}`);
+
+      if (duplicateUserIds.length > 1) {
+        console.log('[getPatentsByUser] DUPLICATE ACCOUNTS DETECTED! IDs:', duplicateUserIds);
+
+        // Query patents for ALL user IDs with this email
+        const { data: allPatents, error: allError } = await supabaseAdmin
+          .from('patents')
+          .select('*')
+          .in('user_id', duplicateUserIds)
+          .order('created_at', { ascending: false });
+
+        if (allError) {
+          console.error('[getPatentsByUser] Error fetching by email:', allError);
+          return [];
+        }
+
+        // Migrate patents to current user_id
+        if (allPatents && allPatents.length > 0) {
+          console.log(`[getPatentsByUser] FOUND ${allPatents.length} patents from duplicate accounts, auto-migrating...`);
+
+          const patentsToMigrate = allPatents.filter(p => p.user_id !== userId);
+
+          for (const patent of patentsToMigrate) {
+            console.log(`[getPatentsByUser] Migrating patent ${patent.id} from ${patent.user_id} to ${userId}`);
+            await supabaseAdmin
+              .from('patents')
+              .update({ user_id: userId })
+              .eq('id', patent.id);
+          }
+
+          console.log(`[getPatentsByUser] Successfully migrated ${patentsToMigrate.length} patents`);
+          return allPatents.map(p => ({ ...p, user_id: userId }));
+        }
+      }
     }
 
     return data || [];

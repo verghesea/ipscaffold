@@ -416,11 +416,17 @@ export async function registerRoutes(
 
       const appUrl = process.env.APP_URL || 'https://ipscaffold.replit.app';
 
+      // Check if user already exists to prevent duplicate account creation
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+
+      console.log('[MagicLink] Existing user found:', !!existingUser, 'for email:', normalizedEmail);
+
       const { data, error } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
         options: {
           emailRedirectTo: `${appUrl}/auth/callback${patentId ? `?patent=${patentId}` : ''}`,
-          shouldCreateUser: true,
+          shouldCreateUser: !existingUser,  // Only create if doesn't exist
         }
       });
 
@@ -1109,6 +1115,58 @@ export async function registerRoutes(
     } catch (error) {
       console.error('[FixOrphaned] Error:', error);
       res.status(500).json({ error: 'Failed to fix orphaned patents' });
+    }
+  });
+
+  // Detect duplicate auth accounts
+  app.get('/api/debug/duplicate-accounts', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+
+      // Get current user's email
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authError || !user?.email) {
+        return res.status(500).json({ error: 'Could not get user email' });
+      }
+
+      // Find all auth users with this email
+      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+      if (usersError) {
+        return res.status(500).json({ error: 'Could not list users' });
+      }
+
+      const duplicateAccounts = users.filter(
+        u => u.email?.toLowerCase() === user.email.toLowerCase()
+      );
+
+      // Get patents for each account
+      const accountDetails = await Promise.all(
+        duplicateAccounts.map(async (account) => {
+          const { data: patents } = await supabaseAdmin
+            .from('patents')
+            .select('id, title, created_at')
+            .eq('user_id', account.id);
+
+          return {
+            userId: account.id,
+            email: account.email,
+            createdAt: account.created_at,
+            patentCount: patents?.length || 0,
+            isCurrentUser: account.id === userId,
+          };
+        })
+      );
+
+      res.json({
+        email: user.email,
+        currentUserId: userId,
+        totalDuplicateAccounts: duplicateAccounts.length,
+        accounts: accountDetails,
+        hasDuplicates: duplicateAccounts.length > 1,
+      });
+    } catch (error) {
+      console.error('[DuplicateAccounts] Error:', error);
+      res.status(500).json({ error: 'Failed to check for duplicates' });
     }
   });
 
