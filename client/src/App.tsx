@@ -14,6 +14,7 @@ import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import LoginPage from "@/pages/LoginPage";
 import AdminPage from "@/pages/AdminPage";
 import { DebugPage } from "@/pages/DebugPage";
+import DiagnosticsPage from "@/pages/DiagnosticsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/auth/callback" component={AuthCallbackPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/debug" component={DebugPage} />
+      <Route path="/diagnostics" component={DiagnosticsPage} />
       <Route component={NotFound} />
     </Switch>
   );

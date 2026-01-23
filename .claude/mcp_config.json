@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=qkmfovzqjujrefuifptk",
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrbWZvdnpxanVqcmVmdWlmcHRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzkyMjUxNCwiZXhwIjoyMDgzNDk4NTE0fQ.YnkXlRE4hteE0BWGO_bLFoLI45pX5LQXTHxRKK-buso"
+      }
+    }
+  }
+}
