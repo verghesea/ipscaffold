@@ -80,6 +80,34 @@ export interface SectionImage {
   updated_at: string;
 }
 
+export interface AppSetting {
+  key: string;
+  value: string;
+  description: string | null;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface WaitlistEntry {
+  id: string;
+  email: string;
+  source: string | null;
+  referrer: string | null;
+  metadata: any | null;
+  approved: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+}
+
+export interface SignupStats {
+  signupCap: number;
+  signupsEnabled: boolean;
+  currentCount: number;
+  available: boolean;
+  waitlistCount: number;
+}
+
 export class SupabaseStorage {
   async getProfile(userId: string): Promise<Profile | null> {
     const { data, error } = await supabaseAdmin
@@ -683,6 +711,150 @@ export class SupabaseStorage {
     if (error) {
       console.error(`Failed to delete PDF from storage: ${error.message}`);
       // Don't throw - deletion is not critical
+    }
+  }
+
+  // ============================================================
+  // APP SETTINGS & SIGNUP CAP METHODS
+  // ============================================================
+
+  async getAppSetting(key: string): Promise<string | null> {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', key)
+      .single();
+
+    if (error) return null;
+    return data.value;
+  }
+
+  async getAllAppSettings(): Promise<AppSetting[]> {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('*')
+      .order('key');
+
+    if (error) return [];
+    return data || [];
+  }
+
+  async updateAppSetting(key: string, value: string, updatedBy: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('app_settings')
+      .update({ value, updated_by: updatedBy, updated_at: new Date().toISOString() })
+      .eq('key', key);
+
+    if (error) {
+      throw new Error(`Failed to update setting ${key}: ${error.message}`);
+    }
+  }
+
+  async getSignupStats(): Promise<SignupStats> {
+    // Get all settings
+    const settings = await this.getAllAppSettings();
+    const signupCap = parseInt(settings.find(s => s.key === 'signup_cap')?.value || '50');
+    const signupsEnabled = settings.find(s => s.key === 'signups_enabled')?.value === 'true';
+
+    // Get actual count from profiles
+    const { count: currentCount } = await supabaseAdmin
+      .from('profiles')
+      .select('*', { count: 'exact', head: true });
+
+    // Get waitlist count
+    const { count: waitlistCount } = await supabaseAdmin
+      .from('waitlist')
+      .select('*', { count: 'exact', head: true })
+      .eq('approved', false);
+
+    return {
+      signupCap,
+      signupsEnabled,
+      currentCount: currentCount || 0,
+      available: signupsEnabled && (currentCount || 0) < signupCap,
+      waitlistCount: waitlistCount || 0,
+    };
+  }
+
+  async checkSignupAvailable(): Promise<boolean> {
+    const stats = await this.getSignupStats();
+    return stats.available;
+  }
+
+  // ============================================================
+  // WAITLIST METHODS
+  // ============================================================
+
+  async addToWaitlist(
+    email: string,
+    source?: string,
+    referrer?: string,
+    metadata?: any
+  ): Promise<WaitlistEntry> {
+    const { data, error } = await supabaseAdmin
+      .from('waitlist')
+      .insert({
+        email: email.toLowerCase(),
+        source,
+        referrer,
+        metadata,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // Check if it's a duplicate email error
+      if (error.code === '23505') {
+        throw new Error('Email already on waitlist');
+      }
+      throw new Error(`Failed to add to waitlist: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async getWaitlist(approvedOnly: boolean = false): Promise<WaitlistEntry[]> {
+    let query = supabaseAdmin
+      .from('waitlist')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (approvedOnly) {
+      query = query.eq('approved', true);
+    }
+
+    const { data, error } = await query;
+
+    if (error) return [];
+    return data || [];
+  }
+
+  async approveWaitlistEntry(
+    id: string,
+    approvedBy: string
+  ): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('waitlist')
+      .update({
+        approved: true,
+        approved_by: approvedBy,
+        approved_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to approve waitlist entry: ${error.message}`);
+    }
+  }
+
+  async deleteWaitlistEntry(id: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('waitlist')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to delete waitlist entry: ${error.message}`);
     }
   }
 }

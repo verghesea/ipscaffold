@@ -300,10 +300,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, patentId }),
     });
-    
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to send magic link');
+      const errorData = await response.json();
+      const error: any = new Error(errorData.error || 'Failed to send magic link');
+      error.code = errorData.code; // Preserve error code (e.g., SIGNUP_CAP_REACHED)
+      error.details = errorData.details;
+      throw error;
     }
   },
   
@@ -786,5 +789,125 @@ export const api = {
       patent: data.patent,
       opportunities: data.opportunities,
     };
+  },
+
+  // ============================================================
+  // SIGNUP CAP & WAITLIST MANAGEMENT (Super Admin)
+  // ============================================================
+
+  async getSignupStats(): Promise<{
+    signupCap: number;
+    signupsEnabled: boolean;
+    currentCount: number;
+    available: boolean;
+    waitlistCount: number;
+  }> {
+    const response = await fetch('/api/admin/signup-stats', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get signup stats');
+    }
+
+    return response.json();
+  },
+
+  async getAllSettings(): Promise<Array<{
+    key: string;
+    value: string;
+    description: string | null;
+    updated_at: string;
+    updated_by: string | null;
+  }>> {
+    const response = await fetch('/api/admin/settings', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get settings');
+    }
+
+    const data = await response.json();
+    return data.settings;
+  },
+
+  async updateSignupCap(value: number): Promise<void> {
+    const response = await fetch('/api/admin/settings/signup-cap', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ value: value.toString() }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update signup cap');
+    }
+  },
+
+  async toggleSignupsEnabled(enabled: boolean): Promise<void> {
+    const response = await fetch('/api/admin/settings/signups-enabled', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to toggle signups');
+    }
+  },
+
+  async getWaitlist(): Promise<Array<{
+    id: string;
+    email: string;
+    source: string | null;
+    referrer: string | null;
+    metadata: any;
+    approved: boolean;
+    approved_by: string | null;
+    approved_at: string | null;
+    created_at: string;
+  }>> {
+    const response = await fetch('/api/admin/waitlist', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get waitlist');
+    }
+
+    const data = await response.json();
+    return data.waitlist;
+  },
+
+  async approveWaitlistEntry(id: string): Promise<void> {
+    const response = await fetch(`/api/admin/waitlist/${id}/approve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to approve waitlist entry');
+    }
+  },
+
+  async deleteWaitlistEntry(id: string): Promise<void> {
+    const response = await fetch(`/api/admin/waitlist/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete waitlist entry');
+    }
   },
 };

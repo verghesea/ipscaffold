@@ -49,7 +49,7 @@ export function PreviewPage() {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       await api.requestMagicLink(email, params?.id);
       toast({
@@ -58,6 +58,18 @@ export function PreviewPage() {
       });
       setEmail('');
     } catch (error: any) {
+      // Handle signup cap reached - redirect to alpha-full page
+      if (error.code === 'SIGNUP_CAP_REACHED') {
+        toast({
+          title: 'Alpha is Full',
+          description: 'Redirecting you to the waitlist...',
+        });
+        setTimeout(() => {
+          setLocation('/alpha-full');
+        }, 1500);
+        return;
+      }
+
       toast({
         title: 'Error',
         description: error.message || 'Failed to send magic link',

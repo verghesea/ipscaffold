@@ -470,6 +470,43 @@ export async function registerRoutes(
 
       console.log('[MagicLink] Existing user found:', !!existingUser, 'for email:', normalizedEmail);
 
+      // SIGNUP CAP CHECK: Only for new users
+      if (!existingUser) {
+        const signupAvailable = await supabaseStorage.checkSignupAvailable();
+        if (!signupAvailable) {
+          console.log('[MagicLink] Signup cap reached, adding to waitlist:', normalizedEmail);
+
+          // Add to waitlist
+          try {
+            await supabaseStorage.addToWaitlist(
+              normalizedEmail,
+              'magic_link_request',
+              req.headers.referer,
+              {
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                patentId,
+              }
+            );
+
+            return res.status(503).json({
+              error: 'Alpha is currently full',
+              code: 'SIGNUP_CAP_REACHED',
+              details: 'We\'ve added you to the waitlist. You\'ll be notified when a spot opens up.',
+            });
+          } catch (waitlistError: any) {
+            if (waitlistError.message === 'Email already on waitlist') {
+              return res.status(503).json({
+                error: 'Alpha is currently full',
+                code: 'SIGNUP_CAP_REACHED',
+                details: 'You\'re already on the waitlist. We\'ll notify you when a spot opens up.',
+              });
+            }
+            throw waitlistError;
+          }
+        }
+      }
+
       const { data, error } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
         options: {
@@ -490,6 +527,46 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('Magic link error:', error);
       res.status(500).json({ error: 'Failed to send magic link', details: error?.message });
+    }
+  });
+
+  // Public waitlist endpoint (no auth required)
+  app.post('/api/waitlist/join', async (req, res) => {
+    try {
+      const { email, source, referrer } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: 'Email required' });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({ error: 'Invalid email address' });
+      }
+
+      await supabaseStorage.addToWaitlist(
+        normalizedEmail,
+        source || 'direct_form',
+        referrer,
+        {
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          timestamp: new Date().toISOString(),
+        }
+      );
+
+      console.log(`[Waitlist] Added ${normalizedEmail} to waitlist from ${source || 'direct_form'}`);
+
+      res.json({ success: true, message: 'Added to waitlist' });
+    } catch (error: any) {
+      if (error.message === 'Email already on waitlist') {
+        return res.status(409).json({ error: 'Email already on waitlist' });
+      }
+      console.error('Waitlist join error:', error);
+      res.status(500).json({ error: 'Failed to join waitlist' });
     }
   });
 
@@ -1586,6 +1663,135 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Admin user details error:', error);
       res.status(500).json({ error: 'Failed to load user details' });
+    }
+  });
+
+  // ============================================================
+  // SIGNUP CAP & WAITLIST MANAGEMENT (Super Admin Only)
+  // ============================================================
+
+  // Get signup statistics
+  app.get('/api/admin/signup-stats', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const stats = await supabaseStorage.getSignupStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Get signup stats error:', error);
+      res.status(500).json({ error: 'Failed to get signup stats' });
+    }
+  });
+
+  // Get all app settings
+  app.get('/api/admin/settings', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const settings = await supabaseStorage.getAllAppSettings();
+      res.json({ settings });
+    } catch (error) {
+      console.error('Get settings error:', error);
+      res.status(500).json({ error: 'Failed to get settings' });
+    }
+  });
+
+  // Update signup cap
+  app.post('/api/admin/settings/signup-cap', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { value } = req.body;
+
+      if (!value || isNaN(parseInt(value)) || parseInt(value) < 0) {
+        return res.status(400).json({ error: 'Invalid signup cap value' });
+      }
+
+      await supabaseStorage.updateAppSetting('signup_cap', value, req.user!.id);
+
+      console.log(`[Admin] Signup cap updated to ${value} by ${req.user!.id}`);
+      res.json({ success: true, value });
+    } catch (error) {
+      console.error('Update signup cap error:', error);
+      res.status(500).json({ error: 'Failed to update signup cap' });
+    }
+  });
+
+  // Toggle signups enabled/disabled
+  app.post('/api/admin/settings/signups-enabled', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid enabled value' });
+      }
+
+      await supabaseStorage.updateAppSetting('signups_enabled', enabled.toString(), req.user!.id);
+
+      console.log(`[Admin] Signups ${enabled ? 'enabled' : 'disabled'} by ${req.user!.id}`);
+      res.json({ success: true, enabled });
+    } catch (error) {
+      console.error('Toggle signups error:', error);
+      res.status(500).json({ error: 'Failed to toggle signups' });
+    }
+  });
+
+  // Get waitlist
+  app.get('/api/admin/waitlist', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const waitlist = await supabaseStorage.getWaitlist();
+      res.json({ waitlist });
+    } catch (error) {
+      console.error('Get waitlist error:', error);
+      res.status(500).json({ error: 'Failed to get waitlist' });
+    }
+  });
+
+  // Approve waitlist entry (creates user account)
+  app.post('/api/admin/waitlist/:id/approve', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get waitlist entry
+      const waitlist = await supabaseStorage.getWaitlist();
+      const entry = waitlist.find(w => w.id === id);
+
+      if (!entry) {
+        return res.status(404).json({ error: 'Waitlist entry not found' });
+      }
+
+      if (entry.approved) {
+        return res.status(400).json({ error: 'Entry already approved' });
+      }
+
+      // Create user account via Supabase Auth Admin
+      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: entry.email,
+        email_confirm: true,
+      });
+
+      if (authError) {
+        throw new Error(`Failed to create user: ${authError.message}`);
+      }
+
+      // Mark as approved in waitlist
+      await supabaseStorage.approveWaitlistEntry(id, req.user!.id);
+
+      console.log(`[Admin] Approved waitlist entry ${id}, created user ${authUser.user.id}`);
+
+      res.json({ success: true, userId: authUser.user.id });
+    } catch (error: any) {
+      console.error('Approve waitlist error:', error);
+      res.status(500).json({ error: 'Failed to approve waitlist entry', details: error.message });
+    }
+  });
+
+  // Delete waitlist entry
+  app.delete('/api/admin/waitlist/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      await supabaseStorage.deleteWaitlistEntry(id);
+
+      console.log(`[Admin] Deleted waitlist entry ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete waitlist error:', error);
+      res.status(500).json({ error: 'Failed to delete waitlist entry' });
     }
   });
 

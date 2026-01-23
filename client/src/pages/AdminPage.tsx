@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { SystemPromptManager } from '@/components/patent/SystemPromptManager';
 import { MetadataCorrectionPanel } from '@/components/admin/MetadataCorrectionPanel';
 import { PatternLearningDashboard } from '@/components/admin/PatternLearningDashboard';
+import { SignupCapManager } from '@/components/admin/SignupCapManager';
 import { api } from '@/lib/api';
 
 interface SystemMetrics {
@@ -370,6 +371,10 @@ export default function AdminPage() {
             </TabsTrigger>
             <TabsTrigger value="promo-codes" data-testid="tab-promo-codes">Promo Codes</TabsTrigger>
             <TabsTrigger value="system-prompts" data-testid="tab-system-prompts">System Prompts</TabsTrigger>
+            <TabsTrigger value="signup-cap" data-testid="tab-signup-cap">
+              <Shield className="w-4 h-4 mr-2" />
+              Signup Cap
+            </TabsTrigger>
             <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -757,6 +762,10 @@ export default function AdminPage() {
 
           <TabsContent value="system-prompts" className="mt-6">
             <SystemPromptManager />
+          </TabsContent>
+
+          <TabsContent value="signup-cap" className="mt-6">
+            <SignupCapManager />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">
