@@ -258,8 +258,14 @@ export class SupabaseStorage {
       .select('*')
       .eq('patent_id', patentId)
       .order('created_at', { ascending: true });
-    
-    if (error) return [];
+
+    if (error) {
+      console.error('[supabaseStorage] ERROR fetching artifacts for patent', patentId);
+      console.error('[supabaseStorage] Error details:', error);
+      console.error('[supabaseStorage] Error message:', error.message);
+      console.error('[supabaseStorage] Error code:', error.code);
+      return [];
+    }
     return data || [];
   }
 
