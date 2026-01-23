@@ -114,13 +114,29 @@ export function setStoredTokens(accessToken: string, refreshToken: string): void
     const iat = payload.iat ? new Date(payload.iat * 1000) : null;
     const ttlMinutes = iat ? Math.round((exp.getTime() - iat.getTime()) / (1000 * 60)) : 'unknown';
     const minutesUntilExpiry = Math.round((exp.getTime() - Date.now()) / (1000 * 60));
+    const userId = payload.sub || 'unknown';
+
+    // UUID MONITORING: Expected user ID is 0515a5f4-1401-4e0e-901a-c5484d3c0f4c
+    // Alert if we see 4a0e instead of 4e0e (known intermittent issue)
+    if (userId.includes('4a0e')) {
+      console.error('🚨 [Auth] WARNING: Incorrect UUID detected in token!', {
+        userId,
+        expected: '0515a5f4-1401-4e0e-901a-c5484d3c0f4c',
+        actual: userId,
+        diff: 'Has 4a0e instead of 4e0e',
+        timestamp: new Date().toISOString(),
+      });
+      alert('WARNING: Authentication token has incorrect user ID! This will cause empty dashboard. Please clear cache and re-login.');
+    } else if (userId.includes('4e0e')) {
+      console.log('[Auth] ✓ Correct UUID verified (4e0e)');
+    }
 
     console.log('[Auth] Tokens stored:', {
       expiresAt: exp.toISOString(),
       issuedAt: iat?.toISOString() || 'unknown',
       ttlMinutes,
       minutesUntilExpiry,
-      userId: payload.sub || 'unknown',
+      userId,
     });
   } catch (e) {
     console.log('[Auth] Tokens stored (could not parse details)');
@@ -211,6 +227,20 @@ export async function refreshSession(): Promise<boolean> {
 export function getAuthHeaders(): HeadersInit {
   const token = getStoredToken();
   if (token) {
+    // UUID MONITORING: Log which user ID is being used for API calls
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userId = payload.sub || 'unknown';
+
+      if (userId.includes('4a0e')) {
+        console.error('🚨 [Auth] Using WRONG UUID for API call:', userId);
+      } else {
+        console.log('[Auth] Using correct UUID (4e0e) for API call');
+      }
+    } catch (e) {
+      // Token parsing failed, just continue
+    }
+
     console.log('[Auth] Token found, length:', token.length);
     return { 'Authorization': `Bearer ${token}` };
   }
