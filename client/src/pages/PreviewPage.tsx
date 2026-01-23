@@ -128,7 +128,7 @@ export function PreviewPage() {
 
         <div className="container mx-auto px-6 mt-12">
           <div className="max-w-3xl mx-auto">
-            {/* ELIA15 Content */}
+            {/* Scientific Narrative Content */}
             <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150" data-testid="elia15-content">
               <div className="flex items-center gap-4 mb-8">
                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">Artifact 01 / 03</span>
@@ -140,7 +140,7 @@ export function PreviewPage() {
                   <Lightbulb className="w-6 h-6 text-amber-600 mt-1" />
                   <div>
                     <h3 className="text-lg font-semibold text-amber-600 font-playfair">
-                      ELIA15 Preview
+                      Scientific Narrative Preview
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       Simplified explanation of your patent
@@ -198,7 +198,7 @@ export function PreviewPage() {
                       </button>
                     </div>
                     <p className="text-xs text-primary-foreground/50">
-                      We'll create a free account with 100 credits for you. No password required.
+                      We'll create a free account with 30 credits for you. No password required.
                     </p>
                   </form>
 
@@ -206,7 +206,7 @@ export function PreviewPage() {
                     {[
                       { title: "Business Narrative", desc: "Investor pitch content" },
                       { title: "Golden Circle", desc: "Strategic positioning" },
-                      { title: "100 Free Credits", desc: "Analyze 10 more patents" },
+                      { title: "30 Free Credits", desc: "Analyze 2 more patents" },
                     ].map((item, i) => (
                       <div key={i} className="space-y-1">
                         <div className="flex items-center gap-2 text-accent-400 text-sm font-bold">

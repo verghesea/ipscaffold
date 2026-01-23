@@ -181,6 +181,33 @@ export async function registerRoutes(
       console.log('[Upload]   - Type:', req.file.mimetype);
       console.log('[Upload]   - Path:', req.file.path);
 
+      // SECURITY: Validate PDF magic bytes (not just MIME type)
+      try {
+        const fileBuffer = await fs.readFile(req.file.path);
+        const magicBytes = fileBuffer.slice(0, 4);
+        const isPDF = magicBytes[0] === 0x25 && // %
+                      magicBytes[1] === 0x50 && // P
+                      magicBytes[2] === 0x44 && // D
+                      magicBytes[3] === 0x46;   // F
+
+        if (!isPDF) {
+          console.log('[Upload] REJECTED: File does not have valid PDF magic bytes');
+          await fs.unlink(req.file.path).catch(() => {});
+          return res.status(400).json({
+            error: 'Invalid file format',
+            details: 'The file you uploaded is not a valid PDF document. Please upload a PDF file.'
+          });
+        }
+        console.log('[Upload] ✓ PDF magic bytes validated');
+      } catch (magicError) {
+        console.error('[Upload] ERROR: Failed to validate PDF magic bytes:', magicError);
+        await fs.unlink(req.file.path).catch(() => {});
+        return res.status(500).json({
+          error: 'File validation failed',
+          details: 'Unable to validate the uploaded file. Please try again.'
+        });
+      }
+
       // CRITICAL: Check if Authorization header was provided but user resolution failed
       const authHeader = req.headers.authorization;
       const user = await getUserFromToken(req);
