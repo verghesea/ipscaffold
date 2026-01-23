@@ -1170,6 +1170,63 @@ export async function registerRoutes(
     }
   });
 
+  // Direct query test - bypasses all logic to test raw database query
+  app.get('/api/debug/direct-patent-query', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      console.log('[DirectQuery] Testing direct database query for user:', userId);
+
+      // Test 1: Raw query with exact user_id
+      const { data: directQuery, error: directError } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id, title, status, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      console.log('[DirectQuery] Direct query result:', directQuery?.length || 0, 'patents');
+
+      // Test 2: Check if ANY patents exist in database
+      const { data: allPatents, error: allError } = await supabaseAdmin
+        .from('patents')
+        .select('id, user_id, title')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      console.log('[DirectQuery] Total patents in DB (sample):', allPatents?.length || 0);
+
+      // Test 3: Count patents with this exact user_id
+      const { count, error: countError } = await supabaseAdmin
+        .from('patents')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      console.log('[DirectQuery] Count query result:', count);
+
+      res.json({
+        userId,
+        directQueryResults: directQuery?.length || 0,
+        directQueryError: directError ? {
+          code: directError.code,
+          message: directError.message,
+          details: directError.details,
+        } : null,
+        samplePatents: allPatents?.map(p => ({
+          id: p.id,
+          user_id: p.user_id,
+          title: p.title?.substring(0, 50),
+          matches: p.user_id === userId,
+        })) || [],
+        totalPatientsInDb: allPatents?.length || 0,
+        countWithUserId: count,
+        countError: countError ? countError.message : null,
+      });
+
+    } catch (error: any) {
+      console.error('[DirectQuery] Error:', error);
+      res.status(500).json({ error: 'Direct query failed', details: error.message });
+    }
+  });
+
   // Clean up notifications for deleted patents
   app.post('/api/cleanup-notifications', requireAuth, async (req, res) => {
     try {
