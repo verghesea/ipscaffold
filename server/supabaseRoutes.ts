@@ -328,18 +328,24 @@ export async function registerRoutes(
         await supabaseStorage.updatePatentStatus(patent.id, 'elia15_complete');
 
         // Deduct credits for authenticated users
-        if (user?.id && profile) {
-          const newBalance = profile.credits - 10;
-          await supabaseStorage.updateProfileCredits(user.id, newBalance);
-          await supabaseStorage.createCreditTransaction({
-            user_id: user.id,
-            amount: -10,
-            balance_after: newBalance,
-            transaction_type: 'ip_processing',
-            description: `Patent analysis: ${parsedPatent.title || 'Untitled'}`,
-            patent_id: patent.id,
-          });
-          console.log('[Upload] ✓ Credits deducted: 10 credits (new balance:', newBalance, ')');
+        if (user?.id) {
+          // Re-fetch profile to ensure we have current credit balance
+          const currentProfile = await supabaseStorage.getProfile(user.id);
+          if (currentProfile) {
+            const newBalance = currentProfile.credits - 10;
+            await supabaseStorage.updateProfileCredits(user.id, newBalance);
+            await supabaseStorage.createCreditTransaction({
+              user_id: user.id,
+              amount: -10,
+              balance_after: newBalance,
+              transaction_type: 'ip_processing',
+              description: `Patent analysis: ${parsedPatent.title || 'Untitled'}`,
+              patent_id: patent.id,
+            });
+            console.log('[Upload] ✓ Credits deducted: 10 credits (new balance:', newBalance, ')');
+          } else {
+            console.error('[Upload] ERROR: Could not fetch profile for credit deduction');
+          }
         }
 
         res.json({
