@@ -2077,11 +2077,14 @@ export async function registerRoutes(
       if (patent.status === 'completed') {
         return res.status(400).json({ error: 'Patent is already completed' });
       }
-      
-      if (patent.status !== 'failed' && patent.status !== 'partial') {
-        return res.status(400).json({ error: 'Patent is not in a failed state' });
+
+      // Allow retry for failed, partial, or stuck processing patents
+      const allowedStatuses = ['failed', 'partial', 'processing', 'elia15_complete'];
+      if (!allowedStatuses.includes(patent.status)) {
+        return res.status(400).json({ error: `Cannot retry patent with status: ${patent.status}` });
       }
-      
+
+      console.log(`[Retry] Retrying patent ${req.params.id} from status: ${patent.status}`);
       await supabaseStorage.updatePatentStatus(req.params.id, 'processing');
       
       const existingArtifacts = await supabaseStorage.getArtifactsByPatent(req.params.id);
