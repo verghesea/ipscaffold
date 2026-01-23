@@ -472,12 +472,12 @@ export function DashboardPage() {
                         </div>
 
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <h3 className="font-semibold font-playfair text-lg line-clamp-2 group-hover:text-primary transition flex-1">
+                          <div className="mb-2 space-y-2">
+                            <h3 className="font-semibold font-playfair text-lg line-clamp-2 group-hover:text-primary transition">
                               {patent.friendlyTitle || patent.title || 'Untitled Patent'}
                             </h3>
                             {patent.patentNumber && (
-                              <Badge variant="secondary" className="text-xs shrink-0 font-mono">
+                              <Badge variant="secondary" className="text-xs font-mono w-fit">
                                 {patent.patentNumber}
                               </Badge>
                             )}
