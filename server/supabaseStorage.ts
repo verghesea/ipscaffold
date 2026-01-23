@@ -164,26 +164,30 @@ export class SupabaseStorage {
   }
 
   async getPatentsByUser(userId: string): Promise<Patent[]> {
-    console.log('[getPatentsByUser] Querying patents for user:', userId);
+    console.log('[getPatentsByUser] ========== QUERYING PATENTS ==========');
+    console.log('[getPatentsByUser] User ID:', userId);
     console.log('[getPatentsByUser] User ID type:', typeof userId, 'Length:', userId.length);
+    console.log('[getPatentsByUser] Timestamp:', new Date().toISOString());
 
-    // First, let's see what patents exist in the database
-    const { data: allPatents, error: allError } = await supabaseAdmin
+    // DIAGNOSTIC: Sample patents in database
+    const { data: samplePatents, error: sampleError } = await supabaseAdmin
       .from('patents')
       .select('id, user_id, title, status, created_at')
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(5);
 
-    if (allError) {
-      console.error('[getPatentsByUser] Error fetching all patents:', allError);
+    if (sampleError) {
+      console.error('[getPatentsByUser] Error fetching sample patents:', sampleError);
     } else {
-      console.log('[getPatentsByUser] Sample of ALL patents in DB (first 10):');
-      allPatents?.forEach((p, i) => {
-        console.log(`  ${i + 1}. ID: ${p.id}, user_id: ${p.user_id}, title: ${p.title?.substring(0, 50) || 'null'}`);
+      console.log('[getPatentsByUser] Sample of ALL patents in DB (first 5):');
+      samplePatents?.forEach((p, i) => {
+        const userIdMatch = p.user_id === userId ? '✓ MATCH' : '✗ no match';
+        console.log(`  ${i + 1}. user_id: ${p.user_id} ${userIdMatch}, title: ${p.title?.substring(0, 40) || 'null'}`);
       });
     }
 
-    // Now query for the specific user
+    // MAIN QUERY: Get patents for this specific user
+    console.log('[getPatentsByUser] Running main query with user_id:', userId);
     const { data, error } = await supabaseAdmin
       .from('patents')
       .select('*')
@@ -191,72 +195,24 @@ export class SupabaseStorage {
       .order('created_at', { ascending: false});
 
     if (error) {
-      console.error('[getPatentsByUser] Error querying user patents:', error);
+      console.error('[getPatentsByUser] ❌ ERROR querying user patents:', error);
+      console.error('[getPatentsByUser] Error code:', error.code);
+      console.error('[getPatentsByUser] Error message:', error.message);
       console.error('[getPatentsByUser] Error details:', JSON.stringify(error, null, 2));
       return [];
     }
 
-    console.log('[getPatentsByUser] Found', data?.length || 0, 'patents for user', userId);
+    console.log('[getPatentsByUser] ✓ Query succeeded');
+    console.log('[getPatentsByUser] Found', data?.length || 0, 'patents for user');
 
-    // If no patents found, check for patents linked to duplicate accounts (same email)
-    if (!data || data.length === 0) {
-      console.log('[getPatentsByUser] No patents for user_id, checking by email for duplicate accounts...');
-
-      // Get user's email
-      const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
-      if (authError || !user?.email) {
-        console.log('[getPatentsByUser] Could not get user email:', authError);
-        return [];
-      }
-
-      console.log('[getPatentsByUser] Checking for other accounts with email:', user.email);
-
-      // Find all auth users with this email
-      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
-      if (usersError) {
-        console.log('[getPatentsByUser] Could not list users:', usersError);
-        return [];
-      }
-
-      const duplicateUserIds = users
-        .filter(u => u.email?.toLowerCase() === user.email.toLowerCase())
-        .map(u => u.id);
-
-      console.log(`[getPatentsByUser] Found ${duplicateUserIds.length} accounts with email ${user.email}`);
-
-      if (duplicateUserIds.length > 1) {
-        console.log('[getPatentsByUser] DUPLICATE ACCOUNTS DETECTED! IDs:', duplicateUserIds);
-
-        // Query patents for ALL user IDs with this email
-        const { data: allPatents, error: allError } = await supabaseAdmin
-          .from('patents')
-          .select('*')
-          .in('user_id', duplicateUserIds)
-          .order('created_at', { ascending: false });
-
-        if (allError) {
-          console.error('[getPatentsByUser] Error fetching by email:', allError);
-          return [];
-        }
-
-        // Migrate patents to current user_id
-        if (allPatents && allPatents.length > 0) {
-          console.log(`[getPatentsByUser] FOUND ${allPatents.length} patents from duplicate accounts, auto-migrating...`);
-
-          const patentsToMigrate = allPatents.filter(p => p.user_id !== userId);
-
-          for (const patent of patentsToMigrate) {
-            console.log(`[getPatentsByUser] Migrating patent ${patent.id} from ${patent.user_id} to ${userId}`);
-            await supabaseAdmin
-              .from('patents')
-              .update({ user_id: userId })
-              .eq('id', patent.id);
-          }
-
-          console.log(`[getPatentsByUser] Successfully migrated ${patentsToMigrate.length} patents`);
-          return allPatents.map(p => ({ ...p, user_id: userId }));
-        }
-      }
+    if (data && data.length > 0) {
+      console.log('[getPatentsByUser] First 3 patents:');
+      data.slice(0, 3).forEach((p, i) => {
+        console.log(`  ${i + 1}. ID: ${p.id}, Title: ${p.title?.substring(0, 40) || 'null'}, Status: ${p.status}`);
+      });
+    } else {
+      console.log('[getPatentsByUser] ⚠️  NO PATENTS FOUND for user:', userId);
+      console.log('[getPatentsByUser] This should not happen if patents exist in DB with this user_id');
     }
 
     return data || [];
