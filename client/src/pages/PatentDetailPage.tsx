@@ -323,7 +323,7 @@ export function PatentDetailPage() {
                     </div>
                   </div>
 
-                  {(patent.status === 'failed' || patent.status === 'partial') && (
+                  {(patent.status === 'failed' || patent.status === 'partial' || (patent.status === 'processing' && artifacts.length === 0)) && (
                     <div className="pt-4 border-t">
                       <Button
                         onClick={handleRetry}
@@ -335,6 +335,11 @@ export function PatentDetailPage() {
                         <RefreshCw className={`w-4 h-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
                         {retrying ? 'Retrying...' : 'Retry Processing'}
                       </Button>
+                      {patent.status === 'processing' && (
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          Patent appears stuck. Click retry to restart generation.
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>
