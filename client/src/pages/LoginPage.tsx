@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, ArrowRight, Loader2, CheckCircle } from "lucide-react";
+import { api } from "@/lib/api";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -46,7 +47,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       toast({
         title: "Email required",
@@ -56,27 +57,10 @@ export default function LoginPage() {
       return;
     }
 
-    if (!supabase) {
-      toast({
-        title: "Error",
-        description: "Authentication service not ready. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/auth/callback`;
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: redirectUrl,
-        },
-      });
-
-      if (error) throw error;
+      // Use backend API endpoint to respect signup cap
+      await api.requestMagicLink(email);
 
       setEmailSent(true);
       toast({
@@ -84,6 +68,18 @@ export default function LoginPage() {
         description: "Check your email for a login link",
       });
     } catch (error: any) {
+      // Handle signup cap reached
+      if (error.code === 'SIGNUP_CAP_REACHED') {
+        toast({
+          title: 'Alpha is Full',
+          description: 'Redirecting you to the waitlist...',
+        });
+        setTimeout(() => {
+          setLocation('/alpha-full');
+        }, 1500);
+        return;
+      }
+
       toast({
         title: "Error",
         description: error.message || "Failed to send magic link. Please try again.",
