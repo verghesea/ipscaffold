@@ -23,7 +23,10 @@ export function useSectionImages(artifactId: string | undefined): UseSectionImag
   const [error, setError] = useState<string | null>(null);
 
   const fetchImages = useCallback(async () => {
-    if (!artifactId) return;
+    if (!artifactId) {
+      setImages([]);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -39,8 +42,9 @@ export function useSectionImages(artifactId: string | undefined): UseSectionImag
     }
   }, [artifactId]);
 
-  // Fetch images when artifact ID changes
+  // Clear images immediately when artifact ID changes, then fetch new ones
   useEffect(() => {
+    setImages([]); // Clear old images immediately
     fetchImages();
   }, [fetchImages]);
 
