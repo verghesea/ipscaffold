@@ -1812,7 +1812,7 @@ export async function registerRoutes(
     }
   });
 
-  // Approve waitlist entry (creates user account)
+  // Approve waitlist entry (marks as approved for manual outreach)
   app.post('/api/admin/waitlist/:id/approve', requireAuth, requireSuperAdmin, async (req, res) => {
     try {
       const { id } = req.params;
@@ -1829,22 +1829,13 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Entry already approved' });
       }
 
-      // Create user account via Supabase Auth Admin
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: entry.email,
-        email_confirm: true,
-      });
-
-      if (authError) {
-        throw new Error(`Failed to create user: ${authError.message}`);
-      }
-
-      // Mark as approved in waitlist
+      // Just mark as approved - no account creation
+      // Admin will manually email them to sign up
       await supabaseStorage.approveWaitlistEntry(id, req.user!.id);
 
-      console.log(`[Admin] Approved waitlist entry ${id}, created user ${authUser.user.id}`);
+      console.log(`[Admin] Approved waitlist entry ${id} for email: ${entry.email}`);
 
-      res.json({ success: true, userId: authUser.user.id });
+      res.json({ success: true, email: entry.email });
     } catch (error: any) {
       console.error('Approve waitlist error:', error);
       res.status(500).json({ error: 'Failed to approve waitlist entry', details: error.message });

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserCheck, UserX, Mail, Loader2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Users, UserCheck, UserX, Mail, Loader2, AlertTriangle, CheckCircle, Clock, Info } from 'lucide-react';
 
 interface SignupStats {
   signupCap: number;
@@ -118,8 +118,8 @@ export function SignupCapManager() {
     try {
       await api.approveWaitlistEntry(id);
       toast({
-        title: 'Success',
-        description: `Approved ${email}`,
+        title: 'Approved!',
+        description: `Marked ${email} as approved. Remember to email them with signup instructions!`,
       });
       await loadData();
     } catch (error: any) {
@@ -169,6 +169,7 @@ export function SignupCapManager() {
 
   const percentFull = (stats.currentCount / stats.signupCap) * 100;
   const pendingWaitlist = waitlist.filter(w => !w.approved);
+  const approvedWaitlist = waitlist.filter(w => w.approved);
 
   return (
     <div className="space-y-6">
@@ -321,10 +322,16 @@ export function SignupCapManager() {
           <CardHeader>
             <CardTitle>Pending Waitlist ({pendingWaitlist.length})</CardTitle>
             <CardDescription>
-              Approve users to create their accounts
+              Mark users as approved for manual outreach. Accounts are NOT created automatically.
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <Alert className="mb-4">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Workflow:</strong> Click "Approve" to mark users. Then manually email them: "We've opened up spots! Visit [your-site] to sign up."
+              </AlertDescription>
+            </Alert>
             <div className="space-y-2">
               {pendingWaitlist.map((entry) => (
                 <div
@@ -358,6 +365,45 @@ export function SignupCapManager() {
                       <UserX className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Approved Waitlist */}
+      {approvedWaitlist.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Approved for Outreach ({approvedWaitlist.length})</CardTitle>
+            <CardDescription>
+              These users have been approved. Email them signup instructions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {approvedWaitlist.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div>
+                      <p className="font-medium">{entry.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Approved {new Date(entry.approvedAt || entry.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDelete(entry.id, entry.email)}
+                  >
+                    <UserX className="w-4 h-4" />
+                  </Button>
                 </div>
               ))}
             </div>
