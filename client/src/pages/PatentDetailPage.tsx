@@ -384,9 +384,9 @@ export function PatentDetailPage() {
                             setActiveTab(key);
                           }}
                         >
-                          <Icon className={`w-4 h-4 ${meta.color}`} />
+                          <Icon className={`w-4 h-4 ${meta.color} hidden sm:inline`} />
                           <span className="hidden sm:inline">{meta.label}</span>
-                          <span className="sm:hidden">{meta.emoji}</span>
+                          <span className="sm:hidden text-xl">{meta.emoji}</span>
                         </TabsTrigger>
                       );
                     })}
