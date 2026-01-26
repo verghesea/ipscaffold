@@ -628,17 +628,31 @@ export async function registerRoutes(
       let profile = await supabaseStorage.getProfile(user.id);
       console.log('Profile:', { exists: !!profile, credits: profile?.credits });
 
-      if (!profile) {
-        // NEW USER from OAuth - check signup cap
+      // Check if this is a newly created user (within last 10 seconds)
+      // The trigger creates the profile immediately, so we need to check if user just signed up
+      const isNewUser = profile && new Date(profile.created_at).getTime() > Date.now() - 10000;
+
+      if (isNewUser) {
+        console.log('[OAuth] Detected new user signup:', user.email);
+
+        // Check signup cap for new OAuth users
         const signupAvailable = await supabaseStorage.checkSignupAvailable();
 
         if (!signupAvailable) {
           console.log('[OAuth] Signup cap reached for user:', user.email);
 
-          // Delete the OAuth user that was just created
+          // Delete the profile created by trigger
+          try {
+            await supabaseAdmin.from('profiles').delete().eq('id', user.id);
+            console.log('[OAuth] Deleted profile due to signup cap:', user.id);
+          } catch (deleteError) {
+            console.error('[OAuth] Failed to delete profile:', deleteError);
+          }
+
+          // Delete the OAuth user
           try {
             await supabaseAdmin.auth.admin.deleteUser(user.id);
-            console.log('[OAuth] Deleted user due to signup cap:', user.id);
+            console.log('[OAuth] Deleted auth user due to signup cap:', user.id);
           } catch (deleteError) {
             console.error('[OAuth] Failed to delete user:', deleteError);
           }
@@ -667,7 +681,10 @@ export async function registerRoutes(
             details: 'You\'ve been added to the waitlist. We\'ll notify you when a spot opens up.',
           });
         }
+      }
 
+      // If no profile exists (shouldn't happen with trigger, but handle it)
+      if (!profile) {
         console.log('Creating new profile for user:', user.id);
         try {
           await supabaseStorage.createProfile({
