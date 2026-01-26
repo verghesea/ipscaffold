@@ -628,9 +628,24 @@ export async function registerRoutes(
       let profile = await supabaseStorage.getProfile(user.id);
       console.log('Profile:', { exists: !!profile, credits: profile?.credits });
 
-      // Check if this is a newly created user (within last 10 seconds)
+      // Check if this is a newly created user (within last 30 seconds)
       // The trigger creates the profile immediately, so we need to check if user just signed up
-      const isNewUser = profile && new Date(profile.created_at).getTime() > Date.now() - 10000;
+      // Use both profile creation time AND auth user creation time as backup for reliability
+      const profileAge = profile ? Date.now() - new Date(profile.created_at).getTime() : Infinity;
+      const authUserAge = Date.now() - new Date(user.created_at).getTime();
+      const isNewUser = profile && (profileAge < 30000 || authUserAge < 30000);
+
+      // Detailed logging for debugging and monitoring
+      console.log('[OAuth] User age check:', {
+        email: user.email,
+        profileCreatedAt: profile?.created_at,
+        authUserCreatedAt: user.created_at,
+        profileAgeMs: profileAge === Infinity ? 'N/A' : profileAge,
+        authUserAgeMs: authUserAge,
+        threshold: 30000,
+        isNewUser,
+        triggeredBy: profileAge < 30000 ? 'profile' : authUserAge < 30000 ? 'auth_user' : 'none'
+      });
 
       if (isNewUser) {
         console.log('[OAuth] Detected new user signup:', user.email);
