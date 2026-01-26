@@ -10,6 +10,7 @@ import { parsePatentPDF } from "./services/pdfParser";
 import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from "./services/aiGenerator";
 import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
 import { logMetadataCorrection, findValueContext, getPendingCorrections } from "./services/extractionLogger";
+import { generateArtifactPDF, generatePatentPackagePDF } from "./services/pdfService";
 import {
   analyzeFieldCorrections,
   deployPattern,
@@ -1094,6 +1095,67 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Progress SSE error:', error);
       res.status(500).json({ error: 'Failed to stream progress' });
+    }
+  });
+
+  // PDF Export: Download single artifact as PDF
+  app.get('/api/artifact/:id/pdf', requireAuth, async (req, res) => {
+    try {
+      const artifactId = req.params.id;
+
+      // Fetch artifact to verify ownership
+      const artifact = await supabaseStorage.getArtifact(artifactId);
+      if (!artifact) {
+        return res.status(404).json({ error: 'Artifact not found' });
+      }
+
+      // Verify patent ownership
+      const patent = await supabaseStorage.getPatent(artifact.patent_id);
+      if (!patent || patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Generate PDF
+      const pdfResult = await generateArtifactPDF(artifactId, {
+        includeImages: true,
+        watermarkImages: true,
+      });
+
+      // Send PDF as download
+      res.setHeader('Content-Type', pdfResult.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${pdfResult.filename}"`);
+      res.setHeader('Content-Length', pdfResult.buffer.length);
+      res.send(pdfResult.buffer);
+
+    } catch (error) {
+      console.error('Artifact PDF generation error:', error);
+      res.status(500).json({ error: 'Failed to generate PDF' });
+    }
+  });
+
+  // PDF Export: Download complete patent package as PDF
+  app.get('/api/patent/:id/pdf', requireAuth, async (req, res) => {
+    try {
+      const patentId = req.params.id;
+
+      // Verify ownership
+      const patent = await supabaseStorage.getPatent(patentId);
+      if (!patent || patent.user_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Generate combined PDF
+      const pdfResult = await generatePatentPackagePDF(patentId);
+
+      // Send PDF as download
+      res.setHeader('Content-Type', pdfResult.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${pdfResult.filename}"`);
+      res.setHeader('Content-Length', pdfResult.buffer.length);
+      res.send(pdfResult.buffer);
+
+    } catch (error) {
+      console.error('Patent package PDF generation error:', error);
+      res.status(500).json({ error: 'Failed to generate PDF package' });
     }
   });
 

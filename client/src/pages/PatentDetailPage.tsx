@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { api, type Artifact } from '@/lib/api';
-import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loader2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Lightbulb, TrendingUp, Target, Loader2, Download, FileDown } from 'lucide-react';
 import { analytics } from '@/lib/analytics';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
@@ -58,6 +58,8 @@ export function PatentDetailPage() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const [downloadingPackage, setDownloadingPackage] = useState(false);
+  const [downloadingArtifact, setDownloadingArtifact] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('elia15');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const hasShownProfileModal = useRef(false);
@@ -145,6 +147,47 @@ export function PatentDetailPage() {
       });
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleDownloadPackage = async () => {
+    if (!params?.id) return;
+    setDownloadingPackage(true);
+    try {
+      await api.downloadPatentPackagePDF(params.id);
+      toast({
+        title: 'Download Started',
+        description: 'Your complete patent analysis package is downloading.',
+      });
+      analytics.trackDownload('patent_package', params.id);
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: 'Could not generate PDF. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingPackage(false);
+    }
+  };
+
+  const handleDownloadArtifact = async (artifactId: string, artifactType: string) => {
+    setDownloadingArtifact(true);
+    try {
+      await api.downloadArtifactPDF(artifactId, artifactType);
+      toast({
+        title: 'Download Started',
+        description: `Your ${ARTIFACT_TYPES[artifactType as keyof typeof ARTIFACT_TYPES]?.label || artifactType} is downloading.`,
+      });
+      analytics.trackDownload('artifact', artifactId);
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: 'Could not generate PDF. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingArtifact(false);
     }
   };
 
@@ -323,6 +366,34 @@ export function PatentDetailPage() {
                     </div>
                   </div>
 
+                  {/* Download Complete Package Button */}
+                  {artifacts.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <Button
+                        onClick={handleDownloadPackage}
+                        disabled={downloadingPackage}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="button-download-package"
+                      >
+                        {downloadingPackage ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Generating PDF...
+                          </>
+                        ) : (
+                          <>
+                            <FileDown className="w-4 h-4 mr-2" />
+                            Download Complete Package
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Download all artifacts as a single PDF
+                      </p>
+                    </div>
+                  )}
+
                   {(patent.status === 'failed' || patent.status === 'partial' || (patent.status === 'processing' && artifacts.length === 0)) && (
                     <div className="pt-4 border-t">
                       <Button
@@ -432,6 +503,28 @@ export function PatentDetailPage() {
                                   generating={generating}
                                   onGenerateImages={handleGenerateImages}
                                 />
+
+                                {/* Download This Artifact Button */}
+                                <div className="flex justify-end mb-4">
+                                  <Button
+                                    onClick={() => artifact?.id && handleDownloadArtifact(artifact.id, key as string)}
+                                    disabled={downloadingArtifact || !artifact?.id}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    {downloadingArtifact ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Generating...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download PDF
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
 
                                 {/* Enhanced Markdown Renderer with Images */}
                                 <EnhancedMarkdownRenderer

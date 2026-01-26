@@ -297,6 +297,21 @@ export class SupabaseStorage {
     return data || [];
   }
 
+  async getArtifact(artifactId: string): Promise<Artifact | null> {
+    const { data, error } = await supabaseAdmin
+      .from('artifacts')
+      .select('*')
+      .eq('id', artifactId)
+      .single();
+
+    if (error) {
+      console.error('[supabaseStorage] ERROR fetching artifact', artifactId);
+      console.error('[supabaseStorage] Error details:', error);
+      return null;
+    }
+    return data;
+  }
+
   async createArtifact(artifact: Omit<Artifact, 'id' | 'created_at'>): Promise<Artifact> {
     const { data, error } = await supabaseAdmin
       .from('artifacts')

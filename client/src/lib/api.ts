@@ -910,4 +910,60 @@ export const api = {
       throw new Error(error.error || 'Failed to delete waitlist entry');
     }
   },
+
+  // PDF Export: Download single artifact as PDF
+  async downloadArtifactPDF(artifactId: string, artifactType: string): Promise<void> {
+    const response = await fetch(`/api/artifact/${artifactId}/pdf`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF');
+    }
+
+    // Get filename from Content-Disposition header or create default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+    const filename = filenameMatch?.[1] || `${artifactType}_artifact.pdf`;
+
+    // Download the file
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // PDF Export: Download complete patent package
+  async downloadPatentPackagePDF(patentId: string): Promise<void> {
+    const response = await fetch(`/api/patent/${patentId}/pdf`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF package');
+    }
+
+    // Get filename from Content-Disposition header or create default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+    const filename = filenameMatch?.[1] || 'patent_analysis_package.pdf';
+
+    // Download the file
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
 };

@@ -2,7 +2,8 @@
  * Image Storage Service - Handles uploading DALL-E images to Supabase Storage
  */
 
-import { supabaseAdmin } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { addWatermark } from './imageWatermarkService.js';
 
 /**
  * Downloads an image from a URL and returns it as a Buffer
@@ -55,6 +56,7 @@ export async function uploadImageToStorage(
 
 /**
  * Downloads image from DALL-E URL and uploads to Supabase Storage
+ * Adds Humble AI watermark before uploading
  *
  * @param dalleImageUrl - Temporary DALL-E image URL
  * @param artifactId - Artifact UUID
@@ -72,9 +74,16 @@ export async function uploadImageFromUrl(
     // Download image from DALL-E
     const imageBuffer = await downloadImageFromUrl(dalleImageUrl);
 
+    // Add watermark
+    const watermarkedBuffer = await addWatermark(imageBuffer, {
+      position: 'bottom-right',
+      opacity: 0.7,
+      scale: 0.15,
+    });
+
     // Upload to Supabase Storage
     const publicUrl = await uploadImageToStorage(
-      imageBuffer,
+      watermarkedBuffer,
       artifactId,
       sectionNumber
     );
