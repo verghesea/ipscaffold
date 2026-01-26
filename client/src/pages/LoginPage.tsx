@@ -75,7 +75,7 @@ export default function LoginPage() {
           description: 'Redirecting you to the waitlist...',
         });
         setTimeout(() => {
-          setLocation('/alpha-full');
+          setLocation(`/alpha-full?email=${encodeURIComponent(email)}`);
         }, 1500);
         return;
       }

@@ -627,8 +627,47 @@ export async function registerRoutes(
 
       let profile = await supabaseStorage.getProfile(user.id);
       console.log('Profile:', { exists: !!profile, credits: profile?.credits });
-      
+
       if (!profile) {
+        // NEW USER from OAuth - check signup cap
+        const signupAvailable = await supabaseStorage.checkSignupAvailable();
+
+        if (!signupAvailable) {
+          console.log('[OAuth] Signup cap reached for user:', user.email);
+
+          // Delete the OAuth user that was just created
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(user.id);
+            console.log('[OAuth] Deleted user due to signup cap:', user.id);
+          } catch (deleteError) {
+            console.error('[OAuth] Failed to delete user:', deleteError);
+          }
+
+          // Add to waitlist
+          try {
+            await supabaseStorage.addToWaitlist(
+              user.email || '',
+              'oauth_signup',
+              'oauth_callback',
+              {
+                provider: 'google',
+                timestamp: new Date().toISOString(),
+              }
+            );
+          } catch (waitlistError: any) {
+            if (waitlistError.message !== 'Email already on waitlist') {
+              console.error('[OAuth] Failed to add to waitlist:', waitlistError);
+            }
+          }
+
+          return res.status(503).json({
+            error: 'Alpha is currently full',
+            code: 'SIGNUP_CAP_REACHED',
+            email: user.email,
+            details: 'You\'ve been added to the waitlist. We\'ll notify you when a spot opens up.',
+          });
+        }
+
         console.log('Creating new profile for user:', user.id);
         try {
           await supabaseStorage.createProfile({

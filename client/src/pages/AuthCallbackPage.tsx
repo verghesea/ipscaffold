@@ -60,6 +60,18 @@ export default function AuthCallbackPage() {
 
           if (!response.ok) {
             const errorData = await response.json();
+
+            // Handle signup cap reached for OAuth
+            if (errorData.code === 'SIGNUP_CAP_REACHED') {
+              setStatus('error');
+              setMessage('Alpha is full. Redirecting to waitlist...');
+              setTimeout(() => {
+                const email = errorData.email || '';
+                setLocation(`/alpha-full?email=${encodeURIComponent(email)}&source=google`);
+              }, 2000);
+              return;
+            }
+
             throw new Error(errorData.details || 'Failed to set up session');
           }
 
@@ -92,15 +104,28 @@ export default function AuthCallbackPage() {
           const response = await fetch('/api/auth/verify-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              accessToken: data.session?.access_token, 
+            body: JSON.stringify({
+              accessToken: data.session?.access_token,
               refreshToken: data.session?.refresh_token,
-              patentId 
+              patentId
             }),
           });
 
           if (!response.ok) {
-            throw new Error('Failed to verify session');
+            const errorData = await response.json();
+
+            // Handle signup cap reached for OAuth
+            if (errorData.code === 'SIGNUP_CAP_REACHED') {
+              setStatus('error');
+              setMessage('Alpha is full. Redirecting to waitlist...');
+              setTimeout(() => {
+                const email = errorData.email || '';
+                setLocation(`/alpha-full?email=${encodeURIComponent(email)}&source=google`);
+              }, 2000);
+              return;
+            }
+
+            throw new Error(errorData.error || 'Failed to verify session');
           }
 
           setStatus('success');
@@ -137,15 +162,28 @@ export default function AuthCallbackPage() {
         const response = await fetch('/api/auth/verify-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            accessToken: session.access_token, 
+          body: JSON.stringify({
+            accessToken: session.access_token,
             refreshToken: session.refresh_token,
-            patentId 
+            patentId
           }),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to verify session');
+          const errorData = await response.json();
+
+          // Handle signup cap reached for OAuth
+          if (errorData.code === 'SIGNUP_CAP_REACHED') {
+            setStatus('error');
+            setMessage('Alpha is full. Redirecting to waitlist...');
+            setTimeout(() => {
+              const email = errorData.email || '';
+              setLocation(`/alpha-full?email=${encodeURIComponent(email)}&source=google`);
+            }, 2000);
+            return;
+          }
+
+          throw new Error(errorData.error || 'Failed to verify session');
         }
 
         setStatus('success');
