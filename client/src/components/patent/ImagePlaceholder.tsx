@@ -23,12 +23,12 @@ export function ImagePlaceholder({
   className,
 }: ImagePlaceholderProps) {
   return (
-    <div className={cn('mb-8', className)}>
+    <div className={cn('mb-8 section-image-container image-with-caption', className)}>
       <div className="relative bg-white border-2 border-dashed border-gray-300 p-2">
         <div className="aspect-video bg-gray-50 flex flex-col items-center justify-center gap-4 relative">
-          {/* Subtle grid */}
+          {/* Subtle grid - hidden in print mode */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-30"
+            className="graph-paper-overlay absolute inset-0 pointer-events-none opacity-30"
             style={{
               backgroundImage: `
                 linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),

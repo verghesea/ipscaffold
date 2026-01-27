@@ -154,15 +154,17 @@ export function EnhancedMarkdownRenderer({
               />
             )}
 
-            {/* Section Header */}
-            <div className="flex items-baseline gap-4 mb-6 flex-wrap">
-              <div className="font-mono text-xs font-bold text-[#dc2626] bg-white px-3 py-1 border-2 border-[#dc2626] uppercase tracking-wider flex-shrink-0">
-                Section {String(section.number).padStart(2, '0')}
+            {/* Section Header - wrapped for page break control */}
+            <div className="section-header-group">
+              <div className="flex items-baseline gap-4 mb-6 flex-wrap">
+                <div className="font-mono text-xs font-bold text-[#dc2626] bg-white px-3 py-1 border-2 border-[#dc2626] uppercase tracking-wider flex-shrink-0">
+                  Section {String(section.number).padStart(2, '0')}
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 relative flex-1 min-w-0">
+                  {section.title}
+                  <span className="absolute bottom-[-4px] left-0 w-2/5 h-[2px] bg-[#2563eb]" />
+                </h3>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 relative flex-1 min-w-0">
-                {section.title}
-                <span className="absolute bottom-[-4px] left-0 w-2/5 h-[2px] bg-[#2563eb]" />
-              </h3>
             </div>
 
             {/* Section Content */}

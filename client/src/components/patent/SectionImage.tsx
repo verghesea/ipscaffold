@@ -72,7 +72,7 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
   };
 
   return (
-    <div className={cn('mb-8', className)}>
+    <div className={cn('mb-8 section-image-container image-with-caption', className)}>
       {/* Image container with corner marks */}
       <div className="relative bg-white border-2 border-[#2563eb] p-2 group">
         <CornerMark position="tl" />
@@ -82,9 +82,9 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
 
         {/* Image */}
         <div className="relative aspect-video bg-white border border-gray-200 overflow-hidden">
-          {/* Subtle grid overlay */}
+          {/* Subtle grid overlay - hidden in print mode */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-30"
+            className="graph-paper-overlay absolute inset-0 pointer-events-none opacity-30"
             style={{
               backgroundImage: `
                 linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),

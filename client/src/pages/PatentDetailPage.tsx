@@ -73,9 +73,9 @@ function PrintArtifactSection({
     <div className="print-artifact mt-6" data-artifact-content>
       {/* Graph paper background container */}
       <div className="relative bg-white shadow-lg overflow-hidden">
-        {/* Graph paper overlay */}
+        {/* Graph paper overlay - hidden in print mode via CSS class */}
         <div
-          className="absolute inset-0 pointer-events-none opacity-50"
+          className="graph-paper-overlay absolute inset-0 pointer-events-none opacity-50"
           style={{
             backgroundImage: `
               linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
@@ -603,9 +603,9 @@ export function PatentDetailPage() {
                       <TabsContent key={key} value={key} className="mt-6">
                         {/* Graph paper background container */}
                         <div className="relative bg-white shadow-lg overflow-hidden">
-                          {/* Graph paper overlay */}
+                          {/* Graph paper overlay - hidden in print mode via CSS class */}
                           <div
-                            className="absolute inset-0 pointer-events-none opacity-50"
+                            className="graph-paper-overlay absolute inset-0 pointer-events-none opacity-50"
                             style={{
                               backgroundImage: `
                                 linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),

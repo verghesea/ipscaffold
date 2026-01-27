@@ -151,7 +151,12 @@
   }
 }
 
-/* Print Mode Styles - Hide UI elements when generating PDF */
+/* ========================================
+   PRINT MODE STYLES
+   For PDF generation via Puppeteer
+   ======================================== */
+
+/* Hide UI elements when generating PDF */
 @media print {
   .no-print,
   button:not(.print-keep),
@@ -164,33 +169,25 @@
     background: white !important;
   }
 
-  /* Font size reductions for print */
+  /* Base font size for print */
   html {
     font-size: 14px;
   }
 
-  h1 {
-    font-size: 1.75rem !important;
-  }
-
-  h2 {
-    font-size: 1.5rem !important;
-  }
-
-  h3 {
-    font-size: 1.25rem !important;
-  }
-
-  h4 {
-    font-size: 1.1rem !important;
-  }
+  /* Heading sizes optimized for print */
+  h1 { font-size: 1.75rem !important; }
+  h2 { font-size: 1.5rem !important; }
+  h3 { font-size: 1.25rem !important; }
+  h4 { font-size: 1.1rem !important; }
 
   body, p, li {
-    font-size: 0.875rem !important;
-    line-height: 1.5 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.6 !important;
   }
 
-  /* Page break handling - keep content together */
+  /* ---- PAGE BREAK HANDLING ---- */
+
+  /* Headers should not be followed by page break */
   h1, h2, h3, h4 {
     page-break-after: avoid;
     break-after: avoid;
@@ -198,18 +195,19 @@
     widows: 3;
   }
 
+  /* Images should not break */
   img {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  /* Keep paragraphs from orphan/widow lines */
+  /* Paragraph orphan/widow control */
   p {
     orphans: 3;
     widows: 3;
   }
 
-  /* Add page breaks between artifacts */
+  /* Force page break between artifacts */
   .print-artifact {
     page-break-before: always;
     break-before: always;
@@ -220,26 +218,75 @@
     break-before: auto;
   }
 
-  /* Keep sections together when possible */
-  .section {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
+  /* NOTE: We do NOT use page-break-inside: avoid on .section
+     because sections are often too large. Instead we protect
+     specific smaller elements. */
 
-  /* Keep lists together */
+  /* Keep list items together */
   li {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
   /* Keep figures with captions */
-  figure, .relative {
+  figure, .figure-container, .image-with-caption {
     page-break-inside: avoid;
     break-inside: avoid;
   }
+
+  /* Keep section header group together */
+  .section-header-group {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep blockquotes together */
+  blockquote {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep code blocks together */
+  pre, code {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ---- GRAPH PAPER REMOVAL ---- */
+  .graph-paper-overlay {
+    display: none !important;
+    opacity: 0 !important;
+  }
+
+  /* ---- IMAGE SIZING FOR PRINT ---- */
+  .section-image-container {
+    max-width: 100% !important;
+  }
+
+  .section-image-container .aspect-video {
+    aspect-ratio: 16 / 9;
+    max-height: 260px !important;
+  }
+
+  .section-image-container img {
+    max-height: 260px !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+
+  /* ---- CONTIGUITY: Header with content ---- */
+  .section > div:first-child {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
 }
 
-/* Also apply when print=true query param (for Puppeteer PDF generation) */
+/* ========================================
+   PRINT MODE CLASS (for Puppeteer)
+   Applied via JavaScript when ?print=true
+   ======================================== */
+
 .print-mode {
   font-size: 14px;
 }
@@ -251,28 +298,19 @@
   display: none !important;
 }
 
-.print-mode h1 {
-  font-size: 1.75rem !important;
-}
-
-.print-mode h2 {
-  font-size: 1.5rem !important;
-}
-
-.print-mode h3 {
-  font-size: 1.25rem !important;
-}
-
-.print-mode h4 {
-  font-size: 1.1rem !important;
-}
+/* Heading sizes */
+.print-mode h1 { font-size: 1.75rem !important; }
+.print-mode h2 { font-size: 1.5rem !important; }
+.print-mode h3 { font-size: 1.25rem !important; }
+.print-mode h4 { font-size: 1.1rem !important; }
 
 .print-mode p,
 .print-mode li {
-  font-size: 0.875rem !important;
-  line-height: 1.5 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
 }
 
+/* Page breaks */
 .print-mode .print-artifact {
   page-break-before: always;
   break-before: always;
@@ -283,7 +321,36 @@
   break-before: auto;
 }
 
-.print-mode .section {
+.print-mode .section-header-group {
   page-break-inside: avoid;
   break-inside: avoid;
+}
+
+.print-mode .image-with-caption {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* Graph paper removal */
+.print-mode .graph-paper-overlay {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+/* Image sizing */
+.print-mode .section-image-container .aspect-video {
+  max-height: 260px !important;
+}
+
+.print-mode .section-image-container img {
+  max-height: 260px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+/* Contiguity */
+.print-mode .section > div:first-child {
+  page-break-after: avoid;
+  break-after: avoid;
 }
