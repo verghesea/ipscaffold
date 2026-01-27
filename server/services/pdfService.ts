@@ -2,12 +2,12 @@
  * PDF Generation Service
  * Converts patent artifacts to downloadable PDFs with embedded images
  *
- * Design System (matching frontend):
- * - Graph paper background texture
- * - Top accent gradient (blue → green → red)
- * - Typography: Playfair Display (headings), Work Sans (body)
+ * Design System:
+ * - Clean professional layout with subtle graph paper on cover only
+ * - Top accent gradient (blue -> green -> red)
+ * - Typography: Helvetica (headings), Times-Roman (body)
  * - Color-coded artifact types (amber, blue, purple)
- * - Professional editorial layout
+ * - Professional editorial layout with proper page breaks
  */
 
 import PDFDocument from 'pdfkit';
@@ -26,11 +26,25 @@ interface PDFResult {
   mimeType: string;
 }
 
+// Layout constants for better content distribution
+const LAYOUT = {
+  // Reduced margins for more content space
+  margins: { top: 50, bottom: 50, left: 54, right: 54 },
+  // Spacing between elements (tighter than before)
+  headingSpaceBefore: { h1: 12, h2: 10, h3: 6 },
+  headingSpaceAfter: { h1: 6, h2: 4, h3: 3 },
+  paragraphSpaceAfter: 8,
+  listItemSpaceAfter: 4,
+  // Minimum space needed for content before forcing page break
+  minHeadingSpace: 80, // Space needed for heading + some content
+  minImageSpace: 180,  // Space needed for image container
+};
+
 // Design constants matching frontend
 const COLORS = {
   // Primary text colors
   black: '#1f2937',
-  darkGray: '#4b5563',
+  darkGray: '#374151',
   mediumGray: '#6b7280',
   lightGray: '#9ca3af',
 
@@ -57,9 +71,9 @@ const COLORS = {
   },
 
   // Background
-  paper: '#fffef9',
-  graphLine: '#e5e7eb',
-  graphLineDark: '#d1d5db',
+  paper: '#fffdf7',
+  graphLine: '#e8e8e8',
+  graphLineDark: '#d4d4d4',
 };
 
 // Artifact type configurations matching frontend ARTIFACT_TYPES
@@ -182,53 +196,44 @@ async function fetchImageBuffer(imageUrl: string, applyWatermark: boolean = fals
 }
 
 /**
- * Draw graph paper background pattern on current page
+ * Draw a simple clean background (optimized for file size)
+ * Only used on cover page for visual appeal
  */
-function drawGraphPaperBackground(doc: PDFKit.PDFDocument) {
+function drawCoverBackground(doc: PDFKit.PDFDocument) {
   const { width, height } = doc.page;
 
   // Save graphics state
   doc.save();
 
   // Fill background with warm off-white
-  doc.rect(0, 0, width, height)
-    .fill(COLORS.paper);
+  doc.rect(0, 0, width, height).fill(COLORS.paper);
 
-  // Draw minor grid lines (10px spacing equivalent, scaled for PDF)
-  const minorSpacing = 8;
+  // Draw a subtle, simplified grid pattern (fewer lines = smaller file size)
+  const gridSpacing = 24; // Larger spacing = fewer lines
   doc.strokeColor(COLORS.graphLine)
-    .lineWidth(0.25)
-    .opacity(0.4);
+    .lineWidth(0.3)
+    .opacity(0.25);
 
-  // Vertical minor lines
-  for (let x = 0; x < width; x += minorSpacing) {
-    doc.moveTo(x, 0).lineTo(x, height).stroke();
+  // Draw lines in a single path for efficiency
+  for (let x = 0; x < width; x += gridSpacing) {
+    doc.moveTo(x, 0).lineTo(x, height);
   }
-
-  // Horizontal minor lines
-  for (let y = 0; y < height; y += minorSpacing) {
-    doc.moveTo(0, y).lineTo(width, y).stroke();
+  for (let y = 0; y < height; y += gridSpacing) {
+    doc.moveTo(0, y).lineTo(width, y);
   }
-
-  // Draw major grid lines (50px spacing equivalent)
-  const majorSpacing = 40;
-  doc.strokeColor(COLORS.graphLineDark)
-    .lineWidth(0.5)
-    .opacity(0.5);
-
-  // Vertical major lines
-  for (let x = 0; x < width; x += majorSpacing) {
-    doc.moveTo(x, 0).lineTo(x, height).stroke();
-  }
-
-  // Horizontal major lines
-  for (let y = 0; y < height; y += majorSpacing) {
-    doc.moveTo(0, y).lineTo(width, y).stroke();
-  }
+  doc.stroke();
 
   // Restore graphics state
   doc.restore();
   doc.opacity(1);
+}
+
+/**
+ * Draw a clean white background for content pages (no grid = smaller file)
+ */
+function drawContentBackground(doc: PDFKit.PDFDocument) {
+  const { width, height } = doc.page;
+  doc.rect(0, 0, width, height).fill('#ffffff');
 }
 
 /**
@@ -255,6 +260,26 @@ function drawTopAccentBar(doc: PDFKit.PDFDocument) {
 }
 
 /**
+ * Check if there's enough space on current page, add new page if not
+ * Returns true if a new page was added
+ */
+function ensureSpace(doc: PDFKit.PDFDocument, requiredSpace: number, isContentPage: boolean = true): boolean {
+  const availableSpace = doc.page.height - doc.page.margins.bottom - doc.y;
+  if (availableSpace < requiredSpace) {
+    doc.addPage();
+    if (isContentPage) {
+      drawContentBackground(doc);
+    } else {
+      drawCoverBackground(doc);
+    }
+    drawTopAccentBar(doc);
+    doc.y = doc.page.margins.top + 8;
+    return true;
+  }
+  return false;
+}
+
+/**
  * Draw artifact header badge (matching frontend ArtifactHeader component)
  */
 function drawArtifactHeader(
@@ -269,9 +294,9 @@ function drawArtifactHeader(
   const margins = doc.page.margins;
   const contentWidth = pageWidth - margins.left - margins.right;
 
-  const boxHeight = 60;
-  const numberBoxSize = 40;
-  const padding = 12;
+  const boxHeight = 50;  // Reduced from 60
+  const numberBoxSize = 36;  // Reduced from 40
+  const padding = 10;  // Reduced from 12
 
   // Draw outer border box
   doc.strokeColor(config.color.primary)
@@ -286,12 +311,13 @@ function drawArtifactHeader(
     .stroke();
 
   // Draw number inside box
-  doc.fontSize(16)
+  doc.font('Helvetica-Bold')
+    .fontSize(14)
     .fillColor(config.color.primary)
     .text(
       String(artifactNumber).padStart(2, '0'),
       margins.left + padding,
-      startY + (boxHeight - 16) / 2,
+      startY + (boxHeight - 14) / 2,
       {
         width: numberBoxSize,
         align: 'center',
@@ -299,28 +325,30 @@ function drawArtifactHeader(
     );
 
   // Draw "Artifact X / Y" label
-  const textStartX = margins.left + padding + numberBoxSize + 12;
+  const textStartX = margins.left + padding + numberBoxSize + 10;
 
-  doc.fontSize(9)
+  doc.font('Helvetica')
+    .fontSize(8)
     .fillColor(COLORS.red)
     .text(
       `ARTIFACT ${String(artifactNumber).padStart(2, '0')} / ${String(totalArtifacts).padStart(2, '0')}`,
       textStartX,
-      startY + 15,
+      startY + 12,
       { characterSpacing: 1 }
     );
 
   // Draw artifact label and tagline
-  doc.fontSize(14)
+  doc.font('Helvetica-Bold')
+    .fontSize(12)
     .fillColor(COLORS.black)
     .text(
-      `${config.label} – ${config.tagline}`,
+      `${config.label} - ${config.tagline}`,
       textStartX,
-      startY + 30,
+      startY + 26,
       { width: contentWidth - numberBoxSize - padding * 3 }
     );
 
-  return startY + boxHeight + 20;
+  return startY + boxHeight + 12;  // Reduced spacing after header
 }
 
 /**
@@ -328,17 +356,18 @@ function drawArtifactHeader(
  */
 function addPageFooter(doc: PDFKit.PDFDocument, pageNum: number, totalPages: number) {
   const { width, height, margins } = doc.page;
-  const footerY = height - 40;
+  const footerY = height - 35;
 
   // Draw separator line
   doc.strokeColor(COLORS.graphLineDark)
     .lineWidth(0.5)
-    .moveTo(margins.left, footerY - 10)
-    .lineTo(width - margins.right, footerY - 10)
+    .moveTo(margins.left, footerY - 8)
+    .lineTo(width - margins.right, footerY - 8)
     .stroke();
 
   // Page number centered
-  doc.fontSize(9)
+  doc.font('Helvetica')
+    .fontSize(8)
     .fillColor(COLORS.mediumGray)
     .text(
       `Page ${pageNum} of ${totalPages}`,
@@ -351,29 +380,51 @@ function addPageFooter(doc: PDFKit.PDFDocument, pageNum: number, totalPages: num
     );
 
   // Branding on right
-  doc.fontSize(8)
+  doc.font('Helvetica')
+    .fontSize(7)
     .fillColor(COLORS.lightGray)
     .text(
       'Humble AI',
-      width - margins.right - 60,
+      width - margins.right - 50,
       footerY,
       {
-        width: 60,
+        width: 50,
         align: 'right',
       }
     );
 }
 
 /**
+ * Render a styled heading with proper page break handling
+ * Returns estimated height needed for the heading
+ */
+function getHeadingHeight(doc: PDFKit.PDFDocument, content: string, level: number): number {
+  const sizes: Record<number, number> = { 1: 18, 2: 14, 3: 12, 4: 11, 5: 10, 6: 10 };
+  const fontSize = sizes[level] || 11;
+  const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right - 12;
+
+  doc.font('Helvetica-Bold').fontSize(fontSize);
+  const textHeight = doc.heightOfString(content, { width: contentWidth });
+
+  // Include space before and after
+  const spaceBefore = level <= 2 ? LAYOUT.headingSpaceBefore.h2 : LAYOUT.headingSpaceBefore.h3;
+  const spaceAfter = level <= 2 ? LAYOUT.headingSpaceAfter.h2 : LAYOUT.headingSpaceAfter.h3;
+
+  return textHeight + spaceBefore + spaceAfter + LAYOUT.minHeadingSpace;
+}
+
+/**
  * Render a styled heading
  */
 function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, artifactColor: typeof COLORS.amber) {
-  const sizes: Record<number, number> = { 1: 22, 2: 18, 3: 15, 4: 13, 5: 12, 6: 11 };
-  const fontSize = sizes[level] || 12;
+  const sizes: Record<number, number> = { 1: 18, 2: 14, 3: 12, 4: 11, 5: 10, 6: 10 };
+  const fontSize = sizes[level] || 11;
 
-  // Add extra space before major headings
+  // Add space before major headings (reduced)
   if (level <= 2) {
-    doc.moveDown(0.8);
+    doc.y += LAYOUT.headingSpaceBefore.h2;
+  } else {
+    doc.y += LAYOUT.headingSpaceBefore.h3;
   }
 
   // For level 2 headings, add a colored accent
@@ -382,18 +433,20 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
     const margins = doc.page.margins;
 
     // Draw small accent bar before heading
-    doc.rect(margins.left, currentY, 3, fontSize + 4)
+    doc.rect(margins.left, currentY, 3, fontSize + 2)
       .fill(artifactColor.primary);
 
-    // Draw heading text with indent
-    doc.fontSize(fontSize)
+    // Draw heading text with indent - use Helvetica-Bold
+    doc.font('Helvetica-Bold')
+      .fontSize(fontSize)
       .fillColor(COLORS.black)
-      .text(content, margins.left + 12, currentY, {
+      .text(content, margins.left + 10, currentY, {
         continued: false,
       });
   } else if (level === 1) {
-    // Main title - larger with underline
-    doc.fontSize(fontSize)
+    // Main title - use Helvetica-Bold
+    doc.font('Helvetica-Bold')
+      .fontSize(fontSize)
       .fillColor(COLORS.black)
       .text(content, {
         continued: false,
@@ -403,57 +456,60 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
     const textWidth = doc.widthOfString(content);
     doc.strokeColor(artifactColor.primary)
       .lineWidth(1)
-      .moveTo(doc.page.margins.left, doc.y + 2)
-      .lineTo(doc.page.margins.left + Math.min(textWidth, 200), doc.y + 2)
+      .moveTo(doc.page.margins.left, doc.y + 1)
+      .lineTo(doc.page.margins.left + Math.min(textWidth, 180), doc.y + 1)
       .stroke();
 
-    doc.moveDown(0.3);
+    doc.y += 2;
   } else {
-    // Other headings
-    doc.fontSize(fontSize)
+    // Other headings - Helvetica-Bold but smaller
+    doc.font('Helvetica-Bold')
+      .fontSize(fontSize)
       .fillColor(level === 3 ? COLORS.darkGray : COLORS.mediumGray)
       .text(content, {
         continued: false,
       });
   }
 
-  doc.moveDown(0.4);
+  // Reduced space after headings
+  doc.y += level <= 2 ? LAYOUT.headingSpaceAfter.h2 : LAYOUT.headingSpaceAfter.h3;
 }
 
 /**
- * Render a paragraph with proper styling
+ * Render a paragraph with proper styling - uses Times-Roman for readability
  */
 function renderParagraph(doc: PDFKit.PDFDocument, content: string) {
-  doc.fontSize(11)
+  doc.font('Times-Roman')
+    .fontSize(11)
     .fillColor(COLORS.darkGray)
     .text(content, {
       align: 'justify',
-      lineGap: 3,
-    })
-    .moveDown(0.7);
+      lineGap: 2,
+    });
+  doc.y += LAYOUT.paragraphSpaceAfter;
 }
 
 /**
- * Render a list item with bullet
+ * Render a list item with bullet - uses Times-Roman for body text
  */
 function renderListItem(doc: PDFKit.PDFDocument, content: string, artifactColor: typeof COLORS.amber) {
-  const currentX = doc.x;
   const currentY = doc.y;
   const margins = doc.page.margins;
 
   // Draw bullet point (small filled circle)
-  doc.circle(margins.left + 8, currentY + 5, 2.5)
+  doc.circle(margins.left + 6, currentY + 5, 2)
     .fill(artifactColor.primary);
 
-  // Draw text with indent
-  doc.fontSize(11)
+  // Draw text with indent - use Times-Roman
+  doc.font('Times-Roman')
+    .fontSize(11)
     .fillColor(COLORS.darkGray)
-    .text(content, margins.left + 20, currentY, {
-      width: doc.page.width - margins.left - margins.right - 20,
+    .text(content, margins.left + 16, currentY, {
+      width: doc.page.width - margins.left - margins.right - 16,
       align: 'left',
-      lineGap: 2,
-    })
-    .moveDown(0.3);
+      lineGap: 1.5,
+    });
+  doc.y += LAYOUT.listItemSpaceAfter;
 }
 
 /**
@@ -465,48 +521,46 @@ async function renderImage(
   artifactColor: typeof COLORS.amber
 ) {
   const margins = doc.page.margins;
-  const maxWidth = doc.page.width - margins.left - margins.right - 24; // padding
-  const maxHeight = 250;
+  const maxWidth = doc.page.width - margins.left - margins.right - 16;
+  const maxHeight = 200; // Reduced from 250
 
-  // Calculate if we need a new page
-  if (doc.y + maxHeight + 40 > doc.page.height - margins.bottom) {
-    doc.addPage();
-    drawGraphPaperBackground(doc);
-    drawTopAccentBar(doc);
-    doc.y = margins.top + 20;
-  }
+  // Calculate total space needed for image container
+  const containerHeight = maxHeight + 16;
+
+  // Check if we need a new page - use ensureSpace
+  ensureSpace(doc, containerHeight + 20, true);
 
   const imageStartY = doc.y;
 
   // Draw image container with border
   doc.strokeColor(artifactColor.border)
     .lineWidth(1)
-    .roundedRect(margins.left, imageStartY, maxWidth + 24, maxHeight + 20, 2)
+    .roundedRect(margins.left, imageStartY, maxWidth + 16, containerHeight, 2)
     .stroke();
 
   // Draw light background
-  doc.rect(margins.left + 1, imageStartY + 1, maxWidth + 22, maxHeight + 18)
+  doc.rect(margins.left + 1, imageStartY + 1, maxWidth + 14, containerHeight - 2)
     .fill('#fafafa');
 
   // Embed the image
   try {
-    doc.image(imageBuffer, margins.left + 12, imageStartY + 10, {
+    doc.image(imageBuffer, margins.left + 8, imageStartY + 8, {
       fit: [maxWidth, maxHeight],
       align: 'center',
       valign: 'center',
     });
   } catch (error) {
     // If image fails, show placeholder text
-    doc.fontSize(10)
+    doc.font('Helvetica')
+      .fontSize(9)
       .fillColor(COLORS.lightGray)
-      .text('Image could not be rendered', margins.left + 12, imageStartY + maxHeight / 2, {
+      .text('Image could not be rendered', margins.left + 8, imageStartY + maxHeight / 2, {
         width: maxWidth,
         align: 'center',
       });
   }
 
-  doc.y = imageStartY + maxHeight + 30;
-  doc.moveDown(0.5);
+  doc.y = imageStartY + containerHeight + 10; // Reduced bottom spacing
 }
 
 /**
@@ -532,15 +586,10 @@ export async function generateArtifactPDF(
 
   const config = ARTIFACT_CONFIG[artifact.artifact_type] || ARTIFACT_CONFIG.elia15;
 
-  // Create PDF document
+  // Create PDF document with tighter margins
   const doc = new PDFDocument({
     size: 'LETTER',
-    margins: {
-      top: 60,
-      bottom: 60,
-      left: 60,
-      right: 60,
-    },
+    margins: LAYOUT.margins,
     info: {
       Title: `${config.label} - Patent Analysis`,
       Author: 'Humble AI',
@@ -548,6 +597,7 @@ export async function generateArtifactPDF(
       Creator: 'Humble Patent Analyzer',
     },
     bufferPages: true,
+    compress: true, // Enable compression for smaller file size
   });
 
   // Collect PDF chunks
@@ -560,40 +610,39 @@ export async function generateArtifactPDF(
     doc.on('error', reject);
   });
 
-  // Draw first page background and accent bar
-  drawGraphPaperBackground(doc);
+  // Draw first page - use content background (clean white, no grid)
+  drawContentBackground(doc);
   drawTopAccentBar(doc);
 
   // Start content after accent bar
-  doc.y = doc.page.margins.top + 10;
+  doc.y = doc.page.margins.top + 8;
 
   // Draw artifact header
   let currentY = drawArtifactHeader(doc, 1, 1, artifact.artifact_type, doc.y);
   doc.y = currentY;
 
-  // Add generation date
-  doc.fontSize(9)
+  // Add generation date (smaller, less space)
+  doc.font('Helvetica')
+    .fontSize(8)
     .fillColor(COLORS.mediumGray)
     .text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, {
       align: 'left',
-    })
-    .moveDown(1.5);
+    });
+  doc.y += 12; // Reduced spacing
 
   // Parse and render content
   const sections = parseMarkdownSections(artifact.content);
   let currentSectionNumber = 0;
 
   for (const section of sections) {
-    // Check if we need a new page
-    if (doc.y > doc.page.height - doc.page.margins.bottom - 100) {
-      doc.addPage();
-      drawGraphPaperBackground(doc);
-      drawTopAccentBar(doc);
-      doc.y = doc.page.margins.top + 10;
-    }
-
     switch (section.type) {
       case 'heading':
+        // Calculate space needed for heading + some following content
+        const headingSpace = getHeadingHeight(doc, section.content, section.level || 2);
+
+        // Ensure we have space for heading and at least some content
+        ensureSpace(doc, headingSpace, true);
+
         if (section.level === 2) {
           currentSectionNumber++;
         }
@@ -609,7 +658,6 @@ export async function generateArtifactPDF(
           if (sectionImage) {
             try {
               const imageBuffer = await fetchImageBuffer(sectionImage.image_url, watermarkImages);
-
               if (imageBuffer) {
                 await renderImage(doc, imageBuffer, config.color);
               }
@@ -621,10 +669,22 @@ export async function generateArtifactPDF(
         break;
 
       case 'paragraph':
+        // Check if paragraph fits, if not add page
+        doc.font('Times-Roman').fontSize(11);
+        const paraHeight = doc.heightOfString(section.content, {
+          width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+        });
+        ensureSpace(doc, paraHeight + LAYOUT.paragraphSpaceAfter + 20, true);
         renderParagraph(doc, section.content);
         break;
 
       case 'list-item':
+        // Check if list item fits
+        doc.font('Times-Roman').fontSize(11);
+        const listHeight = doc.heightOfString(section.content, {
+          width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 16,
+        });
+        ensureSpace(doc, listHeight + LAYOUT.listItemSpaceAfter + 10, true);
         renderListItem(doc, section.content, config.color);
         break;
     }
@@ -674,15 +734,10 @@ export async function generatePatentPackagePDF(
     throw new Error('Patent not found');
   }
 
-  // Create PDF document
+  // Create PDF document with tighter margins and compression
   const doc = new PDFDocument({
     size: 'LETTER',
-    margins: {
-      top: 60,
-      bottom: 60,
-      left: 60,
-      right: 60,
-    },
+    margins: LAYOUT.margins,
     info: {
       Title: `Patent Analysis - ${patent.friendly_title || patent.title || 'Untitled'}`,
       Author: 'Humble AI',
@@ -690,6 +745,7 @@ export async function generatePatentPackagePDF(
       Creator: 'Humble Patent Analyzer',
     },
     bufferPages: true,
+    compress: true, // Enable compression for smaller file size
   });
 
   const chunks: Buffer[] = [];
@@ -701,7 +757,8 @@ export async function generatePatentPackagePDF(
   });
 
   // === COVER PAGE ===
-  drawGraphPaperBackground(doc);
+  // Only the cover page gets the graph paper background
+  drawCoverBackground(doc);
   drawTopAccentBar(doc);
 
   const margins = doc.page.margins;
@@ -709,27 +766,29 @@ export async function generatePatentPackagePDF(
   const contentWidth = pageWidth - margins.left - margins.right;
 
   // Cover page content - centered vertically
-  doc.y = 180;
+  doc.y = 160;
 
-  // "Patent Analysis Package" title
-  doc.fontSize(36)
+  // "Patent Analysis Package" title - use Helvetica-Bold
+  doc.font('Helvetica-Bold')
+    .fontSize(32)
     .fillColor(COLORS.black)
     .text('Patent Analysis', {
       align: 'center',
       width: contentWidth,
     });
 
-  doc.fontSize(36)
+  doc.font('Helvetica-Bold')
+    .fontSize(32)
     .fillColor(COLORS.blue)
     .text('Package', {
       align: 'center',
       width: contentWidth,
-    })
-    .moveDown(2);
+    });
+  doc.y += 20;
 
   // Decorative line
   const lineY = doc.y;
-  const lineWidth = 200;
+  const lineWidth = 180;
   const lineStartX = margins.left + (contentWidth - lineWidth) / 2;
 
   // Three-segment line matching the top accent
@@ -737,32 +796,34 @@ export async function generatePatentPackagePDF(
   doc.rect(lineStartX + lineWidth / 3, lineY, lineWidth / 3, 3).fill(COLORS.green);
   doc.rect(lineStartX + (lineWidth * 2) / 3, lineY, lineWidth / 3, 3).fill(COLORS.red);
 
-  doc.y = lineY + 30;
+  doc.y = lineY + 24;
 
   // Patent title
-  doc.fontSize(18)
+  doc.font('Helvetica-Bold')
+    .fontSize(16)
     .fillColor(COLORS.darkGray)
     .text(patent.friendly_title || patent.title || 'Untitled Patent', {
       align: 'center',
       width: contentWidth,
-    })
-    .moveDown(0.5);
+    });
+  doc.y += 6;
 
   // Assignee
   if (patent.assignee) {
-    doc.fontSize(12)
+    doc.font('Helvetica')
+      .fontSize(11)
       .fillColor(COLORS.mediumGray)
       .text(patent.assignee, {
         align: 'center',
         width: contentWidth,
-      })
-      .moveDown(2);
+      });
+    doc.y += 20;
   }
 
   // Patent number badge
   if (patent.patent_number) {
-    const badgeWidth = 160;
-    const badgeHeight = 30;
+    const badgeWidth = 140;
+    const badgeHeight = 26;
     const badgeX = margins.left + (contentWidth - badgeWidth) / 2;
     const badgeY = doc.y;
 
@@ -771,25 +832,27 @@ export async function generatePatentPackagePDF(
       .rect(badgeX, badgeY, badgeWidth, badgeHeight)
       .stroke();
 
-    doc.fontSize(11)
+    doc.font('Helvetica')
+      .fontSize(10)
       .fillColor(COLORS.darkGray)
-      .text(patent.patent_number, badgeX, badgeY + 9, {
+      .text(patent.patent_number, badgeX, badgeY + 8, {
         width: badgeWidth,
         align: 'center',
       });
 
-    doc.y = badgeY + badgeHeight + 40;
+    doc.y = badgeY + badgeHeight + 30;
   }
 
   // Contents section
-  doc.fontSize(12)
+  doc.font('Helvetica')
+    .fontSize(10)
     .fillColor(COLORS.mediumGray)
     .text('CONTENTS', {
       align: 'center',
       width: contentWidth,
       characterSpacing: 2,
-    })
-    .moveDown(1);
+    });
+  doc.y += 12;
 
   // List artifacts with their colors
   const artifactOrder = ['elia15', 'business_narrative', 'golden_circle'];
@@ -801,38 +864,42 @@ export async function generatePatentPackagePDF(
     const config = ARTIFACT_CONFIG[artifact.artifact_type] || ARTIFACT_CONFIG.elia15;
 
     // Draw bullet
-    doc.circle(margins.left + contentWidth / 2 - 80, doc.y + 5, 4)
+    doc.circle(margins.left + contentWidth / 2 - 70, doc.y + 4, 3)
       .fill(config.color.primary);
 
     // Draw text
-    doc.fontSize(11)
+    doc.font('Helvetica')
+      .fontSize(10)
       .fillColor(COLORS.darkGray)
-      .text(`${config.label}`, margins.left + contentWidth / 2 - 65, doc.y, {
-        width: 200,
+      .text(`${config.label}`, margins.left + contentWidth / 2 - 55, doc.y, {
+        width: 180,
         align: 'left',
-      })
-      .moveDown(0.3);
+      });
+    doc.y += 4;
   });
 
   // Footer on cover
-  doc.y = doc.page.height - 120;
+  doc.y = doc.page.height - 100;
 
-  doc.fontSize(10)
+  doc.font('Helvetica')
+    .fontSize(9)
     .fillColor(COLORS.mediumGray)
     .text('Generated by', {
       align: 'center',
       width: contentWidth,
     });
 
-  doc.fontSize(14)
+  doc.font('Helvetica-Bold')
+    .fontSize(12)
     .fillColor(COLORS.black)
     .text('Humble AI', {
       align: 'center',
       width: contentWidth,
-    })
-    .moveDown(0.5);
+    });
+  doc.y += 6;
 
-  doc.fontSize(9)
+  doc.font('Helvetica')
+    .fontSize(8)
     .fillColor(COLORS.lightGray)
     .text(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), {
       align: 'center',
@@ -846,12 +913,12 @@ export async function generatePatentPackagePDF(
     const artifact = sortedArtifacts[artifactIndex];
     const config = ARTIFACT_CONFIG[artifact.artifact_type] || ARTIFACT_CONFIG.elia15;
 
-    // New page for each artifact
+    // New page for each artifact - use clean white background (no grid)
     doc.addPage();
-    drawGraphPaperBackground(doc);
+    drawContentBackground(doc);
     drawTopAccentBar(doc);
 
-    doc.y = doc.page.margins.top + 10;
+    doc.y = doc.page.margins.top + 8;
 
     // Draw artifact header
     let currentY = drawArtifactHeader(
@@ -869,16 +936,14 @@ export async function generatePatentPackagePDF(
     let currentSectionNumber = 0;
 
     for (const section of sections) {
-      // Check if we need a new page
-      if (doc.y > doc.page.height - doc.page.margins.bottom - 100) {
-        doc.addPage();
-        drawGraphPaperBackground(doc);
-        drawTopAccentBar(doc);
-        doc.y = doc.page.margins.top + 10;
-      }
-
       switch (section.type) {
         case 'heading':
+          // Calculate space needed for heading + some following content
+          const headingSpace = getHeadingHeight(doc, section.content, section.level || 2);
+
+          // Ensure we have space for heading and at least some content
+          ensureSpace(doc, headingSpace, true);
+
           if (section.level === 2) {
             currentSectionNumber++;
           }
@@ -894,7 +959,6 @@ export async function generatePatentPackagePDF(
             if (sectionImage) {
               try {
                 const imageBuffer = await fetchImageBuffer(sectionImage.image_url, watermarkImages);
-
                 if (imageBuffer) {
                   await renderImage(doc, imageBuffer, config.color);
                 }
@@ -906,10 +970,22 @@ export async function generatePatentPackagePDF(
           break;
 
         case 'paragraph':
+          // Check if paragraph fits, if not add page
+          doc.font('Times-Roman').fontSize(11);
+          const paraHeight = doc.heightOfString(section.content, {
+            width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+          });
+          ensureSpace(doc, paraHeight + LAYOUT.paragraphSpaceAfter + 20, true);
           renderParagraph(doc, section.content);
           break;
 
         case 'list-item':
+          // Check if list item fits
+          doc.font('Times-Roman').fontSize(11);
+          const listHeight = doc.heightOfString(section.content, {
+            width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 16,
+          });
+          ensureSpace(doc, listHeight + LAYOUT.listItemSpaceAfter + 10, true);
           renderListItem(doc, section.content, config.color);
           break;
       }
