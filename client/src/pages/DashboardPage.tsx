@@ -293,7 +293,7 @@ export function DashboardPage() {
   const getStatusBadge = (status: string) => {
     const configs = {
       processing: { icon: Clock, text: 'Processing', className: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-      elia15_complete: { icon: Clock, text: 'Generating...', className: 'text-blue-600 bg-blue-50 border-blue-200' },
+      elia15_complete: { icon: Clock, text: 'Scientific Narrative Complete', className: 'text-blue-600 bg-blue-50 border-blue-200' },
       completed: { icon: CheckCircle, text: 'Complete', className: 'text-green-600 bg-green-50 border-green-200' },
       failed: { icon: AlertCircle, text: 'Failed', className: 'text-red-600 bg-red-50 border-red-200' },
       partial: { icon: AlertCircle, text: 'Partial', className: 'text-orange-600 bg-orange-50 border-orange-200' },

@@ -263,7 +263,7 @@ export function PatentDetailPage() {
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       processing: { text: 'Processing', variant: 'secondary' },
-      elia15_complete: { text: 'Generating...', variant: 'secondary' },
+      elia15_complete: { text: 'Scientific Narrative Complete', variant: 'secondary' },
       completed: { text: 'Complete', variant: 'default' },
       failed: { text: 'Failed', variant: 'destructive' },
       partial: { text: 'Partial', variant: 'outline' },
