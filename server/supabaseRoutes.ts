@@ -11,6 +11,7 @@ import { generateELIA15, generateBusinessNarrative, generateGoldenCircle } from 
 import { getProgress, getProgressFromDb, updateProgress } from "./services/progressService";
 import { logMetadataCorrection, findValueContext, getPendingCorrections } from "./services/extractionLogger";
 import { generateArtifactPDF, generatePatentPackagePDF } from "./services/pdfService";
+import { renderPatentToPdf, verifyPrintToken } from "./services/htmlToPdfService";
 import {
   analyzeFieldCorrections,
   deployPattern,
@@ -145,6 +146,23 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   }).catch(() => {
     res.status(401).json({ error: 'Not authenticated' });
   });
+}
+
+// Middleware that allows either normal auth OR a valid print token
+function requireAuthOrPrintToken(req: Request, res: Response, next: NextFunction) {
+  // Check for print token first
+  const printToken = req.query.token as string | undefined;
+  if (printToken) {
+    const patentId = verifyPrintToken(printToken);
+    if (patentId && patentId === req.params.id) {
+      // Valid print token - allow access without normal auth
+      req.user = undefined; // No user context for print mode
+      return next();
+    }
+  }
+
+  // Fall back to normal authentication
+  requireAuth(req, res, next);
 }
 
 export async function registerRoutes(
@@ -1004,13 +1022,19 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/patent/:id', requireAuth, async (req, res) => {
+  app.get('/api/patent/:id', requireAuthOrPrintToken, async (req, res) => {
     try {
       const patentId = req.params.id;
       const patent = await supabaseStorage.getPatent(patentId);
 
-      if (!patent || patent.user_id !== req.user!.id) {
+      // If user is authenticated, check ownership
+      // If using print token, req.user will be undefined (already verified by middleware)
+      if (req.user && patent.user_id !== req.user.id) {
         return res.status(403).json({ error: 'Access denied' });
+      }
+
+      if (!patent) {
+        return res.status(404).json({ error: 'Patent not found' });
       }
 
       const artifacts = await supabaseStorage.getArtifactsByPatent(patentId);
@@ -1144,17 +1168,24 @@ export async function registerRoutes(
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Generate combined PDF with watermarks
-      const pdfResult = await generatePatentPackagePDF(patentId, {
-        includeImages: true,
-        watermarkImages: true,
-      });
+      // Get base URL for rendering
+      const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 5000}`;
+
+      console.log('[PDF] Using HTML-to-PDF rendering with base URL:', baseUrl);
+
+      // Generate PDF from actual web page
+      const pdfBuffer = await renderPatentToPdf(patentId, baseUrl);
+
+      const filename = `${patent.friendly_title || patent.title || 'patent'}-complete.pdf`
+        .replace(/[^a-z0-9-]/gi, '-')
+        .replace(/-+/g, '-')
+        .toLowerCase();
 
       // Send PDF as download
-      res.setHeader('Content-Type', pdfResult.mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${pdfResult.filename}"`);
-      res.setHeader('Content-Length', pdfResult.buffer.length);
-      res.send(pdfResult.buffer);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
 
     } catch (error) {
       console.error('Patent package PDF generation error:', error);

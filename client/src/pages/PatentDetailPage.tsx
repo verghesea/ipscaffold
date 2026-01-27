@@ -66,6 +66,9 @@ export function PatentDetailPage() {
   const { toast } = useToast();
   const { user, profile, refetch: refetchUser } = useAuth();
 
+  // Check if we're in print mode (for PDF generation)
+  const isPrintMode = new URLSearchParams(window.location.search).get('print') === 'true';
+
   // Get current artifact based on active tab
   const currentArtifact = artifacts.find(a => a.type === activeTab);
 
@@ -88,6 +91,14 @@ export function PatentDetailPage() {
       loadPatent(params.id);
     }
   }, [params?.id]);
+
+  // Apply print mode class to body when in print mode
+  useEffect(() => {
+    if (isPrintMode) {
+      document.body.classList.add('print-mode');
+      return () => document.body.classList.remove('print-mode');
+    }
+  }, [isPrintMode]);
 
   // Show profile completion modal when patent is completed and user hasn't completed their profile
   useEffect(() => {
@@ -288,18 +299,21 @@ export function PatentDetailPage() {
 
       <div className="min-h-screen bg-background py-8">
         <div className="container mx-auto px-6">
-          <button
-            onClick={() => setLocation('/dashboard')}
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary-900 transition-colors mb-6"
-            data-testid="button-back-dashboard"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </button>
+          {!isPrintMode && (
+            <button
+              onClick={() => setLocation('/dashboard')}
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary-900 transition-colors mb-6 no-print"
+              data-testid="button-back-dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </button>
+          )}
 
           <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
-              <Card className="sticky top-24">
+            {!isPrintMode && (
+              <div className="lg:col-span-1 sidebar">
+                <Card className="sticky top-24">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
                     {patent.friendlyTitle ? (
@@ -415,9 +429,10 @@ export function PatentDetailPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
+              </div>
+            )}
 
-            <div className="lg:col-span-2">
+            <div className={isPrintMode ? 'col-span-full' : 'lg:col-span-2'} data-patent-content>
               {artifacts.length === 0 && patent.status !== 'failed' && patent.status !== 'partial' ? (
                 <>
                   {params?.id && <GenerationProgress patentId={params.id} onComplete={() => loadPatent(params.id)} />}
@@ -437,9 +452,102 @@ export function PatentDetailPage() {
                     <p className="text-muted-foreground">Processing failed. Use the retry button to try again.</p>
                   </CardContent>
                 </Card>
+              ) : isPrintMode ? (
+                // Print mode: Show all artifacts stacked vertically
+                <div className="space-y-12">
+                  {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta], artifactIndex) => {
+                    const artifact = artifacts.find(a => a.type === key);
+                    if (!artifact) return null;
+
+                    return (
+                      <div key={key} className="print-artifact mt-6" data-artifact-content>
+                        {/* Graph paper background container */}
+                        <div className="relative bg-white shadow-lg overflow-hidden">
+                          {/* Graph paper overlay */}
+                          <div
+                            className="absolute inset-0 pointer-events-none opacity-50"
+                            style={{
+                              backgroundImage: `
+                                linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+                                linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px),
+                                linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px),
+                                linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)
+                              `,
+                              backgroundSize: '10px 10px, 10px 10px, 50px 50px, 50px 50px',
+                            }}
+                          />
+
+                          {/* Top accent line (4-color gradient) */}
+                          <div className="h-[3px] bg-gradient-to-r from-[#2563eb] via-[#059669] to-[#dc2626]" />
+
+                          <div className="relative z-10 p-6 md:p-12">
+                            {artifact ? (
+                              <>
+                                {/* Artifact Header with Generate Button */}
+                                <ArtifactHeader
+                                  artifactNumber={artifactIndex + 1}
+                                  totalArtifacts={3}
+                                  artifactLabel={meta.label}
+                                  artifactTitle={meta.tagline}
+                                  hasImages={images.length > 0}
+                                  imageCount={images.length}
+                                  totalSections={sectionCount}
+                                  generating={generating}
+                                  onGenerateImages={handleGenerateImages}
+                                />
+
+                                {/* Download This Artifact Button (hidden in print mode) */}
+                                <div className="flex justify-end mb-4 no-print">
+                                  <Button
+                                    onClick={() => artifact?.id && handleDownloadArtifact(artifact.id, key as string)}
+                                    disabled={downloadingArtifact || !artifact?.id}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    {downloadingArtifact ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Generating...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download PDF
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                {/* Enhanced Markdown Renderer with Images */}
+                                <EnhancedMarkdownRenderer
+                                  content={artifact.content}
+                                  images={[]} // Print mode: don't load images to avoid complexity
+                                  generating={false}
+                                  onRegenerateImage={handleRegenerateImage}
+                                  onUpdateImagePrompt={handleUpdateImagePrompt}
+                                  isAdmin={false} // Hide admin controls in print mode
+                                />
+                              </>
+                            ) : (
+                              <Card className="text-center py-8">
+                                <CardContent>
+                                  <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground mb-2" />
+                                  <p className="text-sm text-muted-foreground">
+                                    Generating {meta.label}...
+                                  </p>
+                                </CardContent>
+                              </Card>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
+                // Normal mode: Show tabs
                 <Tabs defaultValue={defaultTab} className="w-full">
-                  <TabsList className="w-full grid grid-cols-3 mb-6">
+                  <TabsList className="w-full grid grid-cols-3 mb-6 no-print">
                     {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta]) => {
                       const Icon = meta.icon;
                       const hasArtifact = artifacts.some(a => a.type === key);
@@ -505,7 +613,7 @@ export function PatentDetailPage() {
                                 />
 
                                 {/* Download This Artifact Button */}
-                                <div className="flex justify-end mb-4">
+                                <div className="flex justify-end mb-4 no-print">
                                   <Button
                                     onClick={() => artifact?.id && handleDownloadArtifact(artifact.id, key as string)}
                                     disabled={downloadingArtifact || !artifact?.id}

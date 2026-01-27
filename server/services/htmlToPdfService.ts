@@ -1,0 +1,251 @@
+/**
+ * HTML-to-PDF Service using Puppeteer
+ * Renders actual web pages to PDF for pixel-perfect output
+ * 
+ * Architecture:
+ * - Uses headless Chrome/Chromium via Puppeteer
+ * - Renders the actual PatentDetailPage component
+ * - Captures exact CSS styling, fonts, and layout
+ * - No manual PDF layout code needed - uses browser rendering
+ */
+
+import puppeteer, { type Browser, type Page } from 'puppeteer';
+
+let browserInstance: Browser | null = null;
+
+/**
+ * Get or create a singleton browser instance
+ * Reuses browser to avoid startup overhead
+ */
+async function getBrowser(): Promise<Browser> {
+  if (browserInstance && browserInstance.connected) {
+    return browserInstance;
+  }
+
+  console.log('[Puppeteer] Launching browser...');
+  
+  browserInstance = await puppeteer.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process',
+    ],
+    // Use system Chromium on Replit
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+  });
+
+  console.log('[Puppeteer] Browser launched successfully');
+  
+  return browserInstance;
+}
+
+/**
+ * Close the browser instance
+ */
+export async function closeBrowser(): Promise<void> {
+  if (browserInstance) {
+    await browserInstance.close();
+    browserInstance = null;
+    console.log('[Puppeteer] Browser closed');
+  }
+}
+
+interface RenderOptions {
+  /**
+   * Wait for specific selector before rendering
+   */
+  waitForSelector?: string;
+  
+  /**
+   * Additional wait time in milliseconds after page load
+   */
+  additionalWaitMs?: number;
+  
+  /**
+   * PDF format options
+   */
+  format?: 'Letter' | 'A4' | 'Legal';
+  
+  /**
+   * Print background graphics
+   */
+  printBackground?: boolean;
+  
+  /**
+   * Page margins
+   */
+  margin?: {
+    top?: string;
+    right?: string;
+    bottom?: string;
+    left?: string;
+  };
+}
+
+/**
+ * Render a URL to PDF using Puppeteer
+ * @param url - The URL to render
+ * @param options - Rendering options
+ * @returns PDF buffer
+ */
+export async function renderUrlToPdf(
+  url: string,
+  options: RenderOptions = {}
+): Promise<Buffer> {
+  const {
+    waitForSelector,
+    additionalWaitMs = 2000,
+    format = 'Letter',
+    printBackground = true,
+    margin = { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
+  } = options;
+
+  console.log(`[HTML-to-PDF] Starting render for: ${url}`);
+  
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+
+  try {
+    // Set viewport for consistent rendering
+    await page.setViewport({
+      width: 1200,
+      height: 1600,
+      deviceScaleFactor: 2, // High DPI for crisp text
+    });
+
+    console.log('[HTML-to-PDF] Navigating to page...');
+    
+    // Navigate to the URL
+    await page.goto(url, {
+      waitUntil: 'networkidle0', // Wait for network to be idle
+      timeout: 30000,
+    });
+
+    console.log('[HTML-to-PDF] Page loaded, waiting for content...');
+
+    // Wait for specific selector if provided
+    if (waitForSelector) {
+      await page.waitForSelector(waitForSelector, { timeout: 10000 });
+    }
+
+    // Additional wait for dynamic content (images, lazy loading, etc.)
+    if (additionalWaitMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, additionalWaitMs));
+    }
+
+    console.log('[HTML-to-PDF] Generating PDF...');
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format,
+      printBackground,
+      margin,
+      preferCSSPageSize: false,
+    });
+
+    console.log('[HTML-to-PDF] PDF generated successfully');
+
+    // Convert Uint8Array to Buffer for compatibility
+    return Buffer.from(pdfBuffer);
+  } catch (error) {
+    console.error('[HTML-to-PDF] Error rendering PDF:', error);
+    throw error;
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * Render patent detail page to PDF
+ * @param patentId - Patent ID
+ * @param baseUrl - Base URL of the application (e.g., http://localhost:5000)
+ * @param printToken - Optional print token for authentication-free access
+ * @returns PDF buffer
+ */
+export async function renderPatentToPdf(
+  patentId: string,
+  baseUrl: string,
+  printToken?: string
+): Promise<Buffer> {
+  const token = printToken || generatePrintToken(patentId);
+  const url = `${baseUrl}/patent/${patentId}?print=true&token=${token}`;
+
+  return renderUrlToPdf(url, {
+    waitForSelector: '[data-patent-content]', // Wait for main content
+    additionalWaitMs: 3000, // Extra time for images to load
+    format: 'Letter',
+    printBackground: true,
+  });
+}
+
+/**
+ * Render single artifact to PDF
+ * @param artifactId - Artifact ID
+ * @param baseUrl - Base URL of the application
+ * @returns PDF buffer
+ */
+export async function renderArtifactToPdf(
+  artifactId: string,
+  baseUrl: string
+): Promise<Buffer> {
+  // This would require a dedicated artifact view page
+  // For now, we'll use the patent page with artifact selection
+  const url = `${baseUrl}/artifact/${artifactId}?print=true`;
+  
+  return renderUrlToPdf(url, {
+    waitForSelector: '[data-artifact-content]',
+    additionalWaitMs: 2000,
+    format: 'Letter',
+    printBackground: true,
+  });
+}
+
+/**
+ * Generate a temporary print token for authentication-free printing
+ * Token expires after 5 minutes
+ */
+export function generatePrintToken(patentId: string): string {
+  const crypto = require('crypto');
+  const secret = process.env.JWT_SECRET || 'default-secret';
+  const timestamp = Date.now();
+  const payload = `${patentId}:${timestamp}`;
+  const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${signature}`).toString('base64url');
+}
+
+/**
+ * Verify and decode a print token
+ * Returns patentId if valid, null if invalid or expired
+ */
+export function verifyPrintToken(token: string): string | null {
+  try {
+    const crypto = require('crypto');
+    const secret = process.env.JWT_SECRET || 'default-secret';
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const [patentId, timestamp, signature] = decoded.split(':');
+    
+    // Check expiration (5 minutes)
+    const now = Date.now();
+    const tokenAge = now - parseInt(timestamp, 10);
+    if (tokenAge > 5 * 60 * 1000) {
+      console.log('[Print Token] Token expired');
+      return null;
+    }
+    
+    // Verify signature
+    const expected = crypto.createHmac('sha256', secret).update(`${patentId}:${timestamp}`).digest('hex');
+    if (signature !== expected) {
+      console.log('[Print Token] Invalid signature');
+      return null;
+    }
+    
+    return patentId;
+  } catch (error) {
+    console.error('[Print Token] Verification error:', error);
+    return null;
+  }
+}

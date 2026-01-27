@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["lsof", "cairo", "pango", "libjpeg", "giflib", "librsvg", "pixman", "pkg-config", "libuuid", "fontconfig", "freetype"]
+packages = ["lsof", "cairo", "pango", "libjpeg", "giflib", "librsvg", "pixman", "pkg-config", "libuuid", "fontconfig", "freetype", "chromium"]
 
 [[ports]]
 localPort = 5000

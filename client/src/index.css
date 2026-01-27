@@ -150,3 +150,33 @@
     transform: translateY(0);
   }
 }
+
+/* Print Mode Styles - Hide UI elements when generating PDF */
+@media print {
+  .no-print,
+  button:not(.print-keep),
+  nav:not(.print-keep),
+  .sidebar {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  img {
+    page-break-inside: avoid;
+  }
+}
+
+/* Also apply when print=true query param (for Puppeteer PDF generation) */
+.print-mode .no-print,
+.print-mode button:not(.print-keep),
+.print-mode nav:not(.print-keep),
+.print-mode .sidebar {
+  display: none !important;
+}
