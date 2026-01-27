@@ -120,28 +120,31 @@ export function PatentDetailPage() {
 
   const loadPatent = async (id: string) => {
     try {
-      // In print mode, pass the token in the URL params
-      const printToken = isPrintMode ? new URLSearchParams(window.location.search).get('token') : null;
-      const url = printToken
-        ? `/api/patent/${id}?token=${encodeURIComponent(printToken)}`
-        : `/api/patent/${id}`;
+      let data;
 
-      console.log('[PatentDetailPage] Loading patent:', id);
-      console.log('[PatentDetailPage] Print mode:', isPrintMode);
-      console.log('[PatentDetailPage] Has token:', !!printToken);
-      console.log('[PatentDetailPage] Fetching URL:', url);
+      if (isPrintMode) {
+        // Print mode: use direct fetch with token
+        const printToken = new URLSearchParams(window.location.search).get('token');
+        const url = printToken
+          ? `/api/patent/${id}?token=${encodeURIComponent(printToken)}`
+          : `/api/patent/${id}`;
 
-      const response = await fetch(url);
-      console.log('[PatentDetailPage] Response status:', response.status);
+        console.log('[PatentDetailPage] Print mode loading');
+        console.log('[PatentDetailPage] URL:', url);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[PatentDetailPage] Error response:', errorText);
-        throw new Error(`Failed to load patent: ${response.status} ${errorText}`);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`Failed to load patent: ${response.status}`);
+        }
+
+        data = await response.json();
+      } else {
+        // Normal mode: use API helper (includes auth headers)
+        console.log('[PatentDetailPage] Normal mode loading patent:', id);
+        data = await api.getPatentDetail(id);
       }
 
-      const data = await response.json();
-      console.log('[PatentDetailPage] Data loaded successfully');
       setPatent(data.patent);
       setArtifacts(data.artifacts);
 
