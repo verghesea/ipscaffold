@@ -5,15 +5,55 @@
  * Design System:
  * - Clean professional layout with subtle graph paper on cover only
  * - Top accent gradient (blue -> green -> red)
- * - Typography: Helvetica (headings), Times-Roman (body)
+ * - Typography: Playfair Display (headings), Work Sans (body)
  * - Color-coded artifact types (amber, blue, purple)
  * - Professional editorial layout with proper page breaks
  */
 
 import PDFDocument from 'pdfkit';
+import path from 'path';
 import { supabaseStorage } from '../supabaseStorage.js';
 import type { Artifact, SectionImage } from '../supabaseStorage.js';
 import { addWatermark } from './imageWatermarkService.js';
+
+// Font paths - using custom fonts to match website design
+const FONTS = {
+  // Playfair Display for headings
+  playfairRegular: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay-Regular.ttf'),
+  playfairSemiBold: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay-SemiBold.ttf'),
+  playfairBold: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay-Bold.ttf'),
+  // Work Sans for body text
+  workSansLight: path.join(process.cwd(), 'server/assets/fonts/WorkSans-Light.ttf'),
+  workSansRegular: path.join(process.cwd(), 'server/assets/fonts/WorkSans-Regular.ttf'),
+  workSansMedium: path.join(process.cwd(), 'server/assets/fonts/WorkSans-Medium.ttf'),
+  workSansSemiBold: path.join(process.cwd(), 'server/assets/fonts/WorkSans-SemiBold.ttf'),
+};
+
+// Registered font names for use in the document
+const FONT_NAMES = {
+  // Headings
+  h1: 'Playfair-Bold',
+  h2: 'Playfair-SemiBold',
+  h3: 'Playfair-Regular',
+  // Body text
+  body: 'Work-Sans',
+  bodyMedium: 'Work-Sans-Medium',
+  bodySemiBold: 'Work-Sans-SemiBold',
+  bodyLight: 'Work-Sans-Light',
+};
+
+/**
+ * Register custom fonts with the PDF document
+ */
+function registerFonts(doc: PDFKit.PDFDocument) {
+  doc.registerFont(FONT_NAMES.h1, FONTS.playfairBold);
+  doc.registerFont(FONT_NAMES.h2, FONTS.playfairSemiBold);
+  doc.registerFont(FONT_NAMES.h3, FONTS.playfairRegular);
+  doc.registerFont(FONT_NAMES.body, FONTS.workSansRegular);
+  doc.registerFont(FONT_NAMES.bodyMedium, FONTS.workSansMedium);
+  doc.registerFont(FONT_NAMES.bodySemiBold, FONTS.workSansSemiBold);
+  doc.registerFont(FONT_NAMES.bodyLight, FONTS.workSansLight);
+}
 
 interface PDFGenerationOptions {
   includeImages?: boolean;
@@ -311,7 +351,7 @@ function drawArtifactHeader(
     .stroke();
 
   // Draw number inside box
-  doc.font('Helvetica-Bold')
+  doc.font(FONT_NAMES.bodySemiBold)
     .fontSize(14)
     .fillColor(config.color.primary)
     .text(
@@ -327,7 +367,7 @@ function drawArtifactHeader(
   // Draw "Artifact X / Y" label
   const textStartX = margins.left + padding + numberBoxSize + 10;
 
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.bodyMedium)
     .fontSize(8)
     .fillColor(COLORS.red)
     .text(
@@ -338,7 +378,7 @@ function drawArtifactHeader(
     );
 
   // Draw artifact label and tagline
-  doc.font('Helvetica-Bold')
+  doc.font(FONT_NAMES.h2)
     .fontSize(12)
     .fillColor(COLORS.black)
     .text(
@@ -366,7 +406,7 @@ function addPageFooter(doc: PDFKit.PDFDocument, pageNum: number, totalPages: num
     .stroke();
 
   // Page number centered
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.body)
     .fontSize(8)
     .fillColor(COLORS.mediumGray)
     .text(
@@ -380,7 +420,7 @@ function addPageFooter(doc: PDFKit.PDFDocument, pageNum: number, totalPages: num
     );
 
   // Branding on right
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.bodyMedium)
     .fontSize(7)
     .fillColor(COLORS.lightGray)
     .text(
@@ -403,7 +443,9 @@ function getHeadingHeight(doc: PDFKit.PDFDocument, content: string, level: numbe
   const fontSize = sizes[level] || 11;
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right - 12;
 
-  doc.font('Helvetica-Bold').fontSize(fontSize);
+  // Use appropriate Playfair font based on heading level
+  const fontName = level === 1 ? FONT_NAMES.h1 : level === 2 ? FONT_NAMES.h2 : FONT_NAMES.h3;
+  doc.font(fontName).fontSize(fontSize);
   const textHeight = doc.heightOfString(content, { width: contentWidth });
 
   // Include space before and after
@@ -436,16 +478,16 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
     doc.rect(margins.left, currentY, 3, fontSize + 2)
       .fill(artifactColor.primary);
 
-    // Draw heading text with indent - use Helvetica-Bold
-    doc.font('Helvetica-Bold')
+    // Draw heading text with indent - use Playfair SemiBold for H2
+    doc.font(FONT_NAMES.h2)
       .fontSize(fontSize)
       .fillColor(COLORS.black)
       .text(content, margins.left + 10, currentY, {
         continued: false,
       });
   } else if (level === 1) {
-    // Main title - use Helvetica-Bold
-    doc.font('Helvetica-Bold')
+    // Main title - use Playfair Bold for H1
+    doc.font(FONT_NAMES.h1)
       .fontSize(fontSize)
       .fillColor(COLORS.black)
       .text(content, {
@@ -462,8 +504,8 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
 
     doc.y += 2;
   } else {
-    // Other headings - Helvetica-Bold but smaller
-    doc.font('Helvetica-Bold')
+    // Other headings (H3+) - Playfair Regular
+    doc.font(FONT_NAMES.h3)
       .fontSize(fontSize)
       .fillColor(level === 3 ? COLORS.darkGray : COLORS.mediumGray)
       .text(content, {
@@ -476,10 +518,10 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
 }
 
 /**
- * Render a paragraph with proper styling - uses Times-Roman for readability
+ * Render a paragraph with proper styling - uses Work Sans for readability
  */
 function renderParagraph(doc: PDFKit.PDFDocument, content: string) {
-  doc.font('Times-Roman')
+  doc.font(FONT_NAMES.body)
     .fontSize(11)
     .fillColor(COLORS.darkGray)
     .text(content, {
@@ -490,7 +532,7 @@ function renderParagraph(doc: PDFKit.PDFDocument, content: string) {
 }
 
 /**
- * Render a list item with bullet - uses Times-Roman for body text
+ * Render a list item with bullet - uses Work Sans for body text
  */
 function renderListItem(doc: PDFKit.PDFDocument, content: string, artifactColor: typeof COLORS.amber) {
   const currentY = doc.y;
@@ -500,8 +542,8 @@ function renderListItem(doc: PDFKit.PDFDocument, content: string, artifactColor:
   doc.circle(margins.left + 6, currentY + 5, 2)
     .fill(artifactColor.primary);
 
-  // Draw text with indent - use Times-Roman
-  doc.font('Times-Roman')
+  // Draw text with indent - use Work Sans
+  doc.font(FONT_NAMES.body)
     .fontSize(11)
     .fillColor(COLORS.darkGray)
     .text(content, margins.left + 16, currentY, {
@@ -551,7 +593,7 @@ async function renderImage(
     });
   } catch (error) {
     // If image fails, show placeholder text
-    doc.font('Helvetica')
+    doc.font(FONT_NAMES.body)
       .fontSize(9)
       .fillColor(COLORS.lightGray)
       .text('Image could not be rendered', margins.left + 8, imageStartY + maxHeight / 2, {
@@ -600,6 +642,9 @@ export async function generateArtifactPDF(
     compress: true, // Enable compression for smaller file size
   });
 
+  // Register custom fonts
+  registerFonts(doc);
+
   // Collect PDF chunks
   const chunks: Buffer[] = [];
   doc.on('data', (chunk) => chunks.push(chunk));
@@ -622,7 +667,7 @@ export async function generateArtifactPDF(
   doc.y = currentY;
 
   // Add generation date (smaller, less space)
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.body)
     .fontSize(8)
     .fillColor(COLORS.mediumGray)
     .text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, {
@@ -670,7 +715,7 @@ export async function generateArtifactPDF(
 
       case 'paragraph':
         // Check if paragraph fits, if not add page
-        doc.font('Times-Roman').fontSize(11);
+        doc.font(FONT_NAMES.body).fontSize(11);
         const paraHeight = doc.heightOfString(section.content, {
           width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
         });
@@ -680,7 +725,7 @@ export async function generateArtifactPDF(
 
       case 'list-item':
         // Check if list item fits
-        doc.font('Times-Roman').fontSize(11);
+        doc.font(FONT_NAMES.body).fontSize(11);
         const listHeight = doc.heightOfString(section.content, {
           width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 16,
         });
@@ -748,6 +793,9 @@ export async function generatePatentPackagePDF(
     compress: true, // Enable compression for smaller file size
   });
 
+  // Register custom fonts
+  registerFonts(doc);
+
   const chunks: Buffer[] = [];
   doc.on('data', (chunk) => chunks.push(chunk));
 
@@ -768,8 +816,8 @@ export async function generatePatentPackagePDF(
   // Cover page content - centered vertically
   doc.y = 160;
 
-  // "Patent Analysis Package" title - use Helvetica-Bold
-  doc.font('Helvetica-Bold')
+  // "Patent Analysis Package" title - use Playfair Bold for cover
+  doc.font(FONT_NAMES.h1)
     .fontSize(32)
     .fillColor(COLORS.black)
     .text('Patent Analysis', {
@@ -777,7 +825,7 @@ export async function generatePatentPackagePDF(
       width: contentWidth,
     });
 
-  doc.font('Helvetica-Bold')
+  doc.font(FONT_NAMES.h1)
     .fontSize(32)
     .fillColor(COLORS.blue)
     .text('Package', {
@@ -798,8 +846,8 @@ export async function generatePatentPackagePDF(
 
   doc.y = lineY + 24;
 
-  // Patent title
-  doc.font('Helvetica-Bold')
+  // Patent title - use Playfair SemiBold
+  doc.font(FONT_NAMES.h2)
     .fontSize(16)
     .fillColor(COLORS.darkGray)
     .text(patent.friendly_title || patent.title || 'Untitled Patent', {
@@ -808,9 +856,9 @@ export async function generatePatentPackagePDF(
     });
   doc.y += 6;
 
-  // Assignee
+  // Assignee - use Work Sans
   if (patent.assignee) {
-    doc.font('Helvetica')
+    doc.font(FONT_NAMES.body)
       .fontSize(11)
       .fillColor(COLORS.mediumGray)
       .text(patent.assignee, {
@@ -832,7 +880,7 @@ export async function generatePatentPackagePDF(
       .rect(badgeX, badgeY, badgeWidth, badgeHeight)
       .stroke();
 
-    doc.font('Helvetica')
+    doc.font(FONT_NAMES.bodyMedium)
       .fontSize(10)
       .fillColor(COLORS.darkGray)
       .text(patent.patent_number, badgeX, badgeY + 8, {
@@ -844,7 +892,7 @@ export async function generatePatentPackagePDF(
   }
 
   // Contents section
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.bodyMedium)
     .fontSize(10)
     .fillColor(COLORS.mediumGray)
     .text('CONTENTS', {
@@ -868,7 +916,7 @@ export async function generatePatentPackagePDF(
       .fill(config.color.primary);
 
     // Draw text
-    doc.font('Helvetica')
+    doc.font(FONT_NAMES.body)
       .fontSize(10)
       .fillColor(COLORS.darkGray)
       .text(`${config.label}`, margins.left + contentWidth / 2 - 55, doc.y, {
@@ -881,7 +929,7 @@ export async function generatePatentPackagePDF(
   // Footer on cover
   doc.y = doc.page.height - 100;
 
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.body)
     .fontSize(9)
     .fillColor(COLORS.mediumGray)
     .text('Generated by', {
@@ -889,7 +937,7 @@ export async function generatePatentPackagePDF(
       width: contentWidth,
     });
 
-  doc.font('Helvetica-Bold')
+  doc.font(FONT_NAMES.h2)
     .fontSize(12)
     .fillColor(COLORS.black)
     .text('Humble AI', {
@@ -898,7 +946,7 @@ export async function generatePatentPackagePDF(
     });
   doc.y += 6;
 
-  doc.font('Helvetica')
+  doc.font(FONT_NAMES.body)
     .fontSize(8)
     .fillColor(COLORS.lightGray)
     .text(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), {
@@ -971,7 +1019,7 @@ export async function generatePatentPackagePDF(
 
         case 'paragraph':
           // Check if paragraph fits, if not add page
-          doc.font('Times-Roman').fontSize(11);
+          doc.font(FONT_NAMES.body).fontSize(11);
           const paraHeight = doc.heightOfString(section.content, {
             width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
           });
@@ -981,7 +1029,7 @@ export async function generatePatentPackagePDF(
 
         case 'list-item':
           // Check if list item fits
-          doc.font('Times-Roman').fontSize(11);
+          doc.font(FONT_NAMES.body).fontSize(11);
           const listHeight = doc.heightOfString(section.content, {
             width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 16,
           });
