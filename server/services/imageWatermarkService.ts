@@ -1,6 +1,13 @@
 /**
  * Image Watermarking Service
- * Adds Humble AI watermark to generated images
+ * Applies Humble AI watermark ON-DEMAND (not permanent storage)
+ *
+ * Architecture:
+ * - Original DALL-E images are stored WITHOUT watermarks in Supabase
+ * - Watermark is applied dynamically when generating PDFs
+ * - This allows toggling watermarks without regenerating expensive images
+ * - Web app displays original unwatermarked images
+ * - PDFs include watermarked versions
  */
 
 import { createCanvas, loadImage, Image } from 'canvas';

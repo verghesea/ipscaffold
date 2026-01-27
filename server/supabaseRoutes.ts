@@ -1144,8 +1144,11 @@ export async function registerRoutes(
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Generate combined PDF
-      const pdfResult = await generatePatentPackagePDF(patentId);
+      // Generate combined PDF with watermarks
+      const pdfResult = await generatePatentPackagePDF(patentId, {
+        includeImages: true,
+        watermarkImages: true,
+      });
 
       // Send PDF as download
       res.setHeader('Content-Type', pdfResult.mimeType);

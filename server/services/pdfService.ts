@@ -7,6 +7,7 @@ import PDFDocument from 'pdfkit';
 import { Readable } from 'stream';
 import { supabaseStorage } from '../supabaseStorage.js';
 import type { Artifact, SectionImage } from '../supabaseStorage.js';
+import { addWatermark } from './imageWatermarkService.js';
 
 interface PDFGenerationOptions {
   includeImages?: boolean;
@@ -77,15 +78,34 @@ function parseMarkdownSections(markdown: string): Array<{ type: string; content:
 }
 
 /**
- * Fetch image buffer from URL
+ * Fetch image buffer from URL and optionally apply watermark
+ * @param imageUrl - URL of the image to fetch
+ * @param applyWatermark - Whether to apply watermark (default: false)
+ * @returns Image buffer (watermarked if requested)
  */
-async function fetchImageBuffer(imageUrl: string): Promise<Buffer | null> {
+async function fetchImageBuffer(imageUrl: string, applyWatermark: boolean = false): Promise<Buffer | null> {
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) return null;
 
     const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    let imageBuffer = Buffer.from(arrayBuffer);
+
+    // Apply watermark if requested
+    if (applyWatermark) {
+      try {
+        imageBuffer = await addWatermark(imageBuffer, {
+          position: 'bottom-right',
+          opacity: 0.7,
+          scale: 0.15,
+        });
+      } catch (error) {
+        console.warn('Failed to apply watermark, using original image:', error);
+        // Continue with unwatermarked image if watermarking fails
+      }
+    }
+
+    return imageBuffer;
   } catch (error) {
     console.error('Failed to fetch image:', error);
     return null;
@@ -200,7 +220,7 @@ export async function generateArtifactPDF(
 
           if (sectionImage) {
             try {
-              const imageBuffer = await fetchImageBuffer(sectionImage.image_url);
+              const imageBuffer = await fetchImageBuffer(sectionImage.image_url, watermarkImages);
 
               if (imageBuffer) {
                 doc.moveDown(0.5);
@@ -286,7 +306,12 @@ export async function generateArtifactPDF(
 /**
  * Generate combined PDF for all artifacts of a patent
  */
-export async function generatePatentPackagePDF(patentId: string): Promise<PDFResult> {
+export async function generatePatentPackagePDF(
+  patentId: string,
+  options: PDFGenerationOptions = {}
+): Promise<PDFResult> {
+  const { includeImages = true, watermarkImages = true } = options;
+
   // Fetch all artifacts for patent
   const artifacts = await supabaseStorage.getArtifactsByPatent(patentId);
 
@@ -404,7 +429,7 @@ export async function generatePatentPackagePDF(patentId: string): Promise<PDFRes
 
             if (sectionImage) {
               try {
-                const imageBuffer = await fetchImageBuffer(sectionImage.image_url);
+                const imageBuffer = await fetchImageBuffer(sectionImage.image_url, watermarkImages);
 
                 if (imageBuffer) {
                   doc.moveDown(0.5);
