@@ -11,10 +11,6 @@
  */
 
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Lazy-load canvas to avoid startup crashes if native dependencies are missing
 let canvasModule: any = null;
@@ -41,8 +37,9 @@ interface WatermarkOptions {
 
 /**
  * Default watermark configuration
+ * Using process.cwd() works in both dev and production since server runs from project root
  */
-const DEFAULT_WATERMARK_PATH = path.join(__dirname, '../assets/humble-watermark.png');
+const DEFAULT_WATERMARK_PATH = path.join(process.cwd(), 'server/assets/humble-watermark.png');
 const DEFAULT_OPTIONS: Required<WatermarkOptions> = {
   position: 'bottom-right',
   opacity: 0.7,
