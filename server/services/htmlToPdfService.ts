@@ -17,13 +17,55 @@ let browserInstance: Browser | null = null;
  * Get or create a singleton browser instance
  * Reuses browser to avoid startup overhead
  */
+/**
+ * Find system Chrome/Chromium executable
+ */
+function findChrome(): string | undefined {
+  const { execSync } = require('child_process');
+
+  try {
+    // Try common paths and commands
+    const commands = [
+      'which chromium',
+      'which chromium-browser',
+      'which google-chrome',
+      'which google-chrome-stable',
+    ];
+
+    for (const cmd of commands) {
+      try {
+        const path = execSync(cmd, { encoding: 'utf8' }).trim();
+        if (path) {
+          console.log(`[Puppeteer] Found Chrome at: ${path}`);
+          return path;
+        }
+      } catch {
+        // Command failed, try next
+      }
+    }
+  } catch (error) {
+    console.warn('[Puppeteer] Could not auto-detect Chrome');
+  }
+
+  return undefined;
+}
+
 async function getBrowser(): Promise<Browser> {
   if (browserInstance && browserInstance.connected) {
     return browserInstance;
   }
 
   console.log('[Puppeteer] Launching browser...');
-  
+
+  // Auto-detect Chrome or use environment variable
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || findChrome();
+
+  if (executablePath) {
+    console.log(`[Puppeteer] Using Chrome at: ${executablePath}`);
+  } else {
+    console.warn('[Puppeteer] No Chrome found, using Puppeteer default (may fail)');
+  }
+
   browserInstance = await puppeteer.launch({
     headless: true,
     args: [
@@ -34,12 +76,11 @@ async function getBrowser(): Promise<Browser> {
       '--disable-web-security',
       '--disable-features=IsolateOrigins,site-per-process',
     ],
-    // Use system Chromium on Replit
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath,
   });
 
   console.log('[Puppeteer] Browser launched successfully');
-  
+
   return browserInstance;
 }
 
