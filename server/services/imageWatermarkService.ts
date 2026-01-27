@@ -10,12 +10,28 @@
  * - PDFs include watermarked versions
  */
 
-import { createCanvas, loadImage, Image } from 'canvas';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Lazy-load canvas to avoid startup crashes if native dependencies are missing
+let canvasModule: any = null;
+let canvasAvailable = true;
+
+async function loadCanvas() {
+  if (canvasModule) return canvasModule;
+
+  try {
+    canvasModule = await import('canvas');
+    return canvasModule;
+  } catch (error) {
+    console.warn('Canvas library not available - watermarking disabled:', error);
+    canvasAvailable = false;
+    return null;
+  }
+}
 
 interface WatermarkOptions {
   position?: 'bottom-right' | 'bottom-left' | 'bottom-center' | 'center';
@@ -46,19 +62,28 @@ export async function addWatermark(
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   try {
+    // Load canvas library dynamically
+    const canvas = await loadCanvas();
+    if (!canvas || !canvasAvailable) {
+      console.log('Canvas not available, skipping watermark');
+      return imageBuffer;
+    }
+
+    const { createCanvas, loadImage } = canvas;
+
     // Load original image
     const originalImage = await loadImage(imageBuffer);
     const { width, height } = originalImage;
 
     // Create canvas matching original dimensions
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
+    const canvasElement = createCanvas(width, height);
+    const ctx = canvasElement.getContext('2d');
 
     // Draw original image
     ctx.drawImage(originalImage, 0, 0, width, height);
 
     // Try to load watermark (if it exists)
-    let watermarkImage: Image | null = null;
+    let watermarkImage: any = null;
 
     try {
       watermarkImage = await loadImage(DEFAULT_WATERMARK_PATH);
@@ -111,7 +136,7 @@ export async function addWatermark(
     }
 
     // Convert to buffer
-    return canvas.toBuffer('image/png');
+    return canvasElement.toBuffer('image/png');
   } catch (error) {
     console.error('Failed to add watermark:', error);
     // Return original image if watermarking fails
