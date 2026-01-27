@@ -159,11 +159,11 @@ export async function renderUrlToPdf(
     });
 
     console.log('[HTML-to-PDF] Navigating to page...');
-    
-    // Navigate to the URL
+
+    // Navigate to the URL (increased timeout for image-heavy pages)
     await page.goto(url, {
       waitUntil: 'networkidle0', // Wait for network to be idle
-      timeout: 30000,
+      timeout: 60000, // 60 seconds for image-heavy pages
     });
 
     console.log('[HTML-to-PDF] Page loaded, waiting for content...');
@@ -195,6 +195,23 @@ export async function renderUrlToPdf(
         // Continue anyway - maybe the content is there but selector is wrong
       }
     }
+
+    // Wait for all images to load
+    console.log('[HTML-to-PDF] Waiting for images to load...');
+    await page.evaluate(() => {
+      return Promise.all(
+        Array.from(document.images)
+          .filter(img => !img.complete)
+          .map(img => new Promise((resolve) => {
+            img.onload = img.onerror = resolve;
+            // Timeout after 10s per image
+            setTimeout(resolve, 10000);
+          }))
+      );
+    });
+
+    const imageCount = await page.evaluate(() => document.images.length);
+    console.log(`[HTML-to-PDF] All images loaded (${imageCount} total)`);
 
     // Additional wait for dynamic content (images, lazy loading, etc.)
     if (additionalWaitMs > 0) {
@@ -240,9 +257,10 @@ export async function renderPatentToPdf(
 
   return renderUrlToPdf(url, {
     waitForSelector: '[data-patent-content]', // Wait for main content
-    additionalWaitMs: 3000, // Extra time for images to load
+    additionalWaitMs: 5000, // Extra time for images and React to render
     format: 'Letter',
     printBackground: true,
+    margin: { top: '0.75in', right: '0.75in', bottom: '0.75in', left: '0.75in' }, // Better margins
   });
 }
 

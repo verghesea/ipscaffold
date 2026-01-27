@@ -164,19 +164,126 @@
     background: white !important;
   }
 
-  h1, h2, h3 {
+  /* Font size reductions for print */
+  html {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 1.75rem !important;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+  }
+
+  h3 {
+    font-size: 1.25rem !important;
+  }
+
+  h4 {
+    font-size: 1.1rem !important;
+  }
+
+  body, p, li {
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Page break handling - keep content together */
+  h1, h2, h3, h4 {
     page-break-after: avoid;
+    break-after: avoid;
+    orphans: 3;
+    widows: 3;
   }
 
   img {
     page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep paragraphs from orphan/widow lines */
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Add page breaks between artifacts */
+  .print-artifact {
+    page-break-before: always;
+    break-before: always;
+  }
+
+  .print-artifact:first-child {
+    page-break-before: auto;
+    break-before: auto;
+  }
+
+  /* Keep sections together when possible */
+  .section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep lists together */
+  li {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep figures with captions */
+  figure, .relative {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
 
 /* Also apply when print=true query param (for Puppeteer PDF generation) */
+.print-mode {
+  font-size: 14px;
+}
+
 .print-mode .no-print,
 .print-mode button:not(.print-keep),
 .print-mode nav:not(.print-keep),
 .print-mode .sidebar {
   display: none !important;
+}
+
+.print-mode h1 {
+  font-size: 1.75rem !important;
+}
+
+.print-mode h2 {
+  font-size: 1.5rem !important;
+}
+
+.print-mode h3 {
+  font-size: 1.25rem !important;
+}
+
+.print-mode h4 {
+  font-size: 1.1rem !important;
+}
+
+.print-mode p,
+.print-mode li {
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+}
+
+.print-mode .print-artifact {
+  page-break-before: always;
+  break-before: always;
+}
+
+.print-mode .print-artifact:first-child {
+  page-break-before: auto;
+  break-before: auto;
+}
+
+.print-mode .section {
+  page-break-inside: avoid;
+  break-inside: avoid;
 }

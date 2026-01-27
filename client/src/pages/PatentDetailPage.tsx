@@ -51,6 +51,74 @@ const ARTIFACT_TYPES = {
   }
 } as const;
 
+// Component to render an artifact with its images in print mode
+function PrintArtifactSection({
+  artifact,
+  artifactIndex,
+  meta,
+  onRegenerateImage,
+  onUpdateImagePrompt
+}: {
+  artifact: Artifact;
+  artifactIndex: number;
+  meta: typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES];
+  onRegenerateImage: (sectionNumber: number) => Promise<void>;
+  onUpdateImagePrompt: (imageId: string, newPrompt: string) => Promise<void>;
+}) {
+  // Load images for this specific artifact
+  const { images } = useSectionImages(artifact.id);
+  const sectionCount = countSections(artifact.content);
+
+  return (
+    <div className="print-artifact mt-6" data-artifact-content>
+      {/* Graph paper background container */}
+      <div className="relative bg-white shadow-lg overflow-hidden">
+        {/* Graph paper overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-50"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px),
+              linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)
+            `,
+            backgroundSize: '10px 10px, 10px 10px, 50px 50px, 50px 50px',
+          }}
+        />
+
+        {/* Top accent line (4-color gradient) */}
+        <div className="h-[3px] bg-gradient-to-r from-[#2563eb] via-[#059669] to-[#dc2626]" />
+
+        <div className="relative z-10 p-6 md:p-12">
+          {/* Artifact Header */}
+          <ArtifactHeader
+            artifactNumber={artifactIndex + 1}
+            totalArtifacts={3}
+            artifactLabel={meta.label}
+            artifactTitle={meta.tagline}
+            hasImages={images.length > 0}
+            imageCount={images.length}
+            totalSections={sectionCount}
+            generating={false}
+            onGenerateImages={() => {}}
+          />
+
+          {/* Enhanced Markdown Renderer with Images */}
+          <EnhancedMarkdownRenderer
+            content={artifact.content}
+            images={images}  // Pass actual loaded images
+            generating={false}
+            onRegenerateImage={undefined}
+            onUpdateImagePrompt={undefined}
+            isAdmin={false}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PatentDetailPage() {
   const [, params] = useRoute('/patent/:id');
   const [, setLocation] = useLocation();
@@ -72,7 +140,7 @@ export function PatentDetailPage() {
   // Get current artifact based on active tab
   const currentArtifact = artifacts.find(a => a.type === activeTab);
 
-  // Use image hook for current artifact
+  // Use image hook for current artifact (normal mode only)
   const {
     images,
     loading: imagesLoading,
@@ -482,94 +550,21 @@ export function PatentDetailPage() {
                   </CardContent>
                 </Card>
               ) : isPrintMode ? (
-                // Print mode: Show all artifacts stacked vertically
+                // Print mode: Show all artifacts stacked vertically with images
                 <div className="space-y-12">
                   {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta], artifactIndex) => {
                     const artifact = artifacts.find(a => a.type === key);
                     if (!artifact) return null;
 
                     return (
-                      <div key={key} className="print-artifact mt-6" data-artifact-content>
-                        {/* Graph paper background container */}
-                        <div className="relative bg-white shadow-lg overflow-hidden">
-                          {/* Graph paper overlay */}
-                          <div
-                            className="absolute inset-0 pointer-events-none opacity-50"
-                            style={{
-                              backgroundImage: `
-                                linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
-                                linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px),
-                                linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px),
-                                linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)
-                              `,
-                              backgroundSize: '10px 10px, 10px 10px, 50px 50px, 50px 50px',
-                            }}
-                          />
-
-                          {/* Top accent line (4-color gradient) */}
-                          <div className="h-[3px] bg-gradient-to-r from-[#2563eb] via-[#059669] to-[#dc2626]" />
-
-                          <div className="relative z-10 p-6 md:p-12">
-                            {artifact ? (
-                              <>
-                                {/* Artifact Header with Generate Button */}
-                                <ArtifactHeader
-                                  artifactNumber={artifactIndex + 1}
-                                  totalArtifacts={3}
-                                  artifactLabel={meta.label}
-                                  artifactTitle={meta.tagline}
-                                  hasImages={images.length > 0}
-                                  imageCount={images.length}
-                                  totalSections={sectionCount}
-                                  generating={generating}
-                                  onGenerateImages={handleGenerateImages}
-                                />
-
-                                {/* Download This Artifact Button (hidden in print mode) */}
-                                <div className="flex justify-end mb-4 no-print">
-                                  <Button
-                                    onClick={() => artifact?.id && handleDownloadArtifact(artifact.id, key as string)}
-                                    disabled={downloadingArtifact || !artifact?.id}
-                                    variant="outline"
-                                    size="sm"
-                                  >
-                                    {downloadingArtifact ? (
-                                      <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Generating...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Download PDF
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-
-                                {/* Enhanced Markdown Renderer with Images */}
-                                <EnhancedMarkdownRenderer
-                                  content={artifact.content}
-                                  images={[]} // Print mode: don't load images to avoid complexity
-                                  generating={false}
-                                  onRegenerateImage={handleRegenerateImage}
-                                  onUpdateImagePrompt={handleUpdateImagePrompt}
-                                  isAdmin={false} // Hide admin controls in print mode
-                                />
-                              </>
-                            ) : (
-                              <Card className="text-center py-8">
-                                <CardContent>
-                                  <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground mb-2" />
-                                  <p className="text-sm text-muted-foreground">
-                                    Generating {meta.label}...
-                                  </p>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <PrintArtifactSection
+                        key={key}
+                        artifact={artifact}
+                        artifactIndex={artifactIndex}
+                        meta={meta}
+                        onRegenerateImage={handleRegenerateImage}
+                        onUpdateImagePrompt={handleUpdateImagePrompt}
+                      />
                     );
                   })}
                 </div>
