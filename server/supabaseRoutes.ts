@@ -967,52 +967,24 @@ export async function registerRoutes(
         return res.json({ patents: [] });
       }
 
-      console.log('[Dashboard] Fetching artifact counts for', patents.length, 'patents...');
-      const patentsWithArtifactCount = await Promise.race([
-        Promise.all(
-          patents.map(async (patent, index) => {
-            console.log(`[Dashboard] Processing patent ${index + 1}/${patents.length}: ${patent.id}`);
-            try {
-              const artifacts = await supabaseStorage.getArtifactsByPatent(patent.id);
-              console.log(`[Dashboard] Patent ${patent.id} has ${artifacts.length} artifacts`);
-              return {
-                id: patent.id,
-                title: patent.title,
-                friendlyTitle: patent.friendly_title,
-                assignee: patent.assignee,
-                filingDate: patent.filing_date,
-                patentNumber: patent.patent_number,
-                applicationNumber: patent.application_number,
-                patentClassification: patent.patent_classification,
-                status: patent.status,
-                createdAt: patent.created_at,
-                artifactCount: artifacts.length,
-              };
-            } catch (artifactError) {
-              console.error(`[Dashboard] Error fetching artifacts for patent ${patent.id}:`, artifactError);
-              // Return patent without artifact count if artifacts fail
-              return {
-                id: patent.id,
-                title: patent.title,
-                friendlyTitle: patent.friendly_title,
-                assignee: patent.assignee,
-                filingDate: patent.filing_date,
-                patentNumber: patent.patent_number,
-                applicationNumber: patent.application_number,
-                patentClassification: patent.patent_classification,
-                status: patent.status,
-                createdAt: patent.created_at,
-                artifactCount: 0,
-              };
-            }
-          })
-        ),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Artifact fetching timeout')), 30000))
-      ]) as any[];
+      // Map patents to response format (no artifact count to avoid slow queries)
+      const patentsResponse = patents.map(patent => ({
+        id: patent.id,
+        title: patent.title,
+        friendlyTitle: patent.friendly_title,
+        assignee: patent.assignee,
+        filingDate: patent.filing_date,
+        patentNumber: patent.patent_number,
+        applicationNumber: patent.application_number,
+        patentClassification: patent.patent_classification,
+        status: patent.status,
+        createdAt: patent.created_at,
+        artifactCount: 0, // Removed to improve dashboard performance
+      }));
 
       console.log('[Dashboard] Successfully processed all patents');
-      console.log('[Dashboard] Responding with', patentsWithArtifactCount.length, 'patents');
-      res.json({ patents: patentsWithArtifactCount });
+      console.log('[Dashboard] Responding with', patentsResponse.length, 'patents');
+      res.json({ patents: patentsResponse });
 
     } catch (error) {
       console.error('[Dashboard] ERROR:', error);
