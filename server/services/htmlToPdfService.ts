@@ -168,9 +168,32 @@ export async function renderUrlToPdf(
 
     console.log('[HTML-to-PDF] Page loaded, waiting for content...');
 
-    // Wait for specific selector if provided
+    // Debug: Check what's on the page
+    const pageContent = await page.content();
+    const hasSelector = waitForSelector ? await page.$(waitForSelector) : null;
+    console.log('[HTML-to-PDF] Page title:', await page.title());
+    console.log('[HTML-to-PDF] Has selector?', !!hasSelector);
+
+    if (!hasSelector && waitForSelector) {
+      console.log('[HTML-to-PDF] Selector not found, page HTML length:', pageContent.length);
+      console.log('[HTML-to-PDF] Page URL:', page.url());
+      // Save screenshot for debugging
+      try {
+        await page.screenshot({ path: '/tmp/puppeteer-debug.png' });
+        console.log('[HTML-to-PDF] Debug screenshot saved to /tmp/puppeteer-debug.png');
+      } catch (e) {
+        console.log('[HTML-to-PDF] Could not save screenshot');
+      }
+    }
+
+    // Wait for specific selector if provided (longer timeout for React apps)
     if (waitForSelector) {
-      await page.waitForSelector(waitForSelector, { timeout: 10000 });
+      try {
+        await page.waitForSelector(waitForSelector, { timeout: 30000 });
+      } catch (error) {
+        console.error('[HTML-to-PDF] Timeout waiting for selector, generating PDF anyway');
+        // Continue anyway - maybe the content is there but selector is wrong
+      }
     }
 
     // Additional wait for dynamic content (images, lazy loading, etc.)
