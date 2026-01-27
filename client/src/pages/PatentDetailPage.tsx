@@ -120,7 +120,16 @@ export function PatentDetailPage() {
 
   const loadPatent = async (id: string) => {
     try {
-      const data = await api.getPatentDetail(id);
+      // In print mode, pass the token in the URL params
+      const printToken = isPrintMode ? new URLSearchParams(window.location.search).get('token') : null;
+      const url = printToken
+        ? `/api/patent/${id}?token=${encodeURIComponent(printToken)}`
+        : `/api/patent/${id}`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to load patent');
+
+      const data = await response.json();
       setPatent(data.patent);
       setArtifacts(data.artifacts);
 
@@ -129,12 +138,17 @@ export function PatentDetailPage() {
         setActiveTab(data.artifacts[0].type);
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load patent details',
-        variant: 'destructive',
-      });
-      setLocation('/dashboard');
+      if (!isPrintMode) {
+        // Only show toast and redirect in normal mode, not print mode
+        toast({
+          title: 'Error',
+          description: 'Failed to load patent details',
+          variant: 'destructive',
+        });
+        setLocation('/dashboard');
+      } else {
+        console.error('[Print Mode] Failed to load patent:', error);
+      }
     } finally {
       setLoading(false);
     }
