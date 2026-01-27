@@ -271,7 +271,7 @@ export async function generateArtifactPDF(
   // Add footer with page numbers
   const pages = doc.bufferedPageRange();
   for (let i = 0; i < pages.count; i++) {
-    doc.switchToPage(i);
+    doc.switchToPage(pages.start + i);
 
     doc
       .fontSize(9)
@@ -480,7 +480,7 @@ export async function generatePatentPackagePDF(
   // Add footer with page numbers
   const pages = doc.bufferedPageRange();
   for (let i = 0; i < pages.count; i++) {
-    doc.switchToPage(i);
+    doc.switchToPage(pages.start + i);
 
     doc
       .fontSize(9)
