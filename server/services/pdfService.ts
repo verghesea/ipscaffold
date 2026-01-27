@@ -11,31 +11,36 @@
  */
 
 import PDFDocument from 'pdfkit';
+import path from 'path';
 import { supabaseStorage } from '../supabaseStorage.js';
 import type { Artifact, SectionImage } from '../supabaseStorage.js';
 import { addWatermark } from './imageWatermarkService.js';
 
-// Built-in font names - using PDFKit standard fonts
-// TODO: Replace with custom fonts (Playfair Display, Work Sans) once font files are properly downloaded
-const FONT_NAMES = {
-  // Headings - using Helvetica (built-in, always available)
-  h1: 'Helvetica-Bold',
-  h2: 'Helvetica-Bold',
-  h3: 'Helvetica',
-  // Body text - using Helvetica (built-in)
-  body: 'Helvetica',
-  bodyMedium: 'Helvetica-Bold',
-  bodySemiBold: 'Helvetica-Bold',
-  bodyLight: 'Helvetica',
+// Font paths - using variable fonts from Google Fonts
+const FONTS = {
+  playfair: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay.ttf'),
+  workSans: path.join(process.cwd(), 'server/assets/fonts/WorkSans.ttf'),
+};
+
+// Font names for different text styles
+// Note: Variable fonts contain multiple weights in one file
+// PDFKit will use the default weight from the font
+const FONT_CONFIG = {
+  h1: 'Playfair',
+  h2: 'Playfair',
+  h3: 'Playfair',
+  body: 'WorkSans',
+  bodyMedium: 'WorkSans',
+  bodySemiBold: 'WorkSans',
+  bodyLight: 'WorkSans',
 };
 
 /**
- * Register custom fonts with the PDF document
- * DISABLED: Using built-in fonts until custom fonts are properly sourced
+ * Register custom variable fonts with the PDF document
  */
 function registerFonts(doc: PDFKit.PDFDocument) {
-  // No custom fonts to register - using built-in PDFKit fonts
-  return;
+  doc.registerFont('Playfair', FONTS.playfair);
+  doc.registerFont('WorkSans', FONTS.workSans);
 }
 
 interface PDFGenerationOptions {
@@ -334,7 +339,7 @@ function drawArtifactHeader(
     .stroke();
 
   // Draw number inside box
-  doc.font(FONT_NAMES.bodySemiBold)
+  doc.font(FONT_CONFIG.bodySemiBold)
     .fontSize(14)
     .fillColor(config.color.primary)
     .text(
@@ -350,7 +355,7 @@ function drawArtifactHeader(
   // Draw "Artifact X / Y" label
   const textStartX = margins.left + padding + numberBoxSize + 10;
 
-  doc.font(FONT_NAMES.bodyMedium)
+  doc.font(FONT_CONFIG.bodyMedium)
     .fontSize(8)
     .fillColor(COLORS.red)
     .text(
@@ -361,7 +366,7 @@ function drawArtifactHeader(
     );
 
   // Draw artifact label and tagline
-  doc.font(FONT_NAMES.h2)
+  doc.font(FONT_CONFIG.h2)
     .fontSize(12)
     .fillColor(COLORS.black)
     .text(
@@ -389,7 +394,7 @@ function addPageFooter(doc: PDFKit.PDFDocument, pageNum: number, totalPages: num
     .stroke();
 
   // Page number centered
-  doc.font(FONT_NAMES.body)
+  doc.font(FONT_CONFIG.body)
     .fontSize(8)
     .fillColor(COLORS.mediumGray)
     .text(
@@ -403,7 +408,7 @@ function addPageFooter(doc: PDFKit.PDFDocument, pageNum: number, totalPages: num
     );
 
   // Branding on right
-  doc.font(FONT_NAMES.bodyMedium)
+  doc.font(FONT_CONFIG.bodyMedium)
     .fontSize(7)
     .fillColor(COLORS.lightGray)
     .text(
@@ -427,7 +432,7 @@ function getHeadingHeight(doc: PDFKit.PDFDocument, content: string, level: numbe
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right - 12;
 
   // Use appropriate Playfair font based on heading level
-  const fontName = level === 1 ? FONT_NAMES.h1 : level === 2 ? FONT_NAMES.h2 : FONT_NAMES.h3;
+  const fontName = level === 1 ? FONT_CONFIG.h1 : level === 2 ? FONT_CONFIG.h2 : FONT_CONFIG.h3;
   doc.font(fontName).fontSize(fontSize);
   const textHeight = doc.heightOfString(content, { width: contentWidth });
 
@@ -462,7 +467,7 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
       .fill(artifactColor.primary);
 
     // Draw heading text with indent - use Playfair SemiBold for H2
-    doc.font(FONT_NAMES.h2)
+    doc.font(FONT_CONFIG.h2)
       .fontSize(fontSize)
       .fillColor(COLORS.black)
       .text(content, margins.left + 10, currentY, {
@@ -470,7 +475,7 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
       });
   } else if (level === 1) {
     // Main title - use Playfair Bold for H1
-    doc.font(FONT_NAMES.h1)
+    doc.font(FONT_CONFIG.h1)
       .fontSize(fontSize)
       .fillColor(COLORS.black)
       .text(content, {
@@ -488,7 +493,7 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
     doc.y += 2;
   } else {
     // Other headings (H3+) - Playfair Regular
-    doc.font(FONT_NAMES.h3)
+    doc.font(FONT_CONFIG.h3)
       .fontSize(fontSize)
       .fillColor(level === 3 ? COLORS.darkGray : COLORS.mediumGray)
       .text(content, {
@@ -504,7 +509,7 @@ function renderHeading(doc: PDFKit.PDFDocument, content: string, level: number, 
  * Render a paragraph with proper styling - uses Work Sans for readability
  */
 function renderParagraph(doc: PDFKit.PDFDocument, content: string) {
-  doc.font(FONT_NAMES.body)
+  doc.font(FONT_CONFIG.body)
     .fontSize(11)
     .fillColor(COLORS.darkGray)
     .text(content, {
@@ -526,7 +531,7 @@ function renderListItem(doc: PDFKit.PDFDocument, content: string, artifactColor:
     .fill(artifactColor.primary);
 
   // Draw text with indent - use Work Sans
-  doc.font(FONT_NAMES.body)
+  doc.font(FONT_CONFIG.body)
     .fontSize(11)
     .fillColor(COLORS.darkGray)
     .text(content, margins.left + 16, currentY, {
@@ -576,7 +581,7 @@ async function renderImage(
     });
   } catch (error) {
     // If image fails, show placeholder text
-    doc.font(FONT_NAMES.body)
+    doc.font(FONT_CONFIG.body)
       .fontSize(9)
       .fillColor(COLORS.lightGray)
       .text('Image could not be rendered', margins.left + 8, imageStartY + maxHeight / 2, {
@@ -650,7 +655,7 @@ export async function generateArtifactPDF(
   doc.y = currentY;
 
   // Add generation date (smaller, less space)
-  doc.font(FONT_NAMES.body)
+  doc.font(FONT_CONFIG.body)
     .fontSize(8)
     .fillColor(COLORS.mediumGray)
     .text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, {
@@ -698,7 +703,7 @@ export async function generateArtifactPDF(
 
       case 'paragraph':
         // Check if paragraph fits, if not add page
-        doc.font(FONT_NAMES.body).fontSize(11);
+        doc.font(FONT_CONFIG.body).fontSize(11);
         const paraHeight = doc.heightOfString(section.content, {
           width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
         });
@@ -708,7 +713,7 @@ export async function generateArtifactPDF(
 
       case 'list-item':
         // Check if list item fits
-        doc.font(FONT_NAMES.body).fontSize(11);
+        doc.font(FONT_CONFIG.body).fontSize(11);
         const listHeight = doc.heightOfString(section.content, {
           width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 16,
         });
@@ -800,7 +805,7 @@ export async function generatePatentPackagePDF(
   doc.y = 160;
 
   // "Patent Analysis Package" title - use Playfair Bold for cover
-  doc.font(FONT_NAMES.h1)
+  doc.font(FONT_CONFIG.h1)
     .fontSize(32)
     .fillColor(COLORS.black)
     .text('Patent Analysis', {
@@ -808,7 +813,7 @@ export async function generatePatentPackagePDF(
       width: contentWidth,
     });
 
-  doc.font(FONT_NAMES.h1)
+  doc.font(FONT_CONFIG.h1)
     .fontSize(32)
     .fillColor(COLORS.blue)
     .text('Package', {
@@ -830,7 +835,7 @@ export async function generatePatentPackagePDF(
   doc.y = lineY + 24;
 
   // Patent title - use Playfair SemiBold
-  doc.font(FONT_NAMES.h2)
+  doc.font(FONT_CONFIG.h2)
     .fontSize(16)
     .fillColor(COLORS.darkGray)
     .text(patent.friendly_title || patent.title || 'Untitled Patent', {
@@ -841,7 +846,7 @@ export async function generatePatentPackagePDF(
 
   // Assignee - use Work Sans
   if (patent.assignee) {
-    doc.font(FONT_NAMES.body)
+    doc.font(FONT_CONFIG.body)
       .fontSize(11)
       .fillColor(COLORS.mediumGray)
       .text(patent.assignee, {
@@ -863,7 +868,7 @@ export async function generatePatentPackagePDF(
       .rect(badgeX, badgeY, badgeWidth, badgeHeight)
       .stroke();
 
-    doc.font(FONT_NAMES.bodyMedium)
+    doc.font(FONT_CONFIG.bodyMedium)
       .fontSize(10)
       .fillColor(COLORS.darkGray)
       .text(patent.patent_number, badgeX, badgeY + 8, {
@@ -875,7 +880,7 @@ export async function generatePatentPackagePDF(
   }
 
   // Contents section
-  doc.font(FONT_NAMES.bodyMedium)
+  doc.font(FONT_CONFIG.bodyMedium)
     .fontSize(10)
     .fillColor(COLORS.mediumGray)
     .text('CONTENTS', {
@@ -899,7 +904,7 @@ export async function generatePatentPackagePDF(
       .fill(config.color.primary);
 
     // Draw text
-    doc.font(FONT_NAMES.body)
+    doc.font(FONT_CONFIG.body)
       .fontSize(10)
       .fillColor(COLORS.darkGray)
       .text(`${config.label}`, margins.left + contentWidth / 2 - 55, doc.y, {
@@ -912,7 +917,7 @@ export async function generatePatentPackagePDF(
   // Footer on cover
   doc.y = doc.page.height - 100;
 
-  doc.font(FONT_NAMES.body)
+  doc.font(FONT_CONFIG.body)
     .fontSize(9)
     .fillColor(COLORS.mediumGray)
     .text('Generated by', {
@@ -920,7 +925,7 @@ export async function generatePatentPackagePDF(
       width: contentWidth,
     });
 
-  doc.font(FONT_NAMES.h2)
+  doc.font(FONT_CONFIG.h2)
     .fontSize(12)
     .fillColor(COLORS.black)
     .text('Humble AI', {
@@ -929,7 +934,7 @@ export async function generatePatentPackagePDF(
     });
   doc.y += 6;
 
-  doc.font(FONT_NAMES.body)
+  doc.font(FONT_CONFIG.body)
     .fontSize(8)
     .fillColor(COLORS.lightGray)
     .text(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), {
@@ -1002,7 +1007,7 @@ export async function generatePatentPackagePDF(
 
         case 'paragraph':
           // Check if paragraph fits, if not add page
-          doc.font(FONT_NAMES.body).fontSize(11);
+          doc.font(FONT_CONFIG.body).fontSize(11);
           const paraHeight = doc.heightOfString(section.content, {
             width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
           });
@@ -1012,7 +1017,7 @@ export async function generatePatentPackagePDF(
 
         case 'list-item':
           // Check if list item fits
-          doc.font(FONT_NAMES.body).fontSize(11);
+          doc.font(FONT_CONFIG.body).fontSize(11);
           const listHeight = doc.heightOfString(section.content, {
             width: doc.page.width - doc.page.margins.left - doc.page.margins.right - 16,
           });
