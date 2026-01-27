@@ -11,48 +11,31 @@
  */
 
 import PDFDocument from 'pdfkit';
-import path from 'path';
 import { supabaseStorage } from '../supabaseStorage.js';
 import type { Artifact, SectionImage } from '../supabaseStorage.js';
 import { addWatermark } from './imageWatermarkService.js';
 
-// Font paths - using custom fonts to match website design
-const FONTS = {
-  // Playfair Display for headings
-  playfairRegular: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay-Regular.ttf'),
-  playfairSemiBold: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay-SemiBold.ttf'),
-  playfairBold: path.join(process.cwd(), 'server/assets/fonts/PlayfairDisplay-Bold.ttf'),
-  // Work Sans for body text
-  workSansLight: path.join(process.cwd(), 'server/assets/fonts/WorkSans-Light.ttf'),
-  workSansRegular: path.join(process.cwd(), 'server/assets/fonts/WorkSans-Regular.ttf'),
-  workSansMedium: path.join(process.cwd(), 'server/assets/fonts/WorkSans-Medium.ttf'),
-  workSansSemiBold: path.join(process.cwd(), 'server/assets/fonts/WorkSans-SemiBold.ttf'),
-};
-
-// Registered font names for use in the document
+// Built-in font names - using PDFKit standard fonts
+// TODO: Replace with custom fonts (Playfair Display, Work Sans) once font files are properly downloaded
 const FONT_NAMES = {
-  // Headings
-  h1: 'Playfair-Bold',
-  h2: 'Playfair-SemiBold',
-  h3: 'Playfair-Regular',
-  // Body text
-  body: 'Work-Sans',
-  bodyMedium: 'Work-Sans-Medium',
-  bodySemiBold: 'Work-Sans-SemiBold',
-  bodyLight: 'Work-Sans-Light',
+  // Headings - using Helvetica (built-in, always available)
+  h1: 'Helvetica-Bold',
+  h2: 'Helvetica-Bold',
+  h3: 'Helvetica',
+  // Body text - using Helvetica (built-in)
+  body: 'Helvetica',
+  bodyMedium: 'Helvetica-Bold',
+  bodySemiBold: 'Helvetica-Bold',
+  bodyLight: 'Helvetica',
 };
 
 /**
  * Register custom fonts with the PDF document
+ * DISABLED: Using built-in fonts until custom fonts are properly sourced
  */
 function registerFonts(doc: PDFKit.PDFDocument) {
-  doc.registerFont(FONT_NAMES.h1, FONTS.playfairBold);
-  doc.registerFont(FONT_NAMES.h2, FONTS.playfairSemiBold);
-  doc.registerFont(FONT_NAMES.h3, FONTS.playfairRegular);
-  doc.registerFont(FONT_NAMES.body, FONTS.workSansRegular);
-  doc.registerFont(FONT_NAMES.bodyMedium, FONTS.workSansMedium);
-  doc.registerFont(FONT_NAMES.bodySemiBold, FONTS.workSansSemiBold);
-  doc.registerFont(FONT_NAMES.bodyLight, FONTS.workSansLight);
+  // No custom fonts to register - using built-in PDFKit fonts
+  return;
 }
 
 interface PDFGenerationOptions {
