@@ -126,10 +126,22 @@ export function PatentDetailPage() {
         ? `/api/patent/${id}?token=${encodeURIComponent(printToken)}`
         : `/api/patent/${id}`;
 
+      console.log('[PatentDetailPage] Loading patent:', id);
+      console.log('[PatentDetailPage] Print mode:', isPrintMode);
+      console.log('[PatentDetailPage] Has token:', !!printToken);
+      console.log('[PatentDetailPage] Fetching URL:', url);
+
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to load patent');
+      console.log('[PatentDetailPage] Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[PatentDetailPage] Error response:', errorText);
+        throw new Error(`Failed to load patent: ${response.status} ${errorText}`);
+      }
 
       const data = await response.json();
+      console.log('[PatentDetailPage] Data loaded successfully');
       setPatent(data.patent);
       setArtifacts(data.artifacts);
 

@@ -152,16 +152,25 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 function requireAuthOrPrintToken(req: Request, res: Response, next: NextFunction) {
   // Check for print token first
   const printToken = req.query.token as string | undefined;
+  console.log('[Auth] Checking print token:', !!printToken);
+
   if (printToken) {
+    console.log('[Auth] Verifying print token for patent:', req.params.id);
     const patentId = verifyPrintToken(printToken);
+    console.log('[Auth] Token verified for patent:', patentId);
+
     if (patentId && patentId === req.params.id) {
       // Valid print token - allow access without normal auth
+      console.log('[Auth] Print token valid - allowing access');
       req.user = undefined; // No user context for print mode
       return next();
+    } else {
+      console.log('[Auth] Print token invalid or patent ID mismatch');
     }
   }
 
   // Fall back to normal authentication
+  console.log('[Auth] Falling back to normal authentication');
   requireAuth(req, res, next);
 }
 
