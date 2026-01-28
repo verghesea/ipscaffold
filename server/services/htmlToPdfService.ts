@@ -192,28 +192,77 @@ export async function renderUrlToPdf(
     if (waitForSelector) {
       try {
         await page.waitForSelector(waitForSelector, { timeout: 30000 });
+        console.log('[HTML-to-PDF] Main content selector found');
       } catch (error) {
         console.error('[HTML-to-PDF] Timeout waiting for selector, generating PDF anyway');
         // Continue anyway - maybe the content is there but selector is wrong
       }
     }
 
-    // Wait for all images to load
+    // Wait for all artifacts to finish loading their images
+    console.log('[HTML-to-PDF] Waiting for artifacts to load images...');
+    try {
+      await page.waitForFunction(
+        () => {
+          const artifacts = document.querySelectorAll('[data-artifact-content]');
+          if (artifacts.length === 0) return false;
+
+          // Check if all artifacts have finished loading images
+          const allLoaded = Array.from(artifacts).every(artifact => {
+            const loaded = artifact.getAttribute('data-images-loaded');
+            return loaded === 'true';
+          });
+
+          if (allLoaded) {
+            const imageCounts = Array.from(artifacts).map(a => a.getAttribute('data-image-count'));
+            console.log('[Puppeteer] All artifacts loaded. Image counts:', imageCounts.join(', '));
+          }
+
+          return allLoaded;
+        },
+        { timeout: 30000 } // 30 second timeout
+      );
+      console.log('[HTML-to-PDF] All artifact images loaded successfully');
+    } catch (error) {
+      console.error('[HTML-to-PDF] Timeout waiting for artifact images, continuing anyway');
+    }
+
+    // Wait for all images to load with better debugging
     console.log('[HTML-to-PDF] Waiting for images to load...');
+    const imageInfo = await page.evaluate(() => {
+      const images = Array.from(document.images);
+      const incomplete = images.filter(img => !img.complete);
+      return {
+        total: images.length,
+        incomplete: incomplete.length,
+        urls: images.map(img => ({ src: img.src, complete: img.complete, naturalWidth: img.naturalWidth }))
+      };
+    });
+
+    console.log(`[HTML-to-PDF] Found ${imageInfo.total} images, ${imageInfo.incomplete} incomplete`);
+    console.log('[HTML-to-PDF] Image URLs:', JSON.stringify(imageInfo.urls, null, 2));
+
     await page.evaluate(() => {
       return Promise.all(
         Array.from(document.images)
           .filter(img => !img.complete)
           .map(img => new Promise((resolve) => {
             img.onload = img.onerror = resolve;
-            // Timeout after 10s per image
-            setTimeout(resolve, 10000);
+            // Timeout after 15s per image (increased from 10s)
+            setTimeout(resolve, 15000);
           }))
       );
     });
 
-    const imageCount = await page.evaluate(() => document.images.length);
-    console.log(`[HTML-to-PDF] All images loaded (${imageCount} total)`);
+    const finalImageCount = await page.evaluate(() => {
+      const images = Array.from(document.images);
+      return {
+        total: images.length,
+        loaded: images.filter(img => img.complete && img.naturalWidth > 0).length,
+        failed: images.filter(img => img.complete && img.naturalWidth === 0).length
+      };
+    });
+    console.log(`[HTML-to-PDF] Images: ${finalImageCount.loaded} loaded, ${finalImageCount.failed} failed, ${finalImageCount.total} total`);
 
     // Additional wait for dynamic content (images, lazy loading, etc.)
     if (additionalWaitMs > 0) {
@@ -259,11 +308,11 @@ export async function renderPatentToPdf(
 
   return renderUrlToPdf(url, {
     waitForSelector: '[data-patent-content]', // Wait for main content
-    additionalWaitMs: 5000, // Extra time for images and React to render
+    additionalWaitMs: 8000, // Extra time for all artifacts to load their images
     format: 'Letter',
     printBackground: true,
-    // Reduced margins for wider content area (7.5" instead of 7.0")
-    margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
+    // Minimal margins for maximum content width (7.8" on 8.5" paper)
+    margin: { top: '0.35in', right: '0.35in', bottom: '0.35in', left: '0.35in' },
   });
 }
 

@@ -66,11 +66,16 @@ function PrintArtifactSection({
   onUpdateImagePrompt: (imageId: string, newPrompt: string) => Promise<void>;
 }) {
   // Load images for this specific artifact
-  const { images } = useSectionImages(artifact.id);
+  const { images, loading } = useSectionImages(artifact.id);
   const sectionCount = countSections(artifact.content);
 
   return (
-    <div className="print-artifact mt-6" data-artifact-content>
+    <div
+      className="print-artifact mt-6"
+      data-artifact-content
+      data-images-loaded={!loading}
+      data-image-count={images.length}
+    >
       {/* Graph paper background container */}
       <div className="relative bg-white shadow-lg overflow-hidden">
         {/* Graph paper overlay - hidden in print mode via CSS class */}
