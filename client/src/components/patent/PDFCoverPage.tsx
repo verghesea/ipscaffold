@@ -10,14 +10,12 @@ import type { Patent } from '@/lib/api';
 interface PDFCoverPageProps {
   patent: Patent;
   heroImageUrl?: string;
-  description?: string;
   className?: string;
 }
 
 export function PDFCoverPage({
   patent,
   heroImageUrl,
-  description,
   className,
 }: PDFCoverPageProps) {
   const publicationNumber = patent.publication_number || 'N/A';
@@ -82,17 +80,6 @@ export function PDFCoverPage({
             </span>
           </div>
         </div>
-
-        {/* Description */}
-        {description && (
-          <div className="max-w-3xl">
-            <div className="bg-white/80 backdrop-blur-sm p-8 border-l-4 border-blue-600 shadow-lg">
-              <p className="text-lg text-gray-700 leading-relaxed">
-                {description}
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Footer */}
         <div className="absolute bottom-8 left-0 right-0 text-center">

@@ -577,13 +577,6 @@ export function PatentDetailPage() {
                   <PDFCoverPage
                     patent={patent}
                     heroImageUrl={heroImageUrl}
-                    description={(() => {
-                      // Extract first paragraph from ELIA15 artifact as description
-                      const elia15 = artifacts.find(a => a.type === 'elia15');
-                      if (!elia15) return undefined;
-                      const firstParagraph = elia15.content.split('\n\n')[0];
-                      return firstParagraph?.replace(/^#+\s+/, '').trim();
-                    })()}
                   />
 
                   {/* Print mode: Show all artifacts stacked vertically with images */}

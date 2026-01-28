@@ -151,9 +151,9 @@ export async function renderUrlToPdf(
   const page = await browser.newPage();
 
   try {
-    // Viewport optimized for Letter paper with 0.35" margins
-    // 7.8" content width at 96 DPI = 750px, but we use higher for quality
-    // 1000px viewport scales better to 7.8" while maintaining readability
+    // Viewport optimized for Letter paper with 0.25" margins
+    // 8.0" content width at 96 DPI = 768px, but we use higher for quality
+    // 1000px viewport scales better to 8.0" while maintaining readability
     await page.setViewport({
       width: 1000,
       height: 1400,
@@ -334,8 +334,8 @@ export async function renderPatentToPdf(
     additionalWaitMs: 10000, // Extra time for watermarking and image loading (10 seconds)
     format: 'Letter',
     printBackground: true,
-    // Minimal margins for maximum content width (7.8" on 8.5" paper)
-    margin: { top: '0.35in', right: '0.35in', bottom: '0.35in', left: '0.35in' },
+    // Minimal margins for maximum content width (8.0" on 8.5" paper = 0.25" margins)
+    margin: { top: '0.25in', right: '0.25in', bottom: '0.25in', left: '0.25in' },
   });
 }
 
