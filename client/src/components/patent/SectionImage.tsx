@@ -9,6 +9,7 @@ import { RefreshCw, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SectionImage as SectionImageType } from '@/lib/api';
 import { PromptDetailsModal } from './PromptDetailsModal';
+import { ImageWatermark } from './ImageWatermark';
 
 interface SectionImageProps {
   image: SectionImageType;
@@ -107,6 +108,8 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
                 loading="lazy"
                 onError={() => setImageError(true)}
               />
+              {/* Non-destructive watermark overlay */}
+              <ImageWatermark />
             </>
           )}
 

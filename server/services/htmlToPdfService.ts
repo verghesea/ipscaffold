@@ -151,13 +151,13 @@ export async function renderUrlToPdf(
   const page = await browser.newPage();
 
   try {
-    // Viewport optimized for Letter paper with 0.5" margins
-    // 7.5" content width at 96 DPI = 720px, but we use higher for quality
-    // 1000px viewport scales better to 7.5" while maintaining readability
+    // Viewport optimized for Letter paper with 0.35" margins
+    // 7.8" content width at 96 DPI = 750px, but we use higher for quality
+    // 1000px viewport scales better to 7.8" while maintaining readability
     await page.setViewport({
       width: 1000,
       height: 1400,
-      deviceScaleFactor: 2, // High DPI for crisp text
+      deviceScaleFactor: 1.5, // Reduced from 2 to 1.5 for smaller file size (still crisp)
     });
 
     console.log('[HTML-to-PDF] Navigating to page...');

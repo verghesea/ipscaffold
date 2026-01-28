@@ -3,6 +3,7 @@
  */
 
 import { supabaseAdmin } from '../lib/supabase.js';
+import sharp from 'sharp';
 
 /**
  * Downloads an image from a URL and returns it as a Buffer
@@ -19,6 +20,70 @@ async function downloadImageFromUrl(url: string): Promise<Buffer> {
 }
 
 /**
+ * Compression options for images
+ */
+interface CompressionOptions {
+  quality?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  format?: 'jpeg' | 'png';
+}
+
+/**
+ * Compresses an image buffer using Sharp
+ * Converts to JPEG and resizes for optimal PDF file size
+ *
+ * @param imageBuffer - Original image buffer (typically PNG from DALL-E)
+ * @param options - Compression options
+ * @returns Compressed image buffer
+ */
+async function compressImage(
+  imageBuffer: Buffer,
+  options: CompressionOptions = {}
+): Promise<Buffer> {
+  const {
+    quality = 85,
+    maxWidth = 1024,
+    maxHeight = 1024,
+    format = 'jpeg',
+  } = options;
+
+  const originalSize = imageBuffer.length;
+
+  let pipeline = sharp(imageBuffer);
+
+  // Resize if larger than max dimensions (preserving aspect ratio)
+  pipeline = pipeline.resize(maxWidth, maxHeight, {
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
+
+  // Convert to JPEG with quality setting (mozjpeg for better compression)
+  if (format === 'jpeg') {
+    pipeline = pipeline.jpeg({
+      quality,
+      mozjpeg: true,
+    });
+  } else {
+    pipeline = pipeline.png({
+      compressionLevel: 9,
+    });
+  }
+
+  const compressedBuffer = await pipeline.toBuffer();
+  const compressedSize = compressedBuffer.length;
+  const reduction = ((originalSize - compressedSize) / originalSize) * 100;
+
+  console.log(
+    `[Image Compression] Original: ${(originalSize / 1024 / 1024).toFixed(2)} MB → ` +
+    `Compressed: ${(compressedSize / 1024 / 1024).toFixed(2)} MB ` +
+    `(${reduction.toFixed(1)}% reduction)`
+  );
+
+  return compressedBuffer;
+}
+
+/**
  * Uploads an image buffer to Supabase Storage
  *
  * @param imageBuffer - Image data as Buffer
@@ -31,13 +96,21 @@ export async function uploadImageToStorage(
   artifactId: string,
   sectionNumber: number
 ): Promise<string> {
-  const fileName = `${artifactId}/section-${sectionNumber}.png`;
+  // Compress image to reduce PDF file size
+  const compressedBuffer = await compressImage(imageBuffer, {
+    quality: 85,
+    maxWidth: 1024,
+    maxHeight: 1024,
+    format: 'jpeg',
+  });
+
+  const fileName = `${artifactId}/section-${sectionNumber}.jpeg`;
 
   // Upload to Supabase Storage
   const { data, error } = await supabaseAdmin.storage
     .from('section-images')
-    .upload(fileName, imageBuffer, {
-      contentType: 'image/png',
+    .upload(fileName, compressedBuffer, {
+      contentType: 'image/jpeg',
       upsert: true, // Overwrite if exists (for regeneration)
     });
 
@@ -98,7 +171,7 @@ export async function deleteImageFromStorage(
   artifactId: string,
   sectionNumber: number
 ): Promise<void> {
-  const fileName = `${artifactId}/section-${sectionNumber}.png`;
+  const fileName = `${artifactId}/section-${sectionNumber}.jpeg`;
 
   const { error } = await supabaseAdmin.storage
     .from('section-images')

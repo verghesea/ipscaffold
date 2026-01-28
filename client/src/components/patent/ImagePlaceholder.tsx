@@ -6,6 +6,7 @@
 
 import { Loader2, ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ImageWatermark } from './ImageWatermark';
 
 interface ImagePlaceholderProps {
   sectionNumber: number;
@@ -67,6 +68,9 @@ export function ImagePlaceholder({
               )}
             </>
           )}
+
+          {/* Non-destructive watermark overlay */}
+          <ImageWatermark />
         </div>
       </div>
 
