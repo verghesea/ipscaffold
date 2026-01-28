@@ -2467,6 +2467,35 @@ export async function registerRoutes(
     }
   });
 
+  // Watermarked Image Proxy
+  // Returns any image with Humble watermark applied
+  // Used for PDF generation to apply watermarks on-the-fly
+  app.get('/api/image/watermarked', async (req, res) => {
+    try {
+      const { url } = req.query;
+
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'Image URL required' });
+      }
+
+      // Fetch and watermark the image
+      const { addWatermarkToUrl } = await import('./services/imageWatermarkService.js');
+      const watermarkedBuffer = await addWatermarkToUrl(url, {
+        position: 'bottom-right',
+        opacity: 0.7,
+        scale: 0.15,
+      });
+
+      // Return watermarked image
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.send(watermarkedBuffer);
+    } catch (error) {
+      console.error('Error watermarking image:', error);
+      res.status(500).json({ error: 'Failed to watermark image' });
+    }
+  });
+
   // Hero Image Routes
 
   // Get hero image for a patent

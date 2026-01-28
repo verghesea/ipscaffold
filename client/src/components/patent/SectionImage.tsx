@@ -17,6 +17,7 @@ interface SectionImageProps {
   onPromptUpdate?: (newPrompt: string) => Promise<void>;
   isAdmin?: boolean;
   className?: string;
+  printMode?: boolean;
 }
 
 // Corner marks component (simple L-shapes in blue)
@@ -38,10 +39,15 @@ function CornerMark({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
   );
 }
 
-export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = false, className }: SectionImageProps) {
+export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = false, className, printMode = false }: SectionImageProps) {
   const [regenerating, setRegenerating] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
+
+  // In print mode, use watermarked image URL
+  const imageUrl = printMode
+    ? `/api/image/watermarked?url=${encodeURIComponent(image.image_url)}`
+    : image.image_url;
 
   const handleRegenerate = async () => {
     if (!onRegenerate || regenerating) return;
@@ -102,14 +108,14 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
           ) : (
             <>
               <img
-                src={image.image_url}
+                src={imageUrl}
                 alt={`Figure ${image.section_number} - ${image.section_title}`}
                 className="w-full h-full object-cover relative z-10"
                 loading="lazy"
                 onError={() => setImageError(true)}
               />
-              {/* Non-destructive watermark overlay */}
-              <ImageWatermark />
+              {/* Non-destructive watermark overlay (CSS-based, hidden in print mode where server watermark is used) */}
+              {!printMode && <ImageWatermark />}
             </>
           )}
 

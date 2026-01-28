@@ -19,6 +19,7 @@ interface EnhancedMarkdownRendererProps {
   onUpdateImagePrompt?: (imageId: string, newPrompt: string) => Promise<void>;
   isAdmin?: boolean;
   className?: string;
+  printMode?: boolean;
 }
 
 // Helper to render line content with bold text
@@ -107,6 +108,7 @@ export function EnhancedMarkdownRenderer({
   onUpdateImagePrompt,
   isAdmin = false,
   className,
+  printMode = false,
 }: EnhancedMarkdownRendererProps) {
   const sections = useMemo(() => parseMarkdownSections(content), [content]);
   const imageMap = useMemo(() => mapImagesToSections(sections, images), [sections, images]);
@@ -140,6 +142,7 @@ export function EnhancedMarkdownRenderer({
                     : undefined
                 }
                 isAdmin={isAdmin}
+                printMode={printMode}
               />
             ) : (
               <ImagePlaceholder

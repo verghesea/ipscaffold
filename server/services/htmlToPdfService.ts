@@ -205,26 +205,49 @@ export async function renderUrlToPdf(
       await page.waitForFunction(
         () => {
           const artifacts = document.querySelectorAll('[data-artifact-content]');
-          if (artifacts.length === 0) return false;
+          if (artifacts.length === 0) {
+            console.log('[Puppeteer Check] No artifacts found yet');
+            return false;
+          }
 
           // Check if all artifacts have finished loading images
-          const allLoaded = Array.from(artifacts).every(artifact => {
+          const artifactStatuses = Array.from(artifacts).map((artifact, index) => {
             const loaded = artifact.getAttribute('data-images-loaded');
-            return loaded === 'true';
+            const imageCount = artifact.getAttribute('data-image-count');
+            return {
+              index: index + 1,
+              loaded: loaded === 'true',
+              imageCount: imageCount || '0',
+            };
           });
 
+          console.log('[Puppeteer Check] Artifact statuses:', JSON.stringify(artifactStatuses));
+
+          const allLoaded = artifactStatuses.every(status => status.loaded);
+
           if (allLoaded) {
-            const imageCounts = Array.from(artifacts).map(a => a.getAttribute('data-image-count'));
-            console.log('[Puppeteer] All artifacts loaded. Image counts:', imageCounts.join(', '));
+            console.log('[Puppeteer] All artifacts loaded!');
           }
 
           return allLoaded;
         },
-        { timeout: 30000 } // 30 second timeout
+        { timeout: 60000 } // Increased to 60 second timeout
       );
       console.log('[HTML-to-PDF] All artifact images loaded successfully');
     } catch (error) {
-      console.error('[HTML-to-PDF] Timeout waiting for artifact images, continuing anyway');
+      console.error('[HTML-to-PDF] Timeout waiting for artifact images');
+
+      // Log current state for debugging
+      const artifactStatus = await page.evaluate(() => {
+        const artifacts = document.querySelectorAll('[data-artifact-content]');
+        return Array.from(artifacts).map((artifact, index) => ({
+          index: index + 1,
+          loaded: artifact.getAttribute('data-images-loaded'),
+          imageCount: artifact.getAttribute('data-image-count'),
+        }));
+      });
+      console.error('[HTML-to-PDF] Artifact status on timeout:', JSON.stringify(artifactStatus, null, 2));
+      console.error('[HTML-to-PDF] Continuing anyway...');
     }
 
     // Wait for all images to load with better debugging
@@ -248,8 +271,8 @@ export async function renderUrlToPdf(
           .filter(img => !img.complete)
           .map(img => new Promise((resolve) => {
             img.onload = img.onerror = resolve;
-            // Timeout after 15s per image (increased from 10s)
-            setTimeout(resolve, 15000);
+            // Timeout after 20s per image (watermarking adds processing time)
+            setTimeout(resolve, 20000);
           }))
       );
     });
@@ -308,7 +331,7 @@ export async function renderPatentToPdf(
 
   return renderUrlToPdf(url, {
     waitForSelector: '[data-patent-content]', // Wait for main content
-    additionalWaitMs: 8000, // Extra time for all artifacts to load their images
+    additionalWaitMs: 10000, // Extra time for watermarking and image loading (10 seconds)
     format: 'Letter',
     printBackground: true,
     // Minimal margins for maximum content width (7.8" on 8.5" paper)

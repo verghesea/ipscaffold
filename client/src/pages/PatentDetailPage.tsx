@@ -17,6 +17,7 @@ import { useSectionImages } from '@/hooks/useSectionImages';
 import { countSections } from '@/lib/markdownParser';
 import { GenerationProgress } from '@/components/patent/GenerationProgress';
 import { ProfileCompletionModal } from '@/components/ProfileCompletionModal';
+import { PDFCoverPage } from '@/components/patent/PDFCoverPage';
 
 const ARTIFACT_TYPES = {
   elia15: {
@@ -117,6 +118,7 @@ function PrintArtifactSection({
             onRegenerateImage={undefined}
             onUpdateImagePrompt={undefined}
             isAdmin={false}
+            printMode={true}  // Use Humble watermark in print mode
           />
         </div>
       </div>
@@ -135,6 +137,7 @@ export function PatentDetailPage() {
   const [downloadingArtifact, setDownloadingArtifact] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('elia15');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [heroImageUrl, setHeroImageUrl] = useState<string | undefined>(undefined);
   const hasShownProfileModal = useRef(false);
   const { toast } = useToast();
   const { user, profile, refetch: refetchUser } = useAuth();
@@ -220,6 +223,20 @@ export function PatentDetailPage() {
 
       setPatent(data.patent);
       setArtifacts(data.artifacts);
+
+      // Fetch hero image in print mode for cover page
+      if (isPrintMode) {
+        try {
+          const heroResponse = await fetch(`/api/patent/${id}/hero-image`);
+          if (heroResponse.ok) {
+            const heroData = await heroResponse.json();
+            setHeroImageUrl(heroData.image_url);
+          }
+        } catch (error) {
+          console.error('[Print Mode] Failed to load hero image:', error);
+          // Continue without hero image
+        }
+      }
 
       // Set default active tab to first available artifact
       if (data.artifacts.length > 0) {
@@ -555,11 +572,25 @@ export function PatentDetailPage() {
                   </CardContent>
                 </Card>
               ) : isPrintMode ? (
-                // Print mode: Show all artifacts stacked vertically with images
-                <div className="space-y-12">
-                  {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta], artifactIndex) => {
-                    const artifact = artifacts.find(a => a.type === key);
-                    if (!artifact) return null;
+                <>
+                  {/* PDF Cover Page */}
+                  <PDFCoverPage
+                    patent={patent}
+                    heroImageUrl={heroImageUrl}
+                    description={(() => {
+                      // Extract first paragraph from ELIA15 artifact as description
+                      const elia15 = artifacts.find(a => a.type === 'elia15');
+                      if (!elia15) return undefined;
+                      const firstParagraph = elia15.content.split('\n\n')[0];
+                      return firstParagraph?.replace(/^#+\s+/, '').trim();
+                    })()}
+                  />
+
+                  {/* Print mode: Show all artifacts stacked vertically with images */}
+                  <div className="space-y-12">
+                    {(Object.entries(ARTIFACT_TYPES) as [keyof typeof ARTIFACT_TYPES, typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES]][]).map(([key, meta], artifactIndex) => {
+                      const artifact = artifacts.find(a => a.type === key);
+                      if (!artifact) return null;
 
                     return (
                       <PrintArtifactSection
@@ -572,7 +603,8 @@ export function PatentDetailPage() {
                       />
                     );
                   })}
-                </div>
+                  </div>
+                </>
               ) : (
                 // Normal mode: Show tabs
                 <Tabs defaultValue={defaultTab} className="w-full">
