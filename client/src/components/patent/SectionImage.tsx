@@ -45,8 +45,8 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
   const [imageError, setImageError] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
 
-  // Always use watermarked image URL (Humble logo watermark)
-  const imageUrl = `/api/image/watermarked?url=${encodeURIComponent(image.image_url)}`;
+  // Use pre-watermarked image URL (watermarked at creation time)
+  const imageUrl = image.image_url;
 
   const handleRegenerate = async () => {
     if (!onRegenerate || regenerating) return;
@@ -121,7 +121,7 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
                   onImageErrorProp?.();
                 }}
               />
-              {/* Watermark is embedded by server via /api/image/watermarked endpoint */}
+              {/* Watermark is pre-applied at image creation time */}
             </>
           )}
 
