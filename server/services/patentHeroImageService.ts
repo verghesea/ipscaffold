@@ -10,7 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { uploadImageFromUrl } from './imageStorage';
+import { uploadHeroImageFromUrl } from './imageStorage';
 import { extractELIA15Introduction } from './titleGenerator';
 
 const anthropic = new Anthropic({
@@ -30,6 +30,7 @@ export interface GenerateHeroImageRequest {
 
 export interface HeroImageResult {
   imageUrl: string;
+  originalImageUrl: string;
   promptUsed: string;
   revisedPrompt?: string;
   costUSD: number;
@@ -82,17 +83,17 @@ export async function generatePatentHeroImage(
 
   console.log(`[HeroImage] Image generated in ${generationTime}s, uploading to storage...`);
 
-  // Upload to Supabase Storage
-  const imageUrl = await uploadImageFromUrl(
+  // Upload to Supabase Storage - BOTH original and watermarked versions
+  const { originalUrl, watermarkedUrl } = await uploadHeroImageFromUrl(
     response.data[0].url,
-    `hero-${patentId}`,
-    0 // Use 0 for hero images
+    patentId
   );
 
   console.log(`[HeroImage] ✓ Hero image created for patent ${patentId}`);
 
   return {
-    imageUrl,
+    imageUrl: watermarkedUrl, // Use watermarked version by default
+    originalImageUrl: originalUrl, // Keep original for admin/re-watermarking
     promptUsed: prompt,
     revisedPrompt: response.data[0].revised_prompt,
     costUSD: 0.04, // Standard quality

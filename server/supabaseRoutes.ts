@@ -2622,35 +2622,8 @@ export async function registerRoutes(
   });
 
   // Watermarked Image Proxy
-  // Returns any image with Humble watermark applied
-  // Used for PDF generation to apply watermarks on-the-fly
-  app.get('/api/image/watermarked', async (req, res) => {
-    try {
-      const { url } = req.query;
-
-      if (!url || typeof url !== 'string') {
-        return res.status(400).json({ error: 'Image URL required' });
-      }
-
-      // Fetch and watermark the image
-      const { addWatermarkToUrl } = await import('./services/imageWatermarkService.js');
-      const watermarkedBuffer = await addWatermarkToUrl(url, {
-        position: 'bottom-right',
-        opacity: 0.7,
-        scale: 0.15,
-      });
-
-      // Return watermarked image
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-      res.send(watermarkedBuffer);
-    } catch (error) {
-      console.error('Error watermarking image:', error);
-      res.status(500).json({ error: 'Failed to watermark image' });
-    }
-  });
-
   // Hero Image Routes
+  // Note: On-demand watermarking endpoint removed - images are now pre-watermarked at creation time
 
   // Get hero image for a patent
   app.get('/api/patent/:patentId/hero-image', async (req, res) => {
@@ -2694,10 +2667,11 @@ export async function registerRoutes(
         friendlyTitle: patent.friendly_title || undefined,
       });
 
-      // Save to database
+      // Save to database with BOTH URLs
       const heroImage = await supabaseStorage.upsertPatentHeroImage({
         patent_id: patentId,
-        image_url: heroImageResult.imageUrl,
+        image_url: heroImageResult.imageUrl, // Watermarked version
+        original_image_url: heroImageResult.originalImageUrl, // Original unwatermarked
         prompt_used: heroImageResult.promptUsed,
         image_title: heroImageResult.revisedPrompt || 'Patent hero visualization',
         generation_metadata: {
@@ -2955,7 +2929,8 @@ async function generateRemainingArtifactsWithNotifications(
 
       await supabaseStorage.upsertPatentHeroImage({
         patent_id: patentId,
-        image_url: heroImageResult.imageUrl,
+        image_url: heroImageResult.imageUrl, // Watermarked version
+        original_image_url: heroImageResult.originalImageUrl, // Original unwatermarked
         prompt_used: heroImageResult.promptUsed,
         image_title: heroImageResult.revisedPrompt || 'Patent hero visualization',
         generation_metadata: {

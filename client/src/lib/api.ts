@@ -28,6 +28,7 @@ export interface SectionImage {
   section_number: number;
   section_title: string;
   image_url: string;
+  original_image_url?: string | null;
   prompt_used: string;
   image_title?: string | null;
   generation_metadata: {
@@ -55,6 +56,7 @@ export interface PatentHeroImage {
   id: string;
   patent_id: string;
   image_url: string;
+  original_image_url?: string | null;
   prompt_used: string;
   generation_metadata: {
     model: string;

@@ -110,7 +110,7 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
                 src={imageUrl}
                 alt={`Figure ${image.section_number} - ${image.section_title}`}
                 className="w-full h-full object-cover relative z-10"
-                loading="lazy"
+                loading={printMode ? "eager" : "lazy"}
                 onLoad={() => {
                   console.log('[SectionImage] Image loaded:', image.section_title);
                   onImageLoad?.();

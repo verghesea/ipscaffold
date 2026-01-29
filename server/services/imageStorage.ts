@@ -4,6 +4,7 @@
 
 import { supabaseAdmin } from '../lib/supabase.js';
 import sharp from 'sharp';
+import { addWatermark } from './imageWatermarkService.js';
 
 /**
  * Downloads an image from a URL and returns it as a Buffer
@@ -127,13 +128,21 @@ export async function uploadImageToStorage(
 }
 
 /**
- * Downloads image from DALL-E URL and uploads to Supabase Storage
- * Stores ORIGINAL unwatermarked image - watermark applied only during PDF export
+ * Result of uploading both original and watermarked versions
+ */
+export interface UploadImageResult {
+  originalUrl: string;
+  watermarkedUrl: string;
+}
+
+/**
+ * Downloads image from DALL-E URL and uploads BOTH original and watermarked versions
+ * This implements Option A: Pre-watermark at creation time for fast loading
  *
  * @param dalleImageUrl - Temporary DALL-E image URL
  * @param artifactId - Artifact UUID
  * @param sectionNumber - Section number
- * @returns Permanent Supabase Storage public URL
+ * @returns Object with both original and watermarked URLs
  *
  * Note: DALL-E URLs expire after ~1 hour, so we need to download and store them
  */
@@ -141,20 +150,92 @@ export async function uploadImageFromUrl(
   dalleImageUrl: string,
   artifactId: string,
   sectionNumber: number
-): Promise<string> {
+): Promise<string>;
+export async function uploadImageFromUrl(
+  dalleImageUrl: string,
+  artifactId: string,
+  sectionNumber: number,
+  uploadBoth: true
+): Promise<UploadImageResult>;
+export async function uploadImageFromUrl(
+  dalleImageUrl: string,
+  artifactId: string,
+  sectionNumber: number,
+  uploadBoth?: boolean
+): Promise<string | UploadImageResult> {
   try {
     // Download image from DALL-E
     const imageBuffer = await downloadImageFromUrl(dalleImageUrl);
 
-    // Upload ORIGINAL to Supabase Storage (no watermark)
-    // Watermark will be applied on-demand during PDF generation
-    const publicUrl = await uploadImageToStorage(
-      imageBuffer,
-      artifactId,
-      sectionNumber
-    );
+    if (uploadBoth) {
+      // Upload BOTH original and watermarked versions
+      console.log(`[Image Storage] Creating original and watermarked versions for section ${sectionNumber}...`);
 
-    return publicUrl;
+      // 1. Upload ORIGINAL (unwatermarked) version
+      const compressedOriginal = await compressImage(imageBuffer, {
+        quality: 85,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        format: 'jpeg',
+      });
+
+      const originalFileName = `${artifactId}/original-section-${sectionNumber}.jpeg`;
+      const { error: originalError } = await supabaseAdmin.storage
+        .from('section-images')
+        .upload(originalFileName, compressedOriginal, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (originalError) {
+        throw new Error(`Failed to upload original: ${originalError.message}`);
+      }
+
+      const { data: originalUrlData } = supabaseAdmin.storage
+        .from('section-images')
+        .getPublicUrl(originalFileName);
+
+      // 2. Apply watermark
+      console.log(`[Image Storage] Applying Humble watermark to section ${sectionNumber}...`);
+      const watermarkedBuffer = await addWatermark(compressedOriginal, {
+        position: 'bottom-right',
+        opacity: 0.7,
+        scale: 0.15,
+      });
+
+      // 3. Upload WATERMARKED version
+      const watermarkedFileName = `${artifactId}/section-${sectionNumber}.jpeg`;
+      const { error: watermarkedError } = await supabaseAdmin.storage
+        .from('section-images')
+        .upload(watermarkedFileName, watermarkedBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (watermarkedError) {
+        throw new Error(`Failed to upload watermarked: ${watermarkedError.message}`);
+      }
+
+      const { data: watermarkedUrlData } = supabaseAdmin.storage
+        .from('section-images')
+        .getPublicUrl(watermarkedFileName);
+
+      console.log(`[Image Storage] ✓ Uploaded both versions for section ${sectionNumber}`);
+
+      return {
+        originalUrl: originalUrlData.publicUrl,
+        watermarkedUrl: watermarkedUrlData.publicUrl,
+      };
+    } else {
+      // Legacy: Upload only one version (for backward compatibility)
+      const publicUrl = await uploadImageToStorage(
+        imageBuffer,
+        artifactId,
+        sectionNumber
+      );
+
+      return publicUrl;
+    }
   } catch (error) {
     console.error('Error uploading image from URL:', error);
     throw new Error(`Failed to store image: ${(error as Error).message}`);
@@ -211,6 +292,85 @@ export async function deleteAllArtifactImages(
 
   if (deleteError) {
     throw new Error(`Failed to delete images: ${deleteError.message}`);
+  }
+}
+
+/**
+ * Uploads a hero image from DALL-E URL with BOTH original and watermarked versions
+ *
+ * @param dalleImageUrl - Temporary DALL-E image URL
+ * @param patentId - Patent UUID
+ * @returns Object with both original and watermarked URLs
+ */
+export async function uploadHeroImageFromUrl(
+  dalleImageUrl: string,
+  patentId: string
+): Promise<UploadImageResult> {
+  try {
+    // Download image from DALL-E
+    const imageBuffer = await downloadImageFromUrl(dalleImageUrl);
+
+    console.log(`[Hero Image Storage] Creating original and watermarked versions for patent ${patentId}...`);
+
+    // 1. Compress original
+    const compressedOriginal = await compressImage(imageBuffer, {
+      quality: 85,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      format: 'jpeg',
+    });
+
+    // 2. Upload ORIGINAL (unwatermarked) version
+    const originalFileName = `hero-images/${patentId}/original.jpeg`;
+    const { error: originalError } = await supabaseAdmin.storage
+      .from('section-images')
+      .upload(originalFileName, compressedOriginal, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+
+    if (originalError) {
+      throw new Error(`Failed to upload original hero: ${originalError.message}`);
+    }
+
+    const { data: originalUrlData } = supabaseAdmin.storage
+      .from('section-images')
+      .getPublicUrl(originalFileName);
+
+    // 3. Apply watermark
+    console.log(`[Hero Image Storage] Applying Humble watermark...`);
+    const watermarkedBuffer = await addWatermark(compressedOriginal, {
+      position: 'bottom-right',
+      opacity: 0.7,
+      scale: 0.15,
+    });
+
+    // 4. Upload WATERMARKED version
+    const watermarkedFileName = `hero-images/${patentId}/hero.jpeg`;
+    const { error: watermarkedError } = await supabaseAdmin.storage
+      .from('section-images')
+      .upload(watermarkedFileName, watermarkedBuffer, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+
+    if (watermarkedError) {
+      throw new Error(`Failed to upload watermarked hero: ${watermarkedError.message}`);
+    }
+
+    const { data: watermarkedUrlData } = supabaseAdmin.storage
+      .from('section-images')
+      .getPublicUrl(watermarkedFileName);
+
+    console.log(`[Hero Image Storage] ✓ Uploaded both hero image versions`);
+
+    return {
+      originalUrl: originalUrlData.publicUrl,
+      watermarkedUrl: watermarkedUrlData.publicUrl,
+    };
+  } catch (error) {
+    console.error('Error uploading hero image from URL:', error);
+    throw new Error(`Failed to store hero image: ${(error as Error).message}`);
   }
 }
 

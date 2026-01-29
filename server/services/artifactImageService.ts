@@ -82,21 +82,23 @@ export async function generateArtifactImages(
         sectionContent: section.content, // Pass actual section content for Claude analysis
       });
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage - BOTH original and watermarked versions
       console.log(`Uploading image for section ${section.number} to storage...`);
-      const storedImageUrl = await uploadImageFromUrl(
+      const { originalUrl, watermarkedUrl } = await uploadImageFromUrl(
         imageResult.imageUrl,
         artifactId,
-        section.number
+        section.number,
+        true // Upload both versions
       );
 
-      // Save to database
+      // Save to database with BOTH URLs
       console.log(`Saving image metadata for section ${section.number} to database...`);
       const sectionImage = await supabaseStorage.upsertSectionImage({
         artifact_id: artifactId,
         section_number: section.number,
         section_title: section.title,
-        image_url: storedImageUrl,
+        image_url: watermarkedUrl, // Use watermarked version by default
+        original_image_url: originalUrl, // Keep original for admin/re-watermarking
         prompt_used: imageResult.promptUsed,
         image_title: imageResult.imageTitle, // Use Claude-generated descriptive title
         generation_metadata: {
@@ -147,19 +149,21 @@ export async function generateSingleSectionImage(
     sectionContent, // Pass actual section content for Claude analysis
   });
 
-  // Upload to Supabase Storage
-  const storedImageUrl = await uploadImageFromUrl(
+  // Upload to Supabase Storage - BOTH original and watermarked versions
+  const { originalUrl, watermarkedUrl } = await uploadImageFromUrl(
     imageResult.imageUrl,
     artifactId,
-    sectionNumber
+    sectionNumber,
+    true // Upload both versions
   );
 
-  // Save to database
+  // Save to database with BOTH URLs
   const sectionImage = await supabaseStorage.upsertSectionImage({
     artifact_id: artifactId,
     section_number: sectionNumber,
     section_title: sectionTitle,
-    image_url: storedImageUrl,
+    image_url: watermarkedUrl, // Use watermarked version by default
+    original_image_url: originalUrl, // Keep original for admin/re-watermarking
     prompt_used: imageResult.promptUsed,
     image_title: imageResult.imageTitle, // Use Claude-generated descriptive title
     generation_metadata: {
