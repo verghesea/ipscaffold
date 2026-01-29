@@ -9,6 +9,7 @@ import { LandingPage } from "@/pages/LandingPage";
 import { PreviewPage } from "@/pages/PreviewPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { PatentDetailPage } from "@/pages/PatentDetailPage";
+import { ArtifactPrintPage } from "@/pages/ArtifactPrintPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import LoginPage from "@/pages/LoginPage";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/preview/:id" component={PreviewPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/patent/:id" component={PatentDetailPage} />
+      <Route path="/artifact/:id" component={ArtifactPrintPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/auth/callback" component={AuthCallbackPage} />
       <Route path="/admin" component={AdminPage} />

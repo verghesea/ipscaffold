@@ -344,28 +344,6 @@ export async function renderPatentToPdf(
 }
 
 /**
- * Render single artifact to PDF
- * @param artifactId - Artifact ID
- * @param baseUrl - Base URL of the application
- * @returns PDF buffer
- */
-export async function renderArtifactToPdf(
-  artifactId: string,
-  baseUrl: string
-): Promise<Buffer> {
-  // This would require a dedicated artifact view page
-  // For now, we'll use the patent page with artifact selection
-  const url = `${baseUrl}/artifact/${artifactId}?print=true`;
-  
-  return renderUrlToPdf(url, {
-    waitForSelector: '[data-artifact-content]',
-    additionalWaitMs: 2000,
-    format: 'Letter',
-    printBackground: true,
-  });
-}
-
-/**
  * Generate a temporary print token for authentication-free printing
  * Token expires after 5 minutes
  */
@@ -409,4 +387,79 @@ export function verifyPrintToken(token: string): string | null {
     console.error('[Print Token] Verification error:', error);
     return null;
   }
+}
+
+/**
+ * Generate a time-limited print token for artifacts
+ * Token expires after 5 minutes for security
+ */
+export function generateArtifactPrintToken(artifactId: string): string {
+  const crypto = require('crypto');
+  const secret = process.env.JWT_SECRET || 'default-secret';
+  const timestamp = Date.now();
+  const payload = `artifact:${artifactId}:${timestamp}`;
+  const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${signature}`).toString('base64url');
+}
+
+/**
+ * Verify and decode an artifact print token
+ * Returns artifactId if valid, null if invalid or expired
+ */
+export function verifyArtifactPrintToken(token: string): string | null {
+  try {
+    const crypto = require('crypto');
+    const secret = process.env.JWT_SECRET || 'default-secret';
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const [prefix, artifactId, timestamp, signature] = decoded.split(':');
+
+    if (prefix !== 'artifact') {
+      console.log('[Artifact Print Token] Invalid prefix');
+      return null;
+    }
+
+    // Check expiration (5 minutes)
+    const now = Date.now();
+    const tokenAge = now - parseInt(timestamp, 10);
+    if (tokenAge > 5 * 60 * 1000) {
+      console.log('[Artifact Print Token] Token expired');
+      return null;
+    }
+
+    // Verify signature
+    const payload = `artifact:${artifactId}:${timestamp}`;
+    const expectedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    if (signature !== expectedSignature) {
+      console.log('[Artifact Print Token] Invalid signature');
+      return null;
+    }
+
+    return artifactId;
+  } catch (error) {
+    console.error('[Artifact Print Token] Verification error:', error);
+    return null;
+  }
+}
+
+/**
+ * Render a single artifact to PDF using Puppeteer
+ * @param artifactId - Artifact ID
+ * @param baseUrl - Base URL for the application
+ * @param printToken - Optional pre-generated print token
+ */
+export async function renderArtifactToPdf(
+  artifactId: string,
+  baseUrl: string,
+  printToken?: string
+): Promise<Buffer> {
+  const token = printToken || generateArtifactPrintToken(artifactId);
+  const url = `${baseUrl}/artifact/${artifactId}?print=true&token=${token}`;
+
+  return renderUrlToPdf(url, {
+    waitForSelector: '[data-artifact-content]', // Wait for artifact content
+    additionalWaitMs: 10000, // Extra time for watermarking and image loading
+    format: 'Letter',
+    printBackground: true,
+    margin: { top: '0.25in', right: '0.25in', bottom: '0.25in', left: '0.25in' },
+  });
 }

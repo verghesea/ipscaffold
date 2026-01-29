@@ -174,6 +174,33 @@ function requireAuthOrPrintToken(req: Request, res: Response, next: NextFunction
   requireAuth(req, res, next);
 }
 
+// Middleware for artifacts that allows either normal auth OR a valid artifact print token
+function requireAuthOrArtifactPrintToken(req: Request, res: Response, next: NextFunction) {
+  // Check for artifact print token first
+  const printToken = req.query.token as string | undefined;
+  console.log('[Artifact Auth] Checking print token:', !!printToken);
+
+  if (printToken) {
+    console.log('[Artifact Auth] Verifying print token for artifact:', req.params.id);
+    const { verifyArtifactPrintToken } = require('./services/htmlToPdfService');
+    const artifactId = verifyArtifactPrintToken(printToken);
+    console.log('[Artifact Auth] Token verified for artifact:', artifactId);
+
+    if (artifactId && artifactId === req.params.id) {
+      // Valid print token - allow access without normal auth
+      console.log('[Artifact Auth] Print token valid - allowing access');
+      req.user = undefined; // No user context for print mode
+      return next();
+    } else {
+      console.log('[Artifact Auth] Print token invalid or artifact ID mismatch');
+    }
+  }
+
+  // Fall back to normal authentication
+  console.log('[Artifact Auth] Falling back to normal authentication');
+  requireAuth(req, res, next);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1149,6 +1176,81 @@ export async function registerRoutes(
   });
 
   // PDF Export: Download single artifact as PDF
+  // Get artifact data (with print token support for PDF generation)
+  app.get('/api/artifact/:id', requireAuthOrArtifactPrintToken, async (req, res) => {
+    try {
+      const artifactId = req.params.id;
+      const artifact = await supabaseStorage.getArtifact(artifactId);
+
+      if (!artifact) {
+        return res.status(404).json({ error: 'Artifact not found' });
+      }
+
+      // If user is authenticated, check ownership
+      if (req.user) {
+        const patent = await supabaseStorage.getPatent(artifact.patent_id);
+        if (!patent || patent.user_id !== req.user.id) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      }
+
+      // Get patent data for context
+      const patent = await supabaseStorage.getPatent(artifact.patent_id);
+
+      // If print mode (has token query param), include images
+      const isPrintMode = !!req.query.token;
+      let artifactWithImages;
+
+      if (isPrintMode) {
+        console.log('[API] Print mode detected for artifact, fetching images');
+
+        const { data: images } = await supabaseAdmin
+          .from('section_images')
+          .select('*')
+          .eq('artifact_id', artifactId)
+          .order('section_number', { ascending: true });
+
+        artifactWithImages = {
+          id: artifact.id,
+          type: artifact.artifact_type,
+          content: artifact.content,
+          tokensUsed: artifact.tokens_used,
+          generationTime: artifact.generation_time_seconds,
+          createdAt: artifact.created_at,
+          images: images || [],
+        };
+
+        console.log('[API] Loaded images for artifact:', {
+          artifactId,
+          imageCount: (images || []).length,
+        });
+      } else {
+        artifactWithImages = {
+          id: artifact.id,
+          type: artifact.artifact_type,
+          content: artifact.content,
+          tokensUsed: artifact.tokens_used,
+          generationTime: artifact.generation_time_seconds,
+          createdAt: artifact.created_at,
+        };
+      }
+
+      res.json({
+        artifact: artifactWithImages,
+        patent: {
+          id: patent.id,
+          title: patent.title,
+          friendlyTitle: patent.friendly_title,
+          publication_number: patent.publication_number,
+          assignee: patent.assignee,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching artifact:', error);
+      res.status(500).json({ error: 'Failed to fetch artifact' });
+    }
+  });
+
   app.get('/api/artifact/:id/pdf', requireAuth, async (req, res) => {
     try {
       const artifactId = req.params.id;
@@ -1165,17 +1267,24 @@ export async function registerRoutes(
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Generate PDF
-      const pdfResult = await generateArtifactPDF(artifactId, {
-        includeImages: true,
-        watermarkImages: true,
-      });
+      // Get base URL for rendering
+      const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 5000}`;
+      console.log('[Artifact PDF] Using HTML-to-PDF rendering with base URL:', baseUrl);
+
+      // Generate PDF from actual web page using Puppeteer
+      const { renderArtifactToPdf } = require('./services/htmlToPdfService');
+      const pdfBuffer = await renderArtifactToPdf(artifactId, baseUrl);
+
+      const filename = `${patent.friendly_title || patent.title || 'artifact'}-${artifact.artifact_type}.pdf`
+        .replace(/[^a-z0-9-]/gi, '-')
+        .replace(/-+/g, '-')
+        .toLowerCase();
 
       // Send PDF as download
-      res.setHeader('Content-Type', pdfResult.mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${pdfResult.filename}"`);
-      res.setHeader('Content-Length', pdfResult.buffer.length);
-      res.send(pdfResult.buffer);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
 
     } catch (error) {
       console.error('Artifact PDF generation error:', error);
