@@ -94,21 +94,37 @@
   * {
     @apply border-border;
   }
+
+  /* Prevent horizontal overflow on mobile */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   body {
     @apply font-body antialiased bg-background text-foreground;
   }
+
+  /* Constrain container to viewport */
+  .container {
+    max-width: 100%;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-display font-semibold text-primary-900 tracking-tight;
   }
+
+  /* Mobile-first heading sizes */
   h1 {
-    @apply text-5xl md:text-6xl lg:text-7xl;
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl;
   }
   h2 {
-    @apply text-4xl md:text-5xl;
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl;
   }
   h3 {
-    @apply text-2xl md:text-3xl;
+    @apply text-xl sm:text-2xl md:text-3xl;
   }
+
   .label {
     @apply font-mono text-xs uppercase tracking-widest text-muted-foreground;
   }

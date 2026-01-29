@@ -18,7 +18,7 @@ export function LandingPage() {
                 AI-Powered IP Analysis
               </div>
               
-              <h1 className="font-display font-bold text-5xl md:text-7xl leading-[1.1] text-primary-900 tracking-tight" data-testid="text-hero-title">
+              <h1 className="font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-7xl leading-[1.1] text-primary-900 tracking-tight" data-testid="text-hero-title">
                 Transform Patents into <br className="hidden md:block" />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-900 via-primary-700 to-accent-600">
                   Business Assets

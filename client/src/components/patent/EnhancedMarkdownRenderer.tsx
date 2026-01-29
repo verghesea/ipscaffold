@@ -54,7 +54,7 @@ function renderLineContent(line: string): React.ReactNode {
 // Section content renderer
 function SectionContent({ lines }: { lines: string[] }) {
   return (
-    <div className="bg-white p-6 sm:p-8 border-l-[3px] border-[#2563eb] shadow-sm">
+    <div className="bg-white p-4 sm:p-6 md:p-8 border-l-[3px] border-[#2563eb] shadow-sm">
       {lines.map((line, i) => {
         // Skip ## headers (rendered separately)
         if (line.match(/^##\s+/)) return null;
@@ -71,7 +71,7 @@ function SectionContent({ lines }: { lines: string[] }) {
         // Handle bullet points
         if (line.trim().startsWith('- ')) {
           return (
-            <li key={i} className="ml-8 mb-2 text-gray-700 leading-relaxed list-disc marker:text-[#2563eb]">
+            <li key={i} className="ml-4 sm:ml-6 md:ml-8 mb-2 text-gray-700 leading-relaxed list-disc marker:text-[#2563eb]">
               {renderLineContent(line.replace(/^[\s]*- /, ''))}
             </li>
           );

@@ -501,8 +501,9 @@ export function DashboardPage() {
                   })}
                 </div>
               ) : (
-                <Card>
-                  <Table>
+                <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                  <Card className="min-w-[700px] sm:min-w-0">
+                    <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[35%]">Title</TableHead>
@@ -549,7 +550,8 @@ export function DashboardPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </Card>
+                  </Card>
+                </div>
               )}
             </div>
 
