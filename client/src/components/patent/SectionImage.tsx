@@ -9,7 +9,6 @@ import { RefreshCw, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SectionImage as SectionImageType } from '@/lib/api';
 import { PromptDetailsModal } from './PromptDetailsModal';
-import { ImageWatermark } from './ImageWatermark';
 
 interface SectionImageProps {
   image: SectionImageType;
@@ -46,10 +45,8 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
   const [imageError, setImageError] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
 
-  // In print mode, use watermarked image URL
-  const imageUrl = printMode
-    ? `/api/image/watermarked?url=${encodeURIComponent(image.image_url)}`
-    : image.image_url;
+  // Always use watermarked image URL (Humble logo watermark)
+  const imageUrl = `/api/image/watermarked?url=${encodeURIComponent(image.image_url)}`;
 
   const handleRegenerate = async () => {
     if (!onRegenerate || regenerating) return;
@@ -124,8 +121,7 @@ export function SectionImage({ image, onRegenerate, onPromptUpdate, isAdmin = fa
                   onImageErrorProp?.();
                 }}
               />
-              {/* Non-destructive watermark overlay (CSS-based, hidden in print mode where server watermark is used) */}
-              {!printMode && <ImageWatermark />}
+              {/* Watermark is embedded by server via /api/image/watermarked endpoint */}
             </>
           )}
 
