@@ -84,19 +84,21 @@ export async function generateArtifactImagesParallel(
             sectionContent: task.sectionContent,
           });
 
-          // Upload to Supabase Storage
-          const storedImageUrl = await uploadImageFromUrl(
+          // Upload to Supabase Storage - BOTH original and watermarked versions
+          const { originalUrl, watermarkedUrl } = await uploadImageFromUrl(
             imageResult.imageUrl,
             task.artifactId,
-            task.sectionNumber
+            task.sectionNumber,
+            true // Upload both versions with watermarking
           );
 
-          // Save to database
+          // Save to database with BOTH URLs
           await supabaseStorage.upsertSectionImage({
             artifact_id: task.artifactId,
             section_number: task.sectionNumber,
             section_title: task.sectionTitle,
-            image_url: storedImageUrl,
+            image_url: watermarkedUrl, // Use watermarked version by default
+            original_image_url: originalUrl, // Keep original for admin/re-watermarking
             prompt_used: imageResult.promptUsed,
             image_title: imageResult.imageTitle, // Claude-generated descriptive title
             generation_metadata: {
