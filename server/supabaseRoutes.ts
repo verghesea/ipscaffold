@@ -1020,6 +1020,57 @@ export async function registerRoutes(
 
       const artifacts = await supabaseStorage.getArtifactsByPatent(patentId);
 
+      // If print mode (has token query param), include all images for each artifact
+      const isPrintMode = !!req.query.token;
+      let artifactsWithImages;
+
+      if (isPrintMode) {
+        console.log('[API] Print mode detected, fetching images for all artifacts');
+
+        // Fetch images for all artifacts in parallel
+        const imagesPromises = artifacts.map(async (artifact) => {
+          const { data: images } = await supabaseAdmin
+            .from('section_images')
+            .select('*')
+            .eq('artifact_id', artifact.id)
+            .order('section_number', { ascending: true });
+
+          return {
+            artifactId: artifact.id,
+            images: images || [],
+          };
+        });
+
+        const allImages = await Promise.all(imagesPromises);
+        const imagesMap = Object.fromEntries(
+          allImages.map(item => [item.artifactId, item.images])
+        );
+
+        artifactsWithImages = artifacts.map(a => ({
+          id: a.id,
+          type: a.artifact_type,
+          content: a.content,
+          tokensUsed: a.tokens_used,
+          generationTime: a.generation_time_seconds,
+          createdAt: a.created_at,
+          images: imagesMap[a.id] || [], // Include images array in print mode
+        }));
+
+        console.log('[API] Loaded images for artifacts:', allImages.map(item => ({
+          artifactId: item.artifactId,
+          imageCount: item.images.length,
+        })));
+      } else {
+        artifactsWithImages = artifacts.map(a => ({
+          id: a.id,
+          type: a.artifact_type,
+          content: a.content,
+          tokensUsed: a.tokens_used,
+          generationTime: a.generation_time_seconds,
+          createdAt: a.created_at,
+        }));
+      }
+
       res.json({
         patent: {
           id: patent.id,
@@ -1034,15 +1085,9 @@ export async function registerRoutes(
           patentClassification: patent.patent_classification,
           status: patent.status,
           createdAt: patent.created_at,
+          publication_number: patent.publication_number,
         },
-        artifacts: artifacts.map(a => ({
-          id: a.id,
-          type: a.artifact_type,
-          content: a.content,
-          tokensUsed: a.tokens_used,
-          generationTime: a.generation_time_seconds,
-          createdAt: a.created_at,
-        })),
+        artifacts: artifactsWithImages,
       });
 
     } catch (error) {

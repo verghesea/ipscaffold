@@ -58,23 +58,27 @@ function PrintArtifactSection({
   artifactIndex,
   meta,
   onRegenerateImage,
-  onUpdateImagePrompt
+  onUpdateImagePrompt,
+  preloadedImages
 }: {
   artifact: Artifact;
   artifactIndex: number;
   meta: typeof ARTIFACT_TYPES[keyof typeof ARTIFACT_TYPES];
   onRegenerateImage: (sectionNumber: number) => Promise<void>;
   onUpdateImagePrompt: (imageId: string, newPrompt: string) => Promise<void>;
+  preloadedImages?: any[];
 }) {
-  // Load images for this specific artifact
-  const { images, loading } = useSectionImages(artifact.id);
+  // Use preloaded images from artifact data (for print mode) or fetch them (for normal mode)
+  const shouldFetch = !preloadedImages;
+  const { images: fetchedImages, loading } = useSectionImages(shouldFetch ? artifact.id : undefined);
+  const images = preloadedImages || fetchedImages;
   const sectionCount = countSections(artifact.content);
 
   return (
     <div
       className="print-artifact mt-6"
       data-artifact-content
-      data-images-loaded={!loading}
+      data-images-loaded={preloadedImages ? "true" : (!loading).toString()}
       data-image-count={images.length}
     >
       {/* Graph paper background container */}
@@ -593,6 +597,7 @@ export function PatentDetailPage() {
                         meta={meta}
                         onRegenerateImage={handleRegenerateImage}
                         onUpdateImagePrompt={handleUpdateImagePrompt}
+                        preloadedImages={(artifact as any).images}
                       />
                     );
                   })}

@@ -201,6 +201,10 @@ export async function renderUrlToPdf(
 
     // Wait for all artifacts to finish loading their images
     console.log('[HTML-to-PDF] Waiting for artifacts to load images...');
+
+    // First, wait a bit for React to mount all components
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
     try {
       await page.waitForFunction(
         () => {
@@ -231,7 +235,7 @@ export async function renderUrlToPdf(
 
           return allLoaded;
         },
-        { timeout: 60000 } // Increased to 60 second timeout
+        { timeout: 90000 } // Increased to 90 second timeout to account for 3 sequential API calls
       );
       console.log('[HTML-to-PDF] All artifact images loaded successfully');
     } catch (error) {
