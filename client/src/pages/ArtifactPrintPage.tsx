@@ -48,6 +48,8 @@ export function ArtifactPrintPage() {
   const [artifact, setArtifact] = useState<any>(null);
   const [patent, setPatent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [loadedImageCount, setLoadedImageCount] = useState(0);
 
   // Check if we're in print mode
   const isPrintMode = new URLSearchParams(window.location.search).get('print') === 'true';
@@ -89,6 +91,38 @@ export function ArtifactPrintPage() {
       loadArtifact(params.id);
     }
   }, [params?.id]);
+
+  // Track when all images have loaded
+  useEffect(() => {
+    if (!artifact || !artifact.images) return;
+
+    const totalImages = artifact.images.length;
+
+    // If no images, mark as loaded immediately
+    if (totalImages === 0) {
+      setImagesLoaded(true);
+      console.log('[ArtifactPrintPage] No images to load');
+      return;
+    }
+
+    // Check if all images are loaded
+    if (loadedImageCount >= totalImages) {
+      setImagesLoaded(true);
+      console.log('[ArtifactPrintPage] All images loaded:', loadedImageCount, '/', totalImages);
+    } else {
+      console.log('[ArtifactPrintPage] Images loading:', loadedImageCount, '/', totalImages);
+    }
+  }, [artifact, loadedImageCount]);
+
+  const handleImageLoad = () => {
+    setLoadedImageCount(prev => prev + 1);
+  };
+
+  const handleImageError = () => {
+    // Count errors as "loaded" so we don't wait forever
+    setLoadedImageCount(prev => prev + 1);
+    console.warn('[ArtifactPrintPage] Image failed to load');
+  };
 
   if (loading || !artifact || !patent) {
     return (
@@ -172,7 +206,7 @@ export function ArtifactPrintPage() {
       <div
         className="print-artifact"
         data-artifact-content
-        data-images-loaded="true"
+        data-images-loaded={imagesLoaded.toString()}
         data-image-count={images.length}
       >
         <div className="relative bg-white shadow-lg overflow-hidden">
@@ -202,6 +236,8 @@ export function ArtifactPrintPage() {
               onUpdateImagePrompt={undefined}
               isAdmin={false}
               printMode={true}
+              onImageLoad={handleImageLoad}
+              onImageError={handleImageError}
             />
           </div>
         </div>
