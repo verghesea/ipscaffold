@@ -874,6 +874,56 @@ export class SupabaseStorage {
       throw new Error(`Failed to delete waitlist entry: ${error.message}`);
     }
   }
+
+  // Payment methods
+  async createPayment(payment: {
+    user_id: string;
+    stripe_session_id: string;
+    stripe_payment_intent_id: string;
+    amount_cents: number;
+    currency: string;
+    status: string;
+    product_key: string;
+    credits_awarded: number;
+    metadata?: Record<string, any>;
+  }): Promise<any> {
+    const { data, error } = await supabaseAdmin
+      .from('payments')
+      .insert({
+        user_id: payment.user_id,
+        stripe_session_id: payment.stripe_session_id,
+        stripe_payment_intent_id: payment.stripe_payment_intent_id,
+        amount_cents: payment.amount_cents,
+        currency: payment.currency,
+        status: payment.status,
+        product_key: payment.product_key,
+        credits_awarded: payment.credits_awarded,
+        metadata: payment.metadata || {},
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to create payment: ${error.message}`);
+    return data;
+  }
+
+  async getPaymentsByUser(userId: string): Promise<any[]> {
+    const { data, error } = await supabaseAdmin
+      .from('payments')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return data || [];
+  }
+
+  async updatePaymentStatus(stripeSessionId: string, status: string): Promise<void> {
+    await supabaseAdmin
+      .from('payments')
+      .update({ status })
+      .eq('stripe_session_id', stripeSessionId);
+  }
 }
 
 export const supabaseStorage = new SupabaseStorage();

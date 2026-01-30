@@ -18,6 +18,7 @@ import {
   getPendingCorrectionCounts,
   type PatternSuggestion,
 } from "./services/patternLearningService";
+import { registerPaymentRoutes } from "./paymentRoutes";
 
 declare global {
   namespace Express {
@@ -2814,6 +2815,9 @@ export async function registerRoutes(
       res.status(500).json({ error: 'Failed to update prompt' });
     }
   });
+
+  // Register payment routes (Stripe integration)
+  registerPaymentRoutes(app, requireAuth);
 
   return httpServer;
 }

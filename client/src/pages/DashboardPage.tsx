@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { createAvatar } from '@dicebear/core';
 import { shapes } from '@dicebear/collection';
 import { analytics } from '@/lib/analytics';
+import { BuyCreditsDialog } from '@/components/BuyCreditsDialog';
 
 export function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -32,6 +33,30 @@ export function DashboardPage() {
   useEffect(() => {
     loadDashboard();
   }, []); // Empty deps - run once on mount
+
+  // Handle payment redirects (success or cancelled)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+
+    if (paymentStatus === 'success') {
+      toast({
+        title: 'Payment Successful!',
+        description: 'Your credits have been added to your account.',
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/dashboard');
+      // Reload to get updated credits
+      loadDashboard();
+    } else if (paymentStatus === 'cancelled') {
+      toast({
+        title: 'Payment Cancelled',
+        description: 'Your payment was cancelled. No charges were made.',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, []);
 
   // Auto-refresh hero images every 15 seconds for recently completed patents
   useEffect(() => {
@@ -400,6 +425,7 @@ export function DashboardPage() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                <BuyCreditsDialog />
                 </div>
               </div>
 

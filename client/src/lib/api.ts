@@ -968,4 +968,45 @@ export const api = {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   },
+
+  // Payment methods (Stripe integration)
+  async createCheckoutSession(productKey: string): Promise<{ url: string }> {
+    const response = await fetch('/api/payments/create-checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ productKey }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create checkout');
+    }
+
+    return response.json();
+  },
+
+  async getPaymentHistory(): Promise<{ payments: any[] }> {
+    const response = await fetch('/api/payments/history', {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load payment history');
+    }
+
+    return response.json();
+  },
+
+  async getProducts(): Promise<{ products: any[] }> {
+    const response = await fetch('/api/payments/products');
+
+    if (!response.ok) {
+      throw new Error('Failed to load products');
+    }
+
+    return response.json();
+  },
 };
